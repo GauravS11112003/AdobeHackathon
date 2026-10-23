@@ -25,4 +25,4 @@ output/*
 eval/data/
 
 # VLM weights (GGUF, several GB) are fetched at Docker build time, see Dockerfile
-models/
+/models/
