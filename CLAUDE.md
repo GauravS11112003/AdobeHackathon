@@ -130,6 +130,13 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
 - Best hint for the unpublished model cap: the same organizer's 2025 India round allowed <= 200 MB models,
   <= 10 s per task, 8 CPUs / 16 GB. Keep any learned component small.
 
+## Version control
+- Git repo rooted at AdobeHack/, remote https://github.com/GauravS11112003/AdobeHackathon (private), branch main.
+  The starter's own .git was removed; upstream commit noted in chameleon/UPSTREAM.md.
+- Worker sessions do NOT commit or switch branches; the coordinating session commits verified work with
+  descriptive messages. .gitignore excludes .venv, eval/data, models/, output, reference/, .claude/.
+- Keep the repo private until after the stage-one deadline (2026-10-30).
+
 ## Conventions
 - System `python3` is 3.9 and too old for cr-renderer. Use the venv: `chameleon/.venv` (Python 3.11 from
   `~/.local/bin/python3.11`). Run everything from inside `chameleon/` as `.venv/bin/python -m engine.main`.
