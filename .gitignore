@@ -1,0 +1,24 @@
+# Environments and caches
+chameleon/.venv/
+**/__pycache__/
+**/.pytest_cache/
+.DS_Store
+
+# Generated run artifacts
+chameleon/output/*
+!chameleon/output/.gitkeep
+
+# Eval harness cache (Crello slice, converted designs, run results) — regenerate with eval.crello_convert / run_eval
+chameleon/eval/data/
+
+# Model weights (fetched at Docker build time)
+chameleon/models/
+
+# Other teams' public repos, kept locally for reference only — never publish
+reference/
+
+# Local app config
+.claude/launch.json
+
+# App-local config and skills
+.claude/
