@@ -14,7 +14,6 @@ chameleon/eval/data/
 # Model weights (fetched at Docker build time)
 chameleon/models/
 
-# Other teams' public repos, kept locally for reference only — never publish
 reference/
 
 # Local app config
