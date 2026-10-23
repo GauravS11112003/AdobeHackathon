@@ -113,7 +113,10 @@ def build_cases(index: list[dict[str, Any]], presets: list[tuple[str, int, int]]
     by_id = {d["id"]: d for d in index}
     cases = []
     for d in index:
-        for name, w, h in presets:
+        # a design may carry its own target list (eval/synth.py nasty cases:
+        # 1x1, 4000x4000, identical, +3 % ...) instead of the preset catalogue
+        own = [(f"own:{t['name']}", int(t["width"]), int(t["height"])) for t in d.get("targets") or []]
+        for name, w, h in own or presets:
             cases.append({"key": f"{d['id']}|{name}", "design": d, "preset": name,
                           "target": {"width": w, "height": h}, "gt_id": None})
         if with_gt:
@@ -154,6 +157,12 @@ def run_case(case: dict[str, Any], data_dir: str, outputs_dir: str | None) -> di
         "n_elements": d.get("n_elements"), "n_text": d.get("n_text"), "gt_id": case.get("gt_id"),
         "error": "",
     }
+    if d.get("props"):
+        row["props"] = d["props"]
+        for k, v in d["props"].items():
+            row[f"prop.{k}"] = v
+    if d.get("synthetic"):
+        row["synthetic"] = True
     sx = target["width"] / d["canvas"]["width"]
     sy = target["height"] / d["canvas"]["height"]
     row["ratio_change"] = round(max(sx, sy) / min(sx, sy), 3)
@@ -410,6 +419,8 @@ def write_outputs(run_dir: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def run(args: argparse.Namespace) -> Path:
     data_dir = Path(args.data_dir)
+    if args.synthetic and args.name == "full":
+        args.name = "synth"
     run_dir = Path(args.out) if args.out else RUNS_DIR / args.name
     run_dir.mkdir(parents=True, exist_ok=True)
     outputs_dir = run_dir / "outputs"
@@ -425,6 +436,18 @@ def run(args: argparse.Namespace) -> Path:
         logger.info("summarised %d cases -> %s", len(rows), run_dir)
         print(summary_markdown(s))
         return run_dir
+
+    if args.synthetic:
+        # generate the corpus into its own data dir (designs/ + index.json)
+        # unless the user pointed --data-dir somewhere explicitly
+        from eval.synth import SYNTH_DIR, write_corpus
+
+        if data_dir == DATA_DIR:
+            data_dir = SYNTH_DIR
+        index_rows = write_corpus(data_dir, args.synthetic, args.seed, with_nasty=not args.no_nasty)
+        logger.info("synthetic corpus: %d designs (seed %d) -> %s", len(index_rows), args.seed, data_dir)
+        args.no_samples = True
+        args.no_gt = True
 
     presets = load_presets()
     if args.presets:
@@ -503,6 +526,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-samples", action="store_true", help="do not add the three shipped samples")
     ap.add_argument("--samples-only", action="store_true", help="only the three shipped samples")
     ap.add_argument("--summarize-only", action="store_true")
+    ap.add_argument("--synthetic", type=int, default=0, metavar="N",
+                    help="generate N designs with eval/synth.py (plus the nasty cases) into "
+                         "eval/data/synth/ and evaluate those instead of the Crello index")
+    ap.add_argument("--seed", type=int, default=1, help="seed for --synthetic")
+    ap.add_argument("--no-nasty", action="store_true", help="--synthetic without the nasty cases")
     ap.add_argument("--log-every", type=float, default=15.0, help="seconds between progress lines")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)

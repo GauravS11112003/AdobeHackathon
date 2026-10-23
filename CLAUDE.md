@@ -104,6 +104,52 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   contact sheet of every candidate with its score breakdown.
 - Renderer facts: text is NOT vertically centered or clipped in its box; a single over-wide word overflows;
   drawing uses int(font_size). Comparison renders of each milestone go in `docs/<milestone>/`.
+- **v3 rule upgrades (2026-10-23, docs/EVAL_V3.md, tests/test_v3_rules.py)**, borrowed from the rivals in
+  docs/COMPETITORS.md:
+  - `contrast.py` — no-render contrast estimate: the layers under each text's painted box are composited
+    from the JSON (canvas white, shapes with fill alpha × opacity, ellipses inside only, image assets sampled
+    through their `fit`, missing asset = the renderer's grey placeholder) at a 32×8 grid; a text's ratio is the
+    25th percentile of the WCAG ratios of its colour (and style-run colours covering ≥ 10 %) at those points,
+    `busy` the spread of the composited colours. numpy (ships with skia) does the arithmetic; without it the
+    estimate is empty and the scorer stays neutral. ~1 ms per design vs ~70 ms for a render; log-ratio
+    correlation with the render-based check 0.97 on 300 eval cases (`eval/contrast_check.py`).
+  - Judge loop is two-stage (`resize.judge`): every candidate scored without pixels (estimate), then the top
+    `TOP_RENDER` (3) re-scored with a text-less render that refines ratio / busyness. Contrast hard fail is the
+    *drop rule*: headline / CTA ratio < 3 **and** < 0.5 × the same text's ratio in the source (`Analysis.
+    source_contrast`), so stand-in assets and loosely built sources are not our fault.
+  - `analyze.py` units beyond `group_id` (union-find): *holder* (text ≥ 80 % inside a shape / flat image
+    drawn below it: one label in a pill ≤ 12 % of the canvas, or several short lines in a sticker ≤ 6 %;
+    a bigger shape holding text becomes a PANEL), *frame* (shape of about a photo's size behind it, unit keeps
+    the photo's role), *host* (a thin bar or a shape inside the box of a single text / image, ≤ 3 per host,
+    tested against the host element itself so bars never chain), absorbed decorations, *sibling rows*
+    (≥ 2 chip-like units of one role, similar height, side by side → one `kind="row"` unit with `parts`).
+    `Unit.kind/primary/attachments/parts`; `is_group` now means "more than one element". One CTA per design:
+    a one-label pill at least as wide as tall beats a free text that looked like one. Reading order, panel
+    carry and anchors unchanged.
+  - `floorplan.py`: `_TextItem` footprints are the *painted* extent (`TextMeasurer.painted`: caps start
+    ascent − 0.78·fs below the box top, last baseline + descender only when the text has descenders) plus
+    the attachments, which keep their offset from the painted top/bottom in font units; a letter-spaced line
+    wider than its budget at the floor widens its box so the planned font really fits. Floors:
+    `Metrics.min_font` = max(old rule, 0.85 % of the long side × {legal 0.7, badge 0.8}); logo ≥ 0.14,
+    hero ≥ 0.30, stamp ≥ 0.08 of the short side (`*_FLOOR_FRAC`, on the unit's larger dimension, capped by the
+    slot); chips keep up to 18 % of the canvas height when they were big in the source. *Rescue mode*
+    (`_Item.relax`, `RESCUE_FACTOR`): when even the floors do not fit, secondary / minor floors drop to 0.55×
+    (headline, logo, CTA keep theirs) before the plan is allowed to overflow. Button squeeze allows 3 lines at
+    the floor and a last resort at the floor whatever the height. Row parts in `chips=corner` alternate the two
+    corners of their edge. `resize._keep_headline_largest` caps any text that was smaller than the headline in
+    the source at the headline's output size.
+  - `rectify.py` / `score.py` source-relative rules: `unwanted_overlaps` flags a pair only when its overlap
+    (fraction of the smaller visible box, per part of a row) exceeds the source's by > `OVERLAP_TOL` (1.5 pp);
+    off-canvas is excused up to the bleed the source had (+1 %); a headline / CTA is below the floor only if it
+    also shrank below 0.98 × source font × canvas scale (`score.below_floor`, shared with eval/metrics);
+    `faith.hierarchy` adds the role-rank rule (higher role keeps ≥ min(0.82, source ratio) of the lower one).
+    Penalties outside the 0–100 breakdown (`Score.penalty`): anchor strategy on ratio change ≥ 1.75 pays
+    `ADAPT_PENALTY` (18; it still wins when it is the only clean candidate), a floor plan on ratio change
+    < 1.25 pays up to `DISRUPT_PENALTY` (4, linear to 0) so an identity resize stays the identity.
+    `SMALL_CHANGE_MAX` is 1.75. Layout metrics (balance, alignment, fill, margins) use visible boxes.
+  - Dev tools in `eval/`: `sanity_sheet.py <design> <dir>` (all-preset contact sheet, docs/sanity_v3),
+    `contrast_check.py`, `remeasure.py` (re-judge an old run's outputs under the current metrics, used for
+    the v2 baseline), `compare_runs.py` (before/after table on common cases).
 
 ## Playground (dev tool, not shipped)
 - `chameleon/tools/playground.py` serves a local UI at http://localhost:8765: pick a sample, upload or paste a
@@ -172,3 +218,39 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
 - `eval/report.py --run full --worst 30 [--notes file.md]` renders source/output contact sheets of the
   worst cases into `docs/eval_v1/` and writes `docs/EVAL_V1.md` (summary tables, auto patterns,
   hand-written notes). Tests: `tests/test_eval.py`.
+- **Synthetic adversarial corpus** (`eval/synth.py`, results in docs/EVAL_SYNTH.md): a seeded generator of
+  schema-valid designs with controllable properties (2-45 elements, all four source families, image/shape/no
+  background, text panels, logo in any corner, hero present/absent/missing asset, headlines from two words to
+  140+ chars incl. unbreakable words, 0-4 subheads, free or grouped CTA with insets, 0-6 badges in rows, rotated
+  ribbons/badges/headlines, decorative ellipses bleeding off canvas, letter spacing, line height, style_runs,
+  max_lines, text_align, z ties, tiny elements, shadow headlines) plus `nasty_cases()` (empty content, font
+  0.5/400, zero-size, negative coords, all assets missing, one element, one group, required fields only,
+  rotation 725, unicode, 45 elements, targets 1x1 / 4000x4000 / identical / +3 %). Every property is recorded
+  in `props` so the report slices defect rates by it. Text boxes are sized with the engine's measurer so the
+  sources fit (except deliberate `src_overflow` / `src_overfull`). ids are opaque hex, no role hints.
+  `.venv/bin/python -m eval.run_eval --synthetic 200 --seed 1 --workers 4 --name synth` writes the corpus to
+  `eval/data/synth/` and runs it through the same metrics (nasty cases use their own `targets` instead of
+  the presets, `own:<name>`); `.venv/bin/python -m eval.synth_report --run synth --worst 30 --notes
+  eval/notes_synth.md --meta <file>` writes docs/EVAL_SYNTH.md (per-property tables, nasty table, failure
+  groups, worst-30 sheets in docs/eval_synth/). ~3 min with 4 workers.
+- **Metamorphic tests** (`tests/test_metamorphic.py`, rendering off): contract on the corpus and the nasty cases
+  (never crash, ids/order, immutables, aspect, on canvas, text boxes >= 1 px, no uniform-scale fallback),
+  determinism, opaque ids (renaming), element-order shuffle, group translation. Identity, +3 % width and 2x
+  source scale are *xfail* today (reasons in the file / docs/EVAL_SYNTH.md) with an aggregate pass-rate floor
+  (`test_relation_pass_rate_does_not_regress`) so regressions still fail. ~25 s.
+
+## Learned role classifier (S4, dev + shipped; docs/ROLE_MODEL.md)
+- `engine/role_features.py` (123 id-free per-element features, ~2 ms), `engine/role_model.py`
+  (`predict(source) -> {id: (role, confidence)}`, `predict_proba`, `text_hierarchy`; numpy-only traversal
+  of complete depth-6 trees in `engine/models/roles.npz`, < 3 ms per design, deterministic; returns `{}` if
+  numpy or the file is missing) and `engine/role_merge.py` (`merged_roles` / `apply_to_analysis`: rules +
+  model by confidence, background/panel/decorative and all shapes stay with the rules, groups and analyzer
+  units vote with their texts, one headline / hero / logo / CTA afterwards). Gated by `CHAMELEON_ROLE_MODEL`
+  (default 0 = rule roles untouched); **not wired into resize.py yet**, the one-liner is in the docs §6.
+- Labels: DesignAsCode themes (HF `Tony1109/DesignAsCode-training-data`, Crello train split only) mapped by
+  `tools/role_labels.py`; data via `tools/build_role_dataset.py` (needs `eval/data/raw/train-*.parquet`,
+  ~10 min per shard to fetch, run workers in parallel), training/export `tools/train_role_model.py`
+  (scikit-learn, dev only; checks the numpy path against `predict_proba`), evaluation
+  `tools/eval_role_model.py` (samples with ids stripped, Boynton, agreement with the rules),
+  tables `tools/role_model_report.py`. Tests: `tests/test_role_model.py` (offline, tiny fixture in
+  `tests/fixtures/roles_tiny*`). Changing `FEATURE_NAMES` requires rebuilding the dataset and retraining.
