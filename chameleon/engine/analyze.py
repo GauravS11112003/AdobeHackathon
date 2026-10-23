@@ -4,9 +4,24 @@ Hidden tasks give us only id / type / geometry, so every role here is
 inferred from signals (size, position, opacity, grouping, font size,
 text length, colour), never from element ids.
 
-Output is an `Analysis`: a list of layout `Unit`s (an ungrouped element, or
-a whole `group_id` treated as one piece of furniture), each tagged with a
-role, an importance weight, and the canvas edges it hugs.
+Output is an `Analysis`: a list of layout `Unit`s, each tagged with a role,
+an importance weight, and the canvas edges it hugs. A unit is one piece of
+furniture that travels through every layout as one thing. Beyond the
+schema's `group_id`, units are found by union-find over these relations:
+
+  holder    a text that sits (>= 80 %) inside a small flat shape or a flat
+            image drawn below it: a label in its pill, a date in its square.
+            The tightest holder wins. Such a unit scales uniformly (group).
+  frame     a photo inside a shape of about its own size: the frame travels
+            with the photo and the unit keeps the photo's role (hero/logo).
+  host      a small shape that sits on, or just above / below, a bigger
+            unit (an underline bar under a heading, a divider line, a
+            sticker on a photo) is *attached* to it: the host keeps its
+            own role and the attachment keeps its position relative to
+            the host's painted extent when the host is re-fitted.
+  absorbed  a decoration drawn >= 80 % inside a unit is attached to it.
+  row       two or more chip-like units of the same role, similar height,
+            side by side become one re-flowable row (`Unit.parts`).
 """
 
 from __future__ import annotations
@@ -68,12 +83,32 @@ PANEL_EDGE = 0.02            # ... or one that runs from one canvas edge to the 
 PANEL_CARRY = 0.5            # a unit sits "on" a panel when this fraction of its box is inside it
 PANEL_TEXT_CONTRAST = 1.5    # text with less contrast against the panel's fill is not carried by it
 
+# Units beyond group_id.
+HOLDER_MAX_AREA = 0.12       # a shape / flat image under this share of the canvas can hold one text ...
+STICKER_MAX_AREA = 0.06      # ... or several short texts when it is sticker-sized (a date block);
+STICKER_MAX_CHARS = 24       # ... (each text at most this long). A bigger shape holding text is a panel.
+CARD_MAX_AREA = 0.25         # a shape up to this share holding text it cannot keep as a unit becomes a panel
+INSIDE_FRAC = 0.80           # member inside its holder / host / unit by at least this much
+FRAME_MAX_RATIO = 1.6        # photo-in-frame: the frame's area is at most this x the photo's
+HOST_MAX_AREA = 0.03         # an attachable shape is at most this share of the canvas ...
+HOST_MAX_REL = 0.6           # ... and at most this fraction of its host's area ...
+HOST_THIN = 4.0              # ... and a bar (aspect >= this) unless it lies inside the host's box
+HOST_GAP = 0.06              # ... and at most this x min(W, H) away from the host
+HOST_X_OVERLAP = 0.5         # ... with at least this share of its width over the host's width
+HOST_MAX_ATTACH = 3          # at most this many attachments per host
+CTA_MIN_ASPECT = 1.0         # a button is at least as wide as it is tall and has one label
+ROW_HEIGHT_TOL = 0.25        # sibling rows: heights within this fraction of each other
+ROW_Y_OVERLAP = 0.6          # ... overlapping vertically by this share of the smaller height
+ROW_MAX_GAP = 1.5            # ... horizontal gap at most this x the taller height
+ROW_ROLES = (BADGE, IMAGE, SHAPE)   # chip-like roles that form rows
+
 
 @dataclass
 class Unit:
-    """One piece of furniture: a single element or a whole group."""
+    """One piece of furniture: a single element, a schema group, an inferred
+    cluster (holder / frame), a host with attachments, or a sibling row."""
 
-    key: str                       # element id, or "group:<group_id>"
+    key: str                       # element id, "group:<group_id>", "unit:<id>" or "row:<id>"
     ids: list[str]
     role: str
     box: Box                       # bbox in source canvas px
@@ -84,10 +119,15 @@ class Unit:
     group_id: str | None = None
     members: dict[str, Box] = field(default_factory=dict)   # id -> source box
     panel: str | None = None       # key of the panel this unit sits on in the source
+    kind: str = "single"           # single | group | host | row
+    primary: str | None = None     # the element the role comes from (single / host units)
+    attachments: list[str] = field(default_factory=list)   # host units: the attached shapes / decorations
+    parts: list["Unit"] = field(default_factory=list)       # row units: the sibling units, left to right
 
     @property
     def is_group(self) -> bool:
-        return self.group_id is not None
+        """More than one element: moves and scales as one piece."""
+        return len(self.ids) > 1
 
     @property
     def is_content(self) -> bool:
@@ -99,6 +139,16 @@ class Unit:
     def is_panel(self) -> bool:
         return self.role == PANEL
 
+    @property
+    def is_row(self) -> bool:
+        return self.kind == "row"
+
+    def primary_type(self, elements: dict[str, dict[str, Any]]) -> str | None:
+        """Type of the element that defines this unit (None for groups / rows)."""
+        if self.primary is None:
+            return None
+        return elements[self.primary]["type"]
+
 
 @dataclass
 class Analysis:
@@ -108,6 +158,9 @@ class Analysis:
     element_unit: dict[str, str]   # element id -> unit key
     headline_font_size: float | None = None
     shape_types: dict[str, str] = field(default_factory=dict)   # shape id -> shape_type
+    source_contrast: dict[str, Any] | None = None   # filled lazily by the scorer (engine/contrast.py)
+    source_elements: dict[str, dict[str, Any]] = field(default_factory=dict)   # id -> source element
+    source_visible: dict[str, list[Box]] | None = None   # unit key -> painted part boxes in the source (rectify fills it)
 
     def unit(self, key: str) -> Unit:
         for u in self.units:
@@ -132,85 +185,107 @@ class Analysis:
 # ---------------------------------------------------------------------------
 
 
+class _Cluster:
+    """A union-find cluster while units are being built."""
+
+    def __init__(self, eid: str):
+        self.ids: list[str] = [eid]
+        self.primary: str | None = eid
+        self.attachments: list[str] = []
+        self.group_id: str | None = None
+        self.kind = "single"          # single | group | host
+
+
 def analyze(source: dict[str, Any]) -> Analysis:
     canvas = Box(0.0, 0.0, float(source["canvas"]["width"]), float(source["canvas"]["height"]))
     elements = source["elements"]
     by_id = {el["id"]: el for el in elements}
+    boxes = {el["id"]: Box.of(el) for el in elements}
+    z = {el["id"]: float(el.get("z_index", i) if el.get("z_index") is not None else i)
+         for i, el in enumerate(elements)}
 
     # 1. Per-element roles for things that are decided individually.
     roles: dict[str, str] = {}
     for el in elements:
         if _is_background(el, canvas):
             roles[el["id"]] = BACKGROUND
-        elif _is_panel(el, canvas):
+        elif _is_panel(el, canvas) and not _frames_image(el, elements, boxes, z):
             roles[el["id"]] = PANEL
         elif _is_decorative(el, canvas):
             roles[el["id"]] = DECORATIVE
+    free = [el for el in elements if el["id"] not in roles]
 
-    # 2. Groups become single units; their role is decided from their members.
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for el in elements:
-        gid = el.get("group_id")
-        if gid and roles.get(el["id"]) is None:
-            groups.setdefault(gid, []).append(el)
+    # 2. Union-find clusters: schema groups, holders, frames, hosts, decorations.
+    clusters = _cluster(free, by_id, boxes, z, canvas, roles)
 
-    # 3. Images: logo / hero / other.
-    free_images = [
-        el for el in elements
-        if el["type"] == "image" and el["id"] not in roles and not el.get("group_id")
-    ]
+    # 3. Roles. Clusters with a primary element are classified like a free
+    #    element of that type; the rest like a schema group.
+    free_images = [by_id[c.primary] for c in clusters
+                   if c.primary is not None and by_id[c.primary]["type"] == "image"]
     _assign_image_roles(free_images, canvas, roles)
-
-    # 4. Free text: headline / subhead / body / cta / fine print.
-    free_text = [
-        el for el in elements
-        if el["type"] == "text" and el["id"] not in roles and not el.get("group_id")
-    ]
+    free_text = [by_id[c.primary] for c in clusters
+                 if c.primary is not None and by_id[c.primary]["type"] == "text"]
     headline_size = _assign_text_roles(free_text, canvas, roles)
-
-    # 5. Remaining ungrouped shapes.
-    for el in elements:
-        if el["id"] not in roles and not el.get("group_id"):
-            roles[el["id"]] = SHAPE if el["type"] == "shape" else TEXT
-
-    # 6. Group roles (needs the headline position to tell CTA from badge).
-    headline_box = next((Box.of(el) for el in free_text if roles.get(el["id"]) == HEADLINE), None)
+    for c in clusters:
+        if c.primary is not None and c.primary not in roles:
+            roles[c.primary] = SHAPE if by_id[c.primary]["type"] == "shape" else TEXT
+    headline_box = next((boxes[el["id"]] for el in free_text if roles.get(el["id"]) == HEADLINE), None)
+    groups = {i: [by_id[e] for e in c.ids] for i, c in enumerate(clusters) if c.primary is None}
     group_roles = _assign_group_roles(groups, canvas, headline_box)
-    for gid, members in groups.items():
-        for el in members:
-            roles[el["id"]] = group_roles[gid]
+    # One call to action per design: a button (label in a pill) is the
+    # stronger signal, so a free text that merely looked like one steps down.
+    if any(r == CTA for r in group_roles.values()):
+        for el in free_text:
+            if roles.get(el["id"]) == CTA:
+                roles[el["id"]] = BODY
+    for i, c in enumerate(clusters):
+        role = roles[c.primary] if c.primary is not None else group_roles[i]
+        for eid in c.ids:
+            roles[eid] = role
 
-    # 7. Build units.
+    # 4. Build units.
     units: list[Unit] = []
     element_unit: dict[str, str] = {}
     for el in elements:
-        gid = el.get("group_id")
-        if gid and gid in groups:
-            continue  # handled below
-        box = Box.of(el)
-        u = Unit(key=el["id"], ids=[el["id"]], role=roles[el["id"]], box=box,
-                 members={el["id"]: box})
-        units.append(u)
-        element_unit[el["id"]] = u.key
-    for gid, members in groups.items():
-        boxes = {el["id"]: Box.of(el) for el in members}
-        u = Unit(key=f"group:{gid}", ids=[el["id"] for el in members],
-                 role=group_roles[gid], box=Box.union(boxes.values()),
-                 group_id=gid, members=boxes)
-        units.append(u)
-        for el in members:
+        if el["id"] in roles and roles[el["id"]] in (BACKGROUND, PANEL, DECORATIVE) and el["id"] not in element_unit:
+            # non-content: a unit of its own unless a cluster absorbed it
+            if any(el["id"] in c.ids for c in clusters):
+                continue
+            u = Unit(key=el["id"], ids=[el["id"]], role=roles[el["id"]], box=boxes[el["id"]],
+                     members={el["id"]: boxes[el["id"]]}, primary=el["id"])
+            units.append(u)
             element_unit[el["id"]] = u.key
+    for c in clusters:
+        mem = {eid: boxes[eid] for eid in c.ids}
+        if c.group_id is not None:
+            key = f"group:{c.group_id}"
+        elif len(c.ids) == 1:
+            key = c.ids[0]
+        elif c.primary is not None:
+            key = c.primary
+        else:
+            key = f"unit:{c.ids[0]}"
+        u = Unit(key=key, ids=list(c.ids), role=roles[c.ids[0]], box=Box.union(mem.values()),
+                 group_id=c.group_id, members=mem, kind=c.kind, primary=c.primary,
+                 attachments=list(c.attachments))
+        units.append(u)
+        for eid in c.ids:
+            element_unit[eid] = u.key
 
     for u in units:
         u.importance = IMPORTANCE.get(u.role, 0.3)
         u.anchor_x, u.anchor_y = _anchors(u.box, canvas)
 
+    # 5. Sibling rows of chip-like units.
+    units = _merge_rows(units, canvas)
+    for u in units:
+        for eid in u.ids:
+            element_unit[eid] = u.key
+
     # Which panel does each piece of content sit on? The *topmost* panel
     # drawn below it that holds most of the unit's box: that is the colour
     # the viewer sees behind it (content under an opaque panel is hidden, not
     # carried). The layouts keep that relation.
-    z = {el["id"]: float(el.get("z_index", i) if el.get("z_index") is not None else i)
-         for i, el in enumerate(elements)}
     panels = sorted((u for u in units if u.is_panel), key=lambda u: (-z[u.ids[0]], u.box.area))
     for u in units:
         if not u.is_content:
@@ -242,7 +317,283 @@ def analyze(source: dict[str, Any]) -> Analysis:
     shape_types = {el["id"]: str(el.get("shape_type", "rectangle") or "rectangle")
                    for el in elements if el["type"] == "shape"}
     return Analysis(canvas=canvas, units=units, roles=roles, element_unit=element_unit,
-                    headline_font_size=headline_size, shape_types=shape_types)
+                    headline_font_size=headline_size, shape_types=shape_types, source_elements=by_id)
+
+
+# ---------------------------------------------------------------------------
+# union-find over the relations that make several elements one unit
+
+
+def _cluster(free: list[dict[str, Any]], by_id: dict[str, dict[str, Any]], boxes: dict[str, Box],
+             z: dict[str, float], canvas: Box, roles: dict[str, str]) -> list[_Cluster]:
+    parent: dict[str, str] = {el["id"]: el["id"] for el in free}
+
+    def find(i: str) -> str:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(a: str, b: str) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    group_ids: dict[str, str] = {}
+    kinds: dict[str, str] = {}        # root -> "group" once a holder / frame / schema group joined it
+    primaries: dict[str, str] = {}    # root -> primary element of a host-kind cluster
+    attachments: dict[str, list[str]] = {}
+
+    # a. schema groups
+    by_gid: dict[str, list[str]] = {}
+    for el in free:
+        gid = el.get("group_id")
+        if gid:
+            by_gid.setdefault(str(gid), []).append(el["id"])
+    for gid, ids in by_gid.items():
+        for other in ids[1:]:
+            union(ids[0], other)
+        group_ids[find(ids[0])] = gid
+        kinds[find(ids[0])] = "group"
+    grouped = {eid for ids in by_gid.values() for eid in ids}
+
+    def is_holder(el: dict[str, Any]) -> bool:
+        b = boxes[el["id"]]
+        if b.area <= 0 or b.area / canvas.area >= CARD_MAX_AREA:
+            return False
+        if el["type"] == "shape":
+            return str(el.get("shape_type", "rectangle") or "rectangle") != "line"
+        if el["type"] == "image":
+            from engine.contrast import asset_is_flat   # local: keeps analyze import-light
+            return asset_is_flat(el.get("asset_id"))
+        return False
+
+    holders = [el for el in free if el["id"] not in grouped and is_holder(el)]
+    free = [el for el in free]   # copy: card holders may be dropped below
+
+    # b. holders: a text inside a small flat shape / image drawn below it.
+    #    A holder keeps one label (a pill, a button); a sticker-sized one may
+    #    keep several short lines (a date block). A card with paragraphs is
+    #    a zone, not a unit: its texts stay free and keep their own floors.
+    held: dict[str, list[dict[str, Any]]] = {}
+    for el in free:
+        if el["type"] != "text" or el["id"] in grouped:
+            continue
+        tb = boxes[el["id"]]
+        if tb.area <= 0:
+            continue
+        best = None
+        for h in holders:
+            hb = boxes[h["id"]]
+            if z[h["id"]] >= z[el["id"]] or hb.contains_fraction(tb) < INSIDE_FRAC:
+                continue
+            if best is None or hb.area < boxes[best["id"]].area:
+                best = h
+        if best is not None:
+            held.setdefault(best["id"], []).append(el)
+    for hid, texts in held.items():
+        share = boxes[hid].area / canvas.area
+        if len(texts) > 1:
+            keep = share <= STICKER_MAX_AREA and all(
+                len(str(t.get("content", "")).strip()) <= STICKER_MAX_CHARS for t in texts)
+        else:
+            keep = share <= HOLDER_MAX_AREA
+        if not keep:
+            # A card: a zone rebuilt around the text it carries (panel), so
+            # the text keeps its background and its own font floors.
+            if by_id[hid]["type"] == "shape":
+                roles[hid] = PANEL
+                parent.pop(hid, None)
+            continue
+        for t in texts:
+            union(hid, t["id"])
+            kinds[find(t["id"])] = "group"
+
+    free = [el for el in free if el["id"] in parent]   # card holders became panels
+
+    # c. photo-in-frame: an image and a shape of about the same size and place
+    for el in free:
+        if el["type"] != "image" or el["id"] in grouped:
+            continue
+        ib = boxes[el["id"]]
+        if ib.area <= 0:
+            continue
+        for s in free:
+            if s["type"] != "shape" or s["id"] in grouped:
+                continue
+            sb = boxes[s["id"]]
+            if sb.area <= 0 or sb.area > FRAME_MAX_RATIO * ib.area:
+                continue
+            if sb.contains_fraction(ib) >= INSIDE_FRAC and ib.contains_fraction(sb) >= 0.6:
+                union(el["id"], s["id"])
+                r = find(el["id"])
+                if kinds.get(r) != "group":
+                    kinds[r] = "host"
+                    primaries[r] = el["id"]
+                    attachments.setdefault(r, []).append(s["id"])
+
+    # d. hosts: a thin bar (or a shape inside the host's box) sitting on /
+    #    just above / just below a bigger single element. Tested against
+    #    the host element itself, never against what is already attached,
+    #    so attachments never chain away from their host.
+    def cluster_box(root: str) -> Box:
+        return Box.union(boxes[i] for i in parent if find(i) == root)
+
+    mn = min(canvas.w, canvas.h)
+    small = [el for el in free if el["type"] == "shape" and el["id"] not in grouped
+             and sum(1 for i in parent if find(i) == find(el["id"])) == 1
+             and 0 < boxes[el["id"]].area <= HOST_MAX_AREA * canvas.area]
+    small.sort(key=lambda el: boxes[el["id"]].area)
+    n_attached: dict[str, int] = {}
+    for el in small:
+        sb = boxes[el["id"]]
+        thin = max(sb.w, sb.h) >= HOST_THIN * max(1.0, min(sb.w, sb.h))
+        best = None
+        for root in {find(i) for i in parent}:
+            if root == el["id"] or find(el["id"]) == root:
+                continue
+            if kinds.get(root, "single") == "group":
+                continue          # a pill / sticker is complete; bars attach to free text and images
+            host_id = primaries.get(root, root)
+            if by_id[host_id]["type"] not in ("text", "image") or n_attached.get(root, 0) >= HOST_MAX_ATTACH:
+                continue
+            hb = boxes[host_id]
+            if hb.area <= 0 or sb.area > HOST_MAX_REL * hb.area:
+                continue
+            inside = hb.contains_fraction(sb) >= INSIDE_FRAC
+            if not thin and not inside:
+                continue
+            xo = min(sb.right, hb.right) - max(sb.x, hb.x)
+            if xo < HOST_X_OVERLAP * sb.w:
+                continue
+            gap = max(0.0, max(sb.y - hb.bottom, hb.y - sb.bottom))
+            if gap > HOST_GAP * mn:
+                continue
+            above = hb.cy < sb.cy
+            key = (gap, 0 if above else 1, hb.area)
+            if best is None or key < best[0]:
+                best = (key, root)
+        if best is None:
+            continue
+        root = best[1]
+        union(root, el["id"])
+        new_root = find(el["id"])
+        kinds[new_root] = "host"
+        primaries[new_root] = primaries.get(root, root)
+        attachments[new_root] = attachments.pop(root, []) + [el["id"]]
+        n_attached[new_root] = n_attached.pop(root, 0) + 1
+        for k in (kinds, primaries, attachments, group_ids):
+            if root in k and root != new_root:
+                k[new_root] = k.pop(root)
+
+    # e. decorations drawn inside a content unit travel with it
+    roots = {find(i) for i in parent}
+    for eid, role in list(roles.items()):
+        if role != DECORATIVE:
+            continue
+        db = boxes[eid]
+        if db.area <= 0:
+            continue
+        best = None
+        for root in roots:
+            rb = cluster_box(root)
+            if rb.area < db.area or rb.contains_fraction(db) < INSIDE_FRAC:
+                continue
+            if best is None or rb.area < best[0]:
+                best = (rb.area, root)
+        if best is None:
+            continue
+        root = best[1]
+        parent[eid] = root
+        del roles[eid]
+        if kinds.get(root, "single") != "group":
+            kinds[root] = "host"
+            primaries.setdefault(root, root)
+        attachments.setdefault(root, []).append(eid)
+
+    out: list[_Cluster] = []
+    order = {el["id"]: i for i, el in enumerate(free)}
+    members: dict[str, list[str]] = {}
+    for i in parent:
+        members.setdefault(find(i), []).append(i)
+    for root, ids in sorted(members.items(), key=lambda kv: min(order.get(i, 10 ** 9) for i in kv[1])):
+        c = _Cluster(root)
+        c.ids = sorted(ids, key=lambda i: order.get(i, 10 ** 9))
+        c.group_id = group_ids.get(root)
+        c.kind = kinds.get(root, "single")
+        if c.kind == "group":
+            c.primary = None
+        elif c.kind == "host":
+            c.primary = primaries.get(root, root)
+            c.attachments = [i for i in attachments.get(root, []) if i != c.primary]
+            # a host cluster must have exactly one non-attached element
+            if len(c.ids) - len(c.attachments) != 1:
+                c.kind, c.primary, c.attachments = "group", None, []
+        else:
+            c.primary = c.ids[0]
+        out.append(c)
+    return out
+
+
+def _merge_rows(units: list[Unit], canvas: Box) -> list[Unit]:
+    """Chains of chip-like units of one role, similar height, side by side
+    (left to right) become one row unit with the chain as `parts`."""
+    cand = [u for u in units if u.is_content and u.role in ROW_ROLES and not u.is_row]
+    cand.sort(key=lambda u: u.box.x)
+    used: set[str] = set()
+    rows: list[list[Unit]] = []
+    for u in cand:
+        if u.key in used:
+            continue
+        chain = [u]
+        used.add(u.key)
+        while True:
+            last = chain[-1]
+            nxt = None
+            for v in cand:
+                if v.key in used or v.role != last.role:
+                    continue
+                a, b = last.box, v.box
+                if v.box.x < last.box.x:
+                    continue
+                hmin, hmax = min(a.h, b.h), max(a.h, b.h)
+                if hmin <= 0 or (hmax - hmin) / hmax > ROW_HEIGHT_TOL:
+                    continue
+                yo = min(a.bottom, b.bottom) - max(a.y, b.y)
+                if yo < ROW_Y_OVERLAP * hmin:
+                    continue
+                gap = b.x - a.right
+                if gap < -0.5 * hmin or gap > ROW_MAX_GAP * hmax:
+                    continue
+                if nxt is None or gap < nxt[0]:
+                    nxt = (gap, v)
+            if nxt is None:
+                break
+            chain.append(nxt[1])
+            used.add(nxt[1].key)
+        if len(chain) >= 2:
+            rows.append(chain)
+    if not rows:
+        return units
+    merged: dict[str, Unit] = {}
+    for chain in rows:
+        mem = {eid: b for u in chain for eid, b in u.members.items()}
+        row = Unit(key=f"row:{chain[0].key}", ids=[i for u in chain for i in u.ids], role=chain[0].role,
+                   box=Box.union(mem.values()), members=mem, kind="row", parts=list(chain))
+        row.importance = max(u.importance for u in chain)
+        row.anchor_x, row.anchor_y = _anchors(row.box, canvas)
+        for u in chain:
+            merged[u.key] = row
+    out: list[Unit] = []
+    seen: set[str] = set()
+    for u in units:
+        r = merged.get(u.key)
+        if r is None:
+            out.append(u)
+        elif r.key not in seen:
+            seen.add(r.key)
+            out.append(r)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -280,6 +631,24 @@ def _is_panel(el: dict[str, Any], canvas: Box) -> bool:
     opacity = float(el.get("opacity", 1.0))
     off = 1.0 - canvas.contains_fraction(box)
     return covered >= PANEL_MIN_COVER and opacity >= DECO_OPACITY and off < DECO_BLEED
+
+
+def _frames_image(el: dict[str, Any], elements: list[dict[str, Any]], boxes: dict[str, Box],
+                  z: dict[str, float]) -> bool:
+    """A shape drawn right behind a photo of about its own size is that
+    photo's frame (one unit with it), however big: not a colour zone."""
+    if el["type"] != "shape" or el.get("group_id"):
+        return False
+    sb = boxes[el["id"]]
+    for o in elements:
+        if o["type"] != "image" or o.get("group_id") or z[o["id"]] <= z[el["id"]]:
+            continue
+        ib = boxes[o["id"]]
+        if ib.area <= 0 or sb.area > FRAME_MAX_RATIO * ib.area:
+            continue
+        if sb.contains_fraction(ib) >= INSIDE_FRAC and ib.contains_fraction(sb) >= 0.6:
+            return True
+    return False
 
 
 def _is_decorative(el: dict[str, Any], canvas: Box) -> bool:
@@ -381,10 +750,10 @@ def _fine_print_like(el: dict[str, Any], headline_size: float) -> bool:
     )
 
 
-def _assign_group_roles(groups: dict[str, list[dict[str, Any]]], canvas: Box,
-                        headline_box: Box | None) -> dict[str, str]:
-    out: dict[str, str] = {}
-    button_like: list[tuple[str, Box]] = []
+def _assign_group_roles(groups: dict[Any, list[dict[str, Any]]], canvas: Box,
+                        headline_box: Box | None) -> dict[Any, str]:
+    out: dict[Any, str] = {}
+    button_like: list[tuple[Any, Box]] = []
     for gid, members in groups.items():
         types = {el["type"] for el in members}
         box = Box.union(Box.of(el) for el in members)
@@ -398,14 +767,17 @@ def _assign_group_roles(groups: dict[str, list[dict[str, Any]]], canvas: Box,
         else:
             out[gid] = SHAPE
     # The CTA is the largest button-like group that sits below the headline
-    # (or, with no headline, in the lower half of the canvas).
+    # (or, with no headline, in the lower half of the canvas): one label in
+    # a pill at least as wide as it is tall. A tall card of several lines is
+    # a sticker, not a button.
     candidates = []
     for gid, box in button_like:
         below = box.cy > headline_box.cy if headline_box else box.cy > canvas.h / 2
-        if below:
+        one_label = sum(1 for el in groups[gid] if el["type"] == "text") == 1
+        if below and one_label and box.w >= CTA_MIN_ASPECT * box.h:
             candidates.append((box.area, gid))
     if candidates:
-        candidates.sort(reverse=True)
+        candidates.sort(key=lambda t: -t[0])
         out[candidates[0][1]] = CTA
     return out
 

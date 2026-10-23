@@ -32,7 +32,7 @@ from engine.geometry import Box
 from engine.relayout import Placement, anchor_relayout, ratio_change, resolve_vertical_collisions
 from engine.textfit import TextMeasurer, default_measurer
 
-SMALL_CHANGE_MAX = 1.6      # ratio_change() up to this: anchor variants lead
+SMALL_CHANGE_MAX = 1.75     # ratio_change() up to this: anchor variants compete unpenalised (score.ADAPT_RATIO)
 MAX_CANDIDATES = 12
 ANCHOR_SCALE_BOOSTS = (1.0, 1.12, 1.25)   # content scale = min(sx, sy) * boost, capped at max(sx, sy)
 TIGHT, LOOSE = 0.75, 1.3
@@ -45,7 +45,8 @@ class Candidate:
     placement: Placement
     options: PlanOptions | None = None  # floor plan variant
     scale: float | None = None          # anchor content scale
-    fallback: bool = False              # safety net: only chosen when every real candidate has defects
+    fallback: bool = False              # safety net: pays the scorer's adaptation penalty, so it only
+                                        # wins when every real candidate has a hard defect
 
 
 def generate_candidates(analysis: Analysis, source: dict[str, Any], target: Box,

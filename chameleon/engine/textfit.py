@@ -195,6 +195,65 @@ class TextMeasurer:
         """Height the box needs so the renderer's last line sits inside it."""
         return self.layout(el, font_size, width).height
 
+    def painted(self, el: dict[str, Any], font_size: float, box_w: float) -> "Painted":
+        """Where the glyphs actually land inside a box of width `box_w`,
+        relative to the box's top-left: the renderer puts the first baseline
+        `ascent` below the box top, so caps start `ascent - CAP_HEIGHT * fs`
+        below it; the last line ends at its baseline, plus the descender when
+        the text has glyphs with one. Lines are aligned like `text_align`.
+        Everything is in the element's own (unrotated) frame."""
+        size = float(font_size)
+        lay = self.layout(el, size, box_w)
+        ascent, descent = self.backend.metrics(_font_key(el), size)
+        asc = -float(ascent)
+        lh = float(el.get("line_height", DEFAULT_LINE_HEIGHT) or DEFAULT_LINE_HEIGHT)
+        top = max(0.0, asc - CAP_HEIGHT * size)
+        last_base = (lay.n_lines - 1) * size * lh + asc
+        text = str(el.get("content", ""))
+        bottom = last_base + (min(float(descent), DESCENDER * size) if _has_descender(text) else 0.02 * size)
+        mw = max(lay.max_width, 1.0)
+        align = str(el.get("text_align", "left") or "left")
+        if align == "center":
+            x = (box_w - mw) / 2.0
+        elif align == "right":
+            x = box_w - mw
+        else:
+            x = 0.0
+        return Painted(x=x, top=top, w=mw, bottom=max(bottom, top + 1.0), n_lines=lay.n_lines,
+                       box_h=lay.height, line_widths=list(lay.line_widths))
+
+
+@dataclass
+class Painted:
+    """Painted extent of a text inside its box (offsets from the box's
+    top-left, element frame)."""
+
+    x: float
+    top: float
+    w: float
+    bottom: float
+    n_lines: int
+    box_h: float            # height the box needs (ascent + descent of every line)
+    line_widths: list[float]
+
+    @property
+    def h(self) -> float:
+        return self.bottom - self.top
+
+    def box(self, outer: "Box") -> "Box":
+        """The painted box in canvas coordinates for a text box `outer`."""
+        from engine.geometry import Box as _Box
+        return _Box(outer.x + self.x, outer.y + self.top, self.w, self.h)
+
+
+CAP_HEIGHT = 0.78           # cap / ascender height as a fraction of the font size (gk7494's figure)
+DESCENDER = 0.25            # descender depth as a fraction of the font size
+_DESCENDER_CHARS = set("gjpqyQ,;()[]{}@$@/\\|_")
+
+
+def _has_descender(text: str) -> bool:
+    return any(c in _DESCENDER_CHARS for c in text)
+
 
 def scaled_letter_spacing(el: dict[str, Any], font_size: float) -> float:
     """The element's letter spacing at `font_size`: proportional to its own

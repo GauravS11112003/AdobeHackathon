@@ -37,6 +37,7 @@ from engine.textfit import TextMeasurer, apply_font_size, default_measurer
 
 MAX_PASSES = 6
 EPS = 0.01
+OVERLAP_TOL = 0.015         # a pair may overlap this much more (fraction of the smaller box) than in the source
 MIN_SHRINK = 0.4            # never shrink a unit below this fraction to solve an overlap
 MARGIN_FRAC = 0.015         # on-canvas margin for content, as a fraction of min(W, H)
 SNAP_FRAC = 0.008           # snap tolerance, fraction of min(W, H)
@@ -85,19 +86,11 @@ def rotated_extent(box: Box, rotation: float) -> Box:
 
 
 def ink_box(el: dict[str, Any], box: Box, font_size: float, m: TextMeasurer) -> Box:
-    """Where the glyphs of a text element land: the wrapped lines' extent,
-    aligned inside the box like cr-renderer does (lines from the box top)."""
-    lay = m.layout(el, font_size, box.w)
-    mw = min(max(lay.max_width, 1.0), max(box.w, 1.0)) if lay.max_width <= box.w + 0.5 else lay.max_width
-    align = str(el.get("text_align", "left") or "left")
-    if align == "center":
-        x = box.cx - mw / 2.0
-    elif align == "right":
-        x = box.right - mw
-    else:
-        x = box.x
-    h = max(1.0, min(lay.height, box.h) if lay.height <= box.h + 0.5 else lay.height)
-    ink = Box(x, box.y, mw, h)
+    """Where the glyphs of a text element land: the painted extent of the
+    wrapped lines (caps to the last baseline / descender), aligned inside
+    the box like cr-renderer does. See `TextMeasurer.painted`."""
+    p = m.painted(el, font_size, max(box.w, 1.0))
+    ink = Box(box.x + p.x, box.y + p.top, max(p.w, 1.0), max(p.h, 1.0))
     return rotated_extent(ink, float(el.get("rotation", 0.0) or 0.0))
 
 
@@ -109,6 +102,38 @@ def visible_box(el: dict[str, Any], box: Box, font_size: float | None, m: TextMe
 
 def unit_visible_box(live: Live, elements: dict[str, dict[str, Any]], m: TextMeasurer) -> Box:
     return Box.union(visible_box(elements[eid], b, live.fonts.get(eid), m) for eid, b in live.boxes.items())
+
+
+def unit_visible_parts(live: Live, elements: dict[str, dict[str, Any]], m: TextMeasurer) -> list[Box]:
+    """Visible boxes used for collision tests: one per sibling of a row unit
+    (the badges of a row pinned to two corners do not "overlap" what lies
+    between them), one per element of a host unit (a heading and the bar
+    above it do not cover the gap between them), otherwise the unit's one
+    visible box (a pill with its label is solid)."""
+    if live.unit.is_row:
+        out = []
+        for part in live.unit.parts:
+            ids = [i for i in part.ids if i in live.boxes]
+            if ids:
+                out.append(Box.union(visible_box(elements[i], live.boxes[i], live.fonts.get(i), m) for i in ids))
+        if out:
+            return out
+    if live.unit.kind == "host":
+        return [visible_box(elements[i], b, live.fonts.get(i), m) for i, b in live.boxes.items()]
+    return [unit_visible_box(live, elements, m)]
+
+
+def parts_overlap(a: list[Box], b: list[Box], tol: float = 1.0) -> bool:
+    return any(x.overlaps(y, tol=tol) for x in a for y in b)
+
+
+def parts_overlap_fraction(a: list[Box], b: list[Box]) -> float:
+    """Largest overlap fraction over the part pairs (fraction of the smaller part)."""
+    return max((overlap_fraction(x, y) for x in a for y in b), default=0.0)
+
+
+def parts_intersection(a: list[Box], b: list[Box]) -> float:
+    return sum(x.intersection_area(y) for x in a for y in b)
 
 
 # ---------------------------------------------------------------------------
@@ -157,13 +182,11 @@ class _Rectifier:
         self.margin = clamp(MARGIN_FRAC * mn, 1.0, 16.0)
         self.snap_tol = clamp(SNAP_FRAC * mn, 1.0, 6.0)
         self.gap = clamp(GAP_FRAC * mn, 2.0, 12.0)
-        # Pairs that are allowed to overlap: they already did in the source.
-        self.allowed: set[tuple[str, str]] = set()
-        for i, a in enumerate(self.lives):
-            for b in self.lives[i + 1:]:
-                if a.unit.box.overlaps(b.unit.box, tol=1.0):
-                    self.allowed.add((a.unit.key, b.unit.key))
+        # How much each pair overlapped in the source (visible boxes): a
+        # pair may keep that much overlap (plus OVERLAP_TOL); more is a defect.
+        self.src_frac = source_overlap_fractions(analysis, m)
         self._vis: dict[str, Box] = {}
+        self._parts: dict[str, list[Box]] = {}
         self.src_fonts = {eid: float(el["font_size"]) for eid, el in by_id.items() if el["type"] == "text"}
 
     # -- geometry helpers -----------------------------------------------------
@@ -178,8 +201,16 @@ class _Rectifier:
             self._vis[l.unit.key] = b
         return b
 
+    def parts(self, l: Live) -> list[Box]:
+        p = self._parts.get(l.unit.key)
+        if p is None:
+            p = unit_visible_parts(l, self.by_id, self.m)
+            self._parts[l.unit.key] = p
+        return p
+
     def invalidate(self, l: Live) -> None:
         self._vis.pop(l.unit.key, None)
+        self._parts.pop(l.unit.key, None)
         l.changed = True
 
     def move(self, l: Live, dx: float, dy: float) -> None:
@@ -210,17 +241,35 @@ class _Rectifier:
             l.fonts[eid] = size
 
     def allowed_pair(self, a: Live, b: Live) -> bool:
-        return (a.unit.key, b.unit.key) in self.allowed or (b.unit.key, a.unit.key) in self.allowed
+        """Did the pair overlap in the source? Such pairs are only separated
+        when their overlap grew by more than OVERLAP_TOL (see `collides`)."""
+        return self.src_frac.get(_pair_key(a.unit.key, b.unit.key), 0.0) > 0.0
+
+    def excess(self, a: Live, b: Live, pa: list[Box] | None = None, pb: list[Box] | None = None) -> float:
+        """Overlap fraction now minus what the source had (negative: fine)."""
+        pa = pa if pa is not None else self.parts(a)
+        pb = pb if pb is not None else self.parts(b)
+        return parts_overlap_fraction(pa, pb) - self.src_frac.get(_pair_key(a.unit.key, b.unit.key), 0.0)
 
     def collides(self, l: Live, box: Box | None = None, ignore: Iterable[str] = ()) -> bool:
         """Would `l` (at `box`, default its current visible box) overlap any
         unit it must not overlap?"""
-        vb = box if box is not None else self.vis(l)
+        if box is not None:
+            # a hypothetical position: shift this unit's parts by the same offset
+            cur = self.vis(l)
+            dx, dy = box.x - cur.x, box.y - cur.y
+            mine = [Box(p.x + dx, p.y + dy, p.w, p.h) for p in self.parts(l)]
+        else:
+            mine = self.parts(l)
         skip = set(ignore)
         for o in self.lives:
-            if o is l or o.unit.key in skip or self.allowed_pair(l, o):
+            if o is l or o.unit.key in skip:
                 continue
-            if vb.overlaps(self.vis(o), tol=1.0):
+            if self.allowed_pair(l, o):
+                if self.excess(l, o, mine, self.parts(o)) > OVERLAP_TOL:
+                    return True
+                continue
+            if parts_overlap(mine, self.parts(o), tol=1.0):
                 return True
         return False
 
@@ -266,10 +315,13 @@ class _Rectifier:
         for i in range(n):
             for j in range(i + 1, n):
                 a, b = self.lives[i], self.lives[j]
+                pa, pb = self.parts(a), self.parts(b)
                 if self.allowed_pair(a, b):
+                    # overlapped by design: only a clearly bigger overlap is a defect
+                    if self.excess(a, b, pa, pb) > OVERLAP_TOL:
+                        self._separate(a, b)
                     continue
-                va, vb = self.vis(a), self.vis(b)
-                if not va.overlaps(vb, tol=-self.gap):    # closer than the minimum gap
+                if not parts_overlap(pa, pb, tol=-self.gap):    # closer than the minimum gap
                     continue
                 self._separate(a, b)
 
@@ -487,21 +539,68 @@ class _Rectifier:
                     apply_font_size(el, l.fonts[eid])
 
 
+def _pair_key(a: str, b: str) -> tuple[str, str]:
+    return (a, b) if a <= b else (b, a)
+
+
+def overlap_fraction(a: Box, b: Box) -> float:
+    """Shared area as a fraction of the smaller box (0 = disjoint)."""
+    small = min(a.area, b.area)
+    if small <= 0:
+        return 0.0
+    return a.intersection_area(b) / small
+
+
+def source_overlap_fractions(analysis: Analysis, measurer: TextMeasurer | None = None) -> dict[tuple[str, str], float]:
+    """Overlap fraction of every pair of content units in the *source*
+    (visible boxes: painted text, rotated extents), cached on the analysis.
+    What the designer overlapped on purpose is not a defect when kept."""
+    m = measurer or default_measurer()
+    if analysis.source_visible is None:
+        by_id = analysis.source_elements
+        vis: dict[str, list[Box]] = {}
+        for u in analysis.units:
+            if not u.is_content:
+                continue
+            boxes = {eid: u.members[eid] for eid in u.ids if eid in by_id}
+            if not boxes:
+                continue
+            live = Live(u, boxes, {eid: float(by_id[eid]["font_size"]) for eid in boxes if by_id[eid]["type"] == "text"})
+            try:
+                vis[u.key] = unit_visible_parts(live, by_id, m)
+            except Exception:  # pragma: no cover - odd source element
+                vis[u.key] = [u.box]
+        analysis.source_visible = vis   # type: ignore[assignment]
+    vis = analysis.source_visible
+    out: dict[tuple[str, str], float] = {}
+    keys = list(vis)
+    for i, a in enumerate(keys):
+        for b in keys[i + 1:]:
+            f = parts_overlap_fraction(vis[a], vis[b])
+            if f > 0.0:
+                out[_pair_key(a, b)] = f
+    return out
+
+
 def unwanted_overlaps(analysis: Analysis, elements: list[dict[str, Any]],
-                      measurer: TextMeasurer | None = None, tol: float = 1.0) -> list[tuple[str, str, float]]:
-    """Pairs of content units whose visible boxes overlap in `elements`
-    although their boxes did not overlap in the source, with the overlap
-    area. Shared by the scorer and the tests."""
+                      measurer: TextMeasurer | None = None, tol: float = OVERLAP_TOL) -> list[tuple[str, str, float]]:
+    """Pairs of content units whose visible boxes overlap in `elements` by
+    more than they did in the source (by more than `tol` of the smaller box,
+    so a graze is not a collision and a sticker that sat on the photo may
+    still sit on it), with the overlap area. Shared by the scorer, the
+    rectifier, the eval metrics and the tests."""
     m = measurer or default_measurer()
     by_id = {el["id"]: el for el in elements}
     lives = _lives(analysis, by_id)
-    vis = {l.unit.key: unit_visible_box(l, by_id, m) for l in lives}
+    vis = {l.unit.key: unit_visible_parts(l, by_id, m) for l in lives}
+    src = source_overlap_fractions(analysis, m)
     out = []
     for i, a in enumerate(lives):
         for b in lives[i + 1:]:
-            if a.unit.box.overlaps(b.unit.box, tol=1.0):
+            pa, pb = vis[a.unit.key], vis[b.unit.key]
+            if not parts_overlap(pa, pb, tol=1.0):
                 continue
-            va, vb = vis[a.unit.key], vis[b.unit.key]
-            if va.overlaps(vb, tol=tol):
-                out.append((a.unit.key, b.unit.key, va.intersection_area(vb)))
+            f = parts_overlap_fraction(pa, pb) - src.get(_pair_key(a.unit.key, b.unit.key), 0.0)
+            if f > tol:
+                out.append((a.unit.key, b.unit.key, parts_intersection(pa, pb)))
     return out

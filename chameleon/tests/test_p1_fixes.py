@@ -227,7 +227,7 @@ def test_one_free_text_cta_per_design():
     ctas = [u for u in a.units if u.role == A.CTA]
     assert len(ctas) == 1
     assert ctas[0].key == "el_10"            # the lowest accent-coloured bold line ("EACH YEAR")
-    assert a.roles["el_16"] in (A.SUBHEAD, A.BODY)   # "THE OCEAN" is copy, not a button
+    assert a.roles["el_16"] == A.HEADLINE    # "THE OCEAN" is the headline ("17" lives in the date badge now)
 
 
 def test_every_banner_candidate_sizes_every_text_box():

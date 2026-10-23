@@ -87,7 +87,9 @@ def test_score_without_pixels_still_works():
     out = resize(source, target)
     sc = score_design(analysis, source, out, render=False)
     assert sc.hard == []
-    assert sc.breakdown["read.contrast"] == 1.0
+    # no pixels: contrast comes from the JSON estimate (engine/contrast.py)
+    assert 0.0 <= sc.breakdown["read.contrast"] <= 1.0
+    assert sc.notes["contrast_source"] == "estimate" and sc.notes["contrast"]
     assert "pixels" in sc.notes
 
 
@@ -177,7 +179,7 @@ def test_judge_survives_a_raising_renderer(monkeypatch, fresh_render):
     assert [el["id"] for el in out["elements"]] == [el["id"] for el in source["elements"]]
     best = RZ.LAST_JUDGED[0]
     assert best.design == out and best.score.hard == [] and not best.fallback
-    assert "render_error" in best.score.notes and best.score.breakdown["read.contrast"] == 1.0
+    assert "render_error" in best.score.notes and best.score.notes["contrast_source"] == "estimate"
 
 
 def test_judge_without_pixels_still_picks_a_clean_floor_plan(monkeypatch, fresh_render):

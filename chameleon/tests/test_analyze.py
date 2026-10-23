@@ -102,9 +102,11 @@ def test_level2_anchors(l2):
 def test_reading_order_is_top_to_bottom_left_to_right(l3):
     order = [u.key for u in l3.units if u.reading_index >= 0]
     assert order.index("logo") < order.index("product") < order.index("headline")
-    assert order.index("headline") < order.index("subhead") < order.index("group:badge1")
-    assert order.index("group:badge1") < order.index("group:badge2") < order.index("group:badge3")
-    assert order.index("group:cta") < order.index("legal_text")
+    # the three badges sit side by side at one height: one re-flowable row
+    row = l3.unit(l3.element_unit["badge1_bg"])
+    assert row.is_row and [p.key for p in row.parts] == ["group:badge1", "group:badge2", "group:badge3"]
+    assert order.index("headline") < order.index("subhead") < order.index(row.key)
+    assert order.index(row.key) < order.index("group:cta") < order.index("legal_text")
     # background and decoration are not part of the reading order
     assert l3.unit("bg").reading_index == -1
 

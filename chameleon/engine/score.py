@@ -28,6 +28,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
+from engine import contrast as contrast_est
 from engine.analyze import (
     Analysis,
     BADGE,
@@ -46,10 +47,18 @@ from engine.analyze import (
 from engine.floorplan import Metrics, ratio_family
 from engine.geometry import Box, clamp
 from engine.rectify import Live, _lives, unit_visible_box, unwanted_overlaps, visible_box
+from engine.relayout import ratio_change
 from engine.render import image_scale, render_design
 from engine.textfit import TextMeasurer, default_measurer
 
 HARD_PENALTY = 1000.0
+ADAPT_RATIO = 1.75           # ratio change from which a non-re-laid-out (anchor) candidate ...
+ADAPT_PENALTY = 18.0         # ... pays this (fernando-ace's figure); it still wins when it is the only clean one
+DISRUPT_RATIO = 1.25         # below this ratio change a re-laid-out (floor plan) candidate pays up to ...
+DISRUPT_PENALTY = 4.0        # ... this (linearly, 0 at DISRUPT_RATIO): a finished design is not re-arranged for nothing
+FLOOR_REL = 0.98             # a font is below the floor only if it also shrank below this x the source font x canvas scale
+BLEED_TOL = 0.01             # a unit may be off canvas by this fraction more than it was in the source
+HIER_RATIO = 0.82            # higher-ranked text keeps >= min(this, source ratio) of the lower one's size
 
 WEIGHTS = {
     # readability (30)
@@ -72,10 +81,13 @@ WEIGHTS = {
 
 ASPECT_TOL = 0.05
 CONTRAST_GOOD = 4.5          # WCAG AA for normal text
-CONTRAST_FLOOR = 1.5         # below: no score; headline / CTA below 1.3 is a hard fail
-CONTRAST_FAIL = 1.3
+CONTRAST_FLOOR = 1.5         # below: no score
+CONTRAST_DROP = 3.0          # a headline / CTA under this ratio ...
+CONTRAST_DROP_REL = 0.5      # ... and under this share of its own contrast in the source is a hard fail
+CONTRAST_FAIL = 1.3          # kept for reference: the old absolute rule (the drop rule replaces it)
 GOOD_FILL = 0.55             # content hull covering this much of the canvas is "filled"
 TEXT_ROLES = (HEADLINE, SUBHEAD, BODY, CTA, BADGE, FINE_PRINT, TEXT)
+RANK = {HEADLINE: 4, SUBHEAD: 3, BODY: 2, CTA: 2, TEXT: 2, BADGE: 1, FINE_PRINT: 0}
 
 
 @dataclass
@@ -84,22 +96,28 @@ class Score:
     hard: list[str] = field(default_factory=list)
     breakdown: dict[str, float] = field(default_factory=dict)
     notes: dict[str, Any] = field(default_factory=dict)
+    penalty: float = 0.0        # soft penalties outside the 0-100 breakdown (adaptation)
 
     @property
     def soft(self) -> float:
-        return self.total + HARD_PENALTY * len(self.hard)
+        return self.total + HARD_PENALTY * len(self.hard) + self.penalty
 
     def as_dict(self) -> dict[str, Any]:
         return {"total": round(self.total, 2), "soft": round(self.soft, 2), "hard": list(self.hard),
+                "penalty": round(self.penalty, 2),
                 "breakdown": {k: round(v, 3) for k, v in self.breakdown.items()}, "notes": self.notes}
 
 
 def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, Any],
                  target: Box | None = None, image=None, render: bool = True,
-                 measurer: TextMeasurer | None = None) -> Score:
+                 measurer: TextMeasurer | None = None, strategy: str | None = None) -> Score:
     """Score `design` (a resize of `source`, analysed as `analysis`). Pass a
     PIL image rendered without text to reuse a render; with `render=True`
-    and no image one is rendered here (skipped silently if unavailable)."""
+    and no image one is rendered here (skipped silently if unavailable).
+    Without pixels the contrast terms come from the no-render estimate
+    (engine/contrast.py). `strategy` ("anchor" / "floorplan") enables the
+    adaptation penalty for layouts that were not re-laid-out on a big
+    shape change."""
     m = measurer or default_measurer()
     target = target or Box(0.0, 0.0, float(design["canvas"]["width"]), float(design["canvas"]["height"]))
     elements = design["elements"]
@@ -118,15 +136,22 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
     for l in lives:
         fb = l.frame(by_id)    # drawn extent: a rotated box counts rotated
         if fb.x < -0.5 or fb.y < -0.5 or fb.right > target.w + 0.5 or fb.bottom > target.h + 0.5:
-            hard.append(f"{l.unit.key} off canvas")
+            # Bleed the designer had (a photo running off the edge) is excused
+            # up to the same share; anything more is a defect.
+            off_now = 1.0 - target.contains_fraction(fb)
+            off_src = 1.0 - analysis.canvas.contains_fraction(l.unit.box)
+            if off_now > off_src + BLEED_TOL:
+                hard.append(f"{l.unit.key} off canvas")
     met = Metrics.for_canvas(analysis.canvas, target, ratio_family(target))
+    area_scale = math.sqrt(target.area / analysis.canvas.area)
     for el in elements:
         if el["type"] == "text":
             font = float(el["font_size"])
             if not m.fits(el, font, float(el["width"]), float(el["height"])):
                 hard.append(f"{el['id']} text overflows its box")
             role = analysis.roles.get(el["id"])
-            if role in (HEADLINE, CTA) and font < met.min_font(role) - 0.5:
+            src_font = float(src_by_id[el["id"]]["font_size"]) if el["id"] in src_by_id else font
+            if role in (HEADLINE, CTA) and below_floor(font, role, src_font, met, area_scale):
                 hard.append(f"{el['id']} {role} font {font:g} below readable {met.min_font(role):g}")
         elif el["type"] == "image" and el.get("fit", "contain") != "cover":
             s = src_by_id.get(el["id"])
@@ -139,7 +164,6 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
         hard.append(f"{a} collides with {b} ({area:.0f}px²)")
 
     # ---- 2. readability ------------------------------------------------------
-    area_scale = math.sqrt(target.area / analysis.canvas.area)
     size_num = size_den = 0.0
     lines_num = lines_den = 0.0
     for el in elements:
@@ -156,7 +180,7 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
             # A headline on more than three lines, a button label on more than
             # one, reads as a defect however the source wrapped them.
             n = m.layout(el).n_lines
-            allowed, slope = {HEADLINE: (3, 4.0), CTA: (1, 2.0)}.get(role, (3, 5.0))
+            allowed, slope = {HEADLINE: (3, 2.0), CTA: (1, 2.0)}.get(role, (3, 5.0))
             extra = max(0, n - allowed)
             lines_num += imp * clamp(1.0 - extra / slope, 0.0, 1.0)
             lines_den += imp
@@ -171,37 +195,68 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
             image = None
             notes["render_error"] = str(exc)
     try:
-        contrast, worst = _contrast(analysis, elements, design, image, m)
+        contrast, worst, src_worst, how = _contrast_terms(analysis, source, elements, design, image, m)
     except Exception as exc:  # pragma: no cover - odd image / crop
-        contrast, worst = 1.0, {}
+        contrast, worst, src_worst, how = 1.0, {}, {}, "error"
         notes["contrast_error"] = str(exc)
         image = None
     bd["read.contrast"] = contrast
     notes["contrast"] = worst
+    notes["contrast_source"] = how
     if image is None:
-        notes["pixels"] = "no render; contrast neutral"
+        notes["pixels"] = "no render; contrast from the JSON estimate" if worst else "no render; contrast neutral"
     for eid, ratio in worst.items():
         role = analysis.roles.get(eid)
-        if role in (HEADLINE, CTA) and ratio < CONTRAST_FAIL:
-            hard.append(f"{eid} unreadable contrast {ratio:.2f}")
+        if role not in (HEADLINE, CTA):
+            continue
+        src_ratio = src_worst.get(eid)
+        # The drop rule: unreadable now AND clearly worse than the designer's
+        # own version (stand-in assets or a loosely built source are not our fault).
+        if ratio < CONTRAST_DROP and (src_ratio is None or ratio < CONTRAST_DROP_REL * src_ratio):
+            hard.append(f"{eid} unreadable contrast {ratio:.2f} (source {src_ratio if src_ratio is None else round(src_ratio, 2)})")
 
     # ---- 3. layout quality ---------------------------------------------------
-    boxes = [l.box for l in lives]
-    bd["layout.balance"] = _balance(lives, target)
+    # On what the viewer sees: painted text, rotated extents (a text box is
+    # taller than its glyphs and often wider than its longest line).
+    boxes = [vis[l.unit.key] for l in lives]
+    bd["layout.balance"] = _balance(lives, target, vis)
     bd["layout.alignment"] = _alignment(boxes, target)
-    bd["layout.spacing"] = _spacing(list(vis.values()))
+    bd["layout.spacing"] = _spacing(boxes)
     bd["layout.fill"] = _fill(boxes, target)
     bd["layout.margins"] = _margins(boxes, target)
 
     # ---- 4. faithfulness -----------------------------------------------------
     bd["faith.order"] = _order(lives, vis)
     bd["faith.anchors"] = _anchor_keep(lives, target)
-    bd["faith.hierarchy"] = _hierarchy(elements, src_by_id)
+    bd["faith.hierarchy"] = _hierarchy(elements, src_by_id, analysis.roles)
     bd["faith.scale"] = _scale_consistency(lives)
 
+    # ---- 5. adaptation -----------------------------------------------------
+    # A layout that only slid things to their anchors is not a design for a
+    # canvas of a very different shape; it still wins when it is the only
+    # candidate without a hard defect (the penalty is far below HARD_PENALTY).
+    penalty = 0.0
+    change = ratio_change(analysis.canvas, target)
+    if strategy == "anchor" and change >= ADAPT_RATIO:
+        penalty = ADAPT_PENALTY
+        notes["adaptation_penalty"] = penalty
+    elif strategy == "floorplan" and change < DISRUPT_RATIO:
+        penalty = DISRUPT_PENALTY * (DISRUPT_RATIO - change) / (DISRUPT_RATIO - 1.0)
+        notes["disruption_penalty"] = round(penalty, 2)
+
     soft = sum(WEIGHTS[k] * clamp(v, 0.0, 1.0) for k, v in bd.items())
-    total = soft - HARD_PENALTY * len(hard)
-    return Score(total=total, hard=hard, breakdown=bd, notes=notes)
+    total = soft - HARD_PENALTY * len(hard) - penalty
+    return Score(total=total, hard=hard, breakdown=bd, notes=notes, penalty=penalty)
+
+
+def below_floor(font: float, role: str, src_font: float, met: Metrics, area_scale: float) -> bool:
+    """Is `font` too small for `role` on this canvas? Only when it is under
+    the canvas's floor *and* smaller than the designer's own size scaled to
+    the canvas: a 13 px label the source already had on a banner of this
+    size is the designer's call, not a regression (shared with eval/metrics)."""
+    if font >= met.min_font(role) - 0.5:
+        return False
+    return font < FLOOR_REL * src_font * area_scale - 0.5
 
 
 def _presence(lives: list[Live], src_canvas: Box, target: Box) -> float:
@@ -253,18 +308,71 @@ def _rgba(color: Any) -> tuple[tuple[int, int, int], float]:
     return rgb, alpha
 
 
-def _contrast(analysis: Analysis, elements: list[dict[str, Any]], design: dict[str, Any],
-              image, m: TextMeasurer) -> tuple[float, dict[str, float]]:
-    """Importance-weighted contrast score in [0, 1] and the per-text ratio."""
-    if image is None:
-        return 1.0, {}
+def _ink_boxes(elements: list[dict[str, Any]], m: TextMeasurer) -> dict[str, Box]:
+    out = {}
+    for el in elements:
+        if el["type"] == "text" and str(el.get("content", "")).strip():
+            out[el["id"]] = visible_box(el, Box.of(el), float(el["font_size"]), m)
+    return out
+
+
+def source_contrast(analysis: Analysis, source: dict[str, Any], m: TextMeasurer) -> dict[str, float]:
+    """Estimated contrast of every text in the source design (cached)."""
+    if analysis.source_contrast is None:
+        est = contrast_est.estimate(source, _ink_boxes(source["elements"], m))
+        analysis.source_contrast = {k: v.ratio for k, v in est.items()}
+    return analysis.source_contrast
+
+
+def _contrast_terms(analysis: Analysis, source: dict[str, Any], elements: list[dict[str, Any]],
+                    design: dict[str, Any], image, m: TextMeasurer
+                    ) -> tuple[float, dict[str, float], dict[str, float], str]:
+    """(importance-weighted contrast score in [0, 1], per-text ratio, per-text
+    source ratio, where the numbers came from). The JSON estimate serves
+    every text; a render without text, when given, refines ratio and
+    busyness for the texts it covers (the final top candidates)."""
+    ratios, busy = _contrast_estimate(elements, design, m)
+    how = "estimate" if ratios else "none"
+    if image is not None:
+        px_ratios, px_busy = _contrast_pixels(elements, design, image, m)
+        if px_ratios:
+            ratios.update(px_ratios)
+            busy.update(px_busy)
+            how = "pixels+estimate" if how == "estimate" else "pixels"
+    src = source_contrast(analysis, source, m)
+    if not ratios:
+        return 1.0, {}, src, how
+    num = den = 0.0
+    for el in elements:
+        eid = el["id"]
+        if eid not in ratios:
+            continue
+        ratio = ratios[eid]
+        b = clamp((busy.get(eid, 0.0) - 20.0) / 60.0, 0.0, 1.0)
+        score = clamp((ratio - CONTRAST_FLOOR) / (CONTRAST_GOOD - CONTRAST_FLOOR), 0.0, 1.0) * (1.0 - 0.5 * b)
+        imp = analysis.unit(analysis.element_unit[eid]).importance if eid in analysis.element_unit else 0.3
+        imp = max(imp, 0.05)
+        num += imp * score
+        den += imp
+    return (num / den if den else 1.0), ratios, src, how
+
+
+def _contrast_estimate(elements: list[dict[str, Any]], design: dict[str, Any],
+                       m: TextMeasurer) -> tuple[dict[str, float], dict[str, float]]:
+    est = contrast_est.estimate(design, _ink_boxes(elements, m))
+    return {k: v.ratio for k, v in est.items()}, {k: v.busy for k, v in est.items()}
+
+
+def _contrast_pixels(elements: list[dict[str, Any]], design: dict[str, Any], image,
+                     m: TextMeasurer) -> tuple[dict[str, float], dict[str, float]]:
+    """Per-text contrast ratio and busyness from a render without text."""
     try:
         from PIL import ImageStat
     except Exception:  # pragma: no cover
-        return 1.0, {}
+        return {}, {}
     k = image_scale(design, image)
-    num = den = 0.0
     ratios: dict[str, float] = {}
+    busy: dict[str, float] = {}
     for el in elements:
         if el["type"] != "text" or not str(el.get("content", "")).strip():
             continue
@@ -278,12 +386,22 @@ def _contrast(analysis: Analysis, elements: list[dict[str, Any]], design: dict[s
         mean = tuple(float(v) for v in stat.mean[:3])
         rgb, alpha = _rgba(el.get("color"))
         blended = tuple(alpha * c + (1.0 - alpha) * b for c, b in zip(rgb, mean))
-        ratio = contrast_ratio(blended, mean)
-        ratios[el["id"]] = ratio
-        lum_std = sum(float(v) for v in stat.stddev[:3]) / 3.0
-        busy = clamp((lum_std - 20.0) / 60.0, 0.0, 1.0)
-        score = clamp((ratio - CONTRAST_FLOOR) / (CONTRAST_GOOD - CONTRAST_FLOOR), 0.0, 1.0) * (1.0 - 0.5 * busy)
-        imp = analysis.unit(analysis.element_unit[el["id"]]).importance if el["id"] in analysis.element_unit else 0.3
+        ratios[el["id"]] = contrast_ratio(blended, mean)
+        busy[el["id"]] = sum(float(v) for v in stat.stddev[:3]) / 3.0
+    return ratios, busy
+
+
+def _contrast(analysis: Analysis, elements: list[dict[str, Any]], design: dict[str, Any],
+              image, m: TextMeasurer) -> tuple[float, dict[str, float]]:
+    """Render-based contrast only (kept for eval/contrast_check.py)."""
+    if image is None:
+        return 1.0, {}
+    ratios, busy = _contrast_pixels(elements, design, image, m)
+    num = den = 0.0
+    for eid, ratio in ratios.items():
+        b = clamp((busy.get(eid, 0.0) - 20.0) / 60.0, 0.0, 1.0)
+        score = clamp((ratio - CONTRAST_FLOOR) / (CONTRAST_GOOD - CONTRAST_FLOOR), 0.0, 1.0) * (1.0 - 0.5 * b)
+        imp = analysis.unit(analysis.element_unit[eid]).importance if eid in analysis.element_unit else 0.3
         imp = max(imp, 0.05)
         num += imp * score
         den += imp
@@ -294,11 +412,11 @@ def _contrast(analysis: Analysis, elements: list[dict[str, Any]], design: dict[s
 # layout quality (Ngo et al. style measures, each in [0, 1])
 
 
-def _balance(lives: list[Live], target: Box) -> float:
+def _balance(lives: list[Live], target: Box, vis: dict[str, Box] | None = None) -> float:
     tw = tot = 0.0
     bx = by = 0.0
     for l in lives:
-        b = l.box
+        b = vis[l.unit.key] if vis else l.box
         w = b.area * (l.importance + 0.1)
         bx += w * (b.cx - target.w / 2.0)
         by += w * (b.cy - target.h / 2.0)
@@ -507,7 +625,13 @@ def _anchor_keep(lives: list[Live], target: Box) -> float:
     return num / den if den else 1.0
 
 
-def _hierarchy(elements: list[dict[str, Any]], src_by_id: dict[str, dict[str, Any]]) -> float:
+def _hierarchy(elements: list[dict[str, Any]], src_by_id: dict[str, dict[str, Any]],
+               roles: dict[str, str] | None = None) -> float:
+    """Size relations kept: a text that was clearly bigger than another
+    stays at least as big; a higher-ranked role (headline over subhead over
+    body over badge over legal) keeps at least min(HIER_RATIO, the source's
+    own ratio) of the lower one's size; a bigger image stays bigger."""
+    roles = roles or {}
     texts = [el for el in elements if el["type"] == "text" and el["id"] in src_by_id]
     images = [el for el in elements if el["type"] == "image" and el["id"] in src_by_id]
     ok = tot = 0
@@ -520,6 +644,15 @@ def _hierarchy(elements: list[dict[str, Any]], src_by_id: dict[str, dict[str, An
             elif sb >= 1.1 * sa:
                 tot += 1
                 ok += float(b["font_size"]) >= float(a["font_size"]) - 0.5
+            ra, rb = RANK.get(roles.get(a["id"], ""), 2), RANK.get(roles.get(b["id"], ""), 2)
+            if ra == rb:
+                continue
+            hi, lo = (a, b) if ra > rb else (b, a)
+            s_hi, s_lo = float(src_by_id[hi["id"]]["font_size"]), float(src_by_id[lo["id"]]["font_size"])
+            src_ratio = s_hi / max(1.0, s_lo)
+            out_ratio = float(hi["font_size"]) / max(1.0, float(lo["font_size"]))
+            tot += 1
+            ok += out_ratio >= min(HIER_RATIO, src_ratio) - 0.01
     for i, a in enumerate(images):
         for b in images[i + 1:]:
             sa, sb = Box.of(src_by_id[a["id"]]).area, Box.of(src_by_id[b["id"]]).area

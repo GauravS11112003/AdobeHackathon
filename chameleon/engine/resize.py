@@ -44,7 +44,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from engine.analyze import BACKGROUND, DECORATIVE, Analysis, analyze
+from engine.analyze import BACKGROUND, DECORATIVE, HEADLINE, Analysis, analyze
 from engine.candidates import SMALL_CHANGE_MAX, Candidate, generate_candidates
 from engine.geometry import Box
 from engine import render as judge_render
@@ -56,6 +56,7 @@ from engine.textfit import MIN_FONT_SIZE, apply_font_size, default_measurer
 logger = logging.getLogger(__name__)
 
 JUDGE_RENDER = os.environ.get("CHAMELEON_NO_RENDER", "") not in ("1", "true", "yes")
+TOP_RENDER = 3                     # candidates re-judged with pixels after the no-render pass
 DUMP_DIR = os.environ.get("CHAMELEON_DUMP_DIR") or None
 LAST_JUDGED: list["Judged"] = []     # every candidate of the most recent resize(), best first
 _run_counter = 0
@@ -103,24 +104,33 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
     render = JUDGE_RENDER if render is None else render
     judge_render.begin_task()          # per-task pixel budget; see engine/render.py
     judged: list[Judged] = []
+    # Stage 1: every candidate is judged on geometry and the JSON contrast
+    # estimate (no pixels). Stage 2: the top few are re-judged with a render
+    # without text, which refines contrast / busyness under each text.
     for cand in generate_candidates(analysis, source, target):
         t0 = time.time()
         try:
             design = realize(source, analysis, cand.placement, target)
-            sc = score_design(analysis, source, design, target, render=render)
+            sc = score_design(analysis, source, design, target, render=False, strategy=cand.strategy)
         except Exception:
             logger.exception("candidate %s failed; skipped", cand.name)
             continue
         judged.append(Judged(cand.name, cand.strategy, design, sc, time.time() - t0, cand.fallback))
     if not judged:
         raise RuntimeError("no candidate could be realized")
-    # Best first. The safety-net candidate (proportions kept, everything slid
-    # to its anchors) only competes when every real candidate has a defect:
-    # it scores high on faithfulness by construction but is not a layout
-    # designed for the new shape. Sort is stable, so earlier (default)
-    # candidates win exact ties.
-    real_is_clean = any(not j.score.hard and not j.fallback for j in judged)
-    judged.sort(key=lambda j: (j.fallback and real_is_clean, -j.score.total))
+    # Best first; sort is stable, so earlier (default) candidates win exact
+    # ties. The anchor safety net on a big shape change carries the scorer's
+    # adaptation penalty, so it only wins when every real layout has a defect.
+    judged.sort(key=lambda j: -j.score.total)
+    if render:
+        for j in judged[:TOP_RENDER]:
+            t0 = time.time()
+            try:
+                j.score = score_design(analysis, source, j.design, target, render=True, strategy=j.strategy)
+            except Exception:
+                logger.exception("re-judging %s with pixels failed; keeping the estimate", j.name)
+            j.elapsed += time.time() - t0
+        judged.sort(key=lambda j: -j.score.total)
     LAST_JUDGED = judged
     return judged[0].design, judged
 
@@ -131,6 +141,7 @@ def realize(source: dict[str, Any], analysis: Analysis, placement: Placement, ta
     elements = materialize(source, analysis, placement, target)
     elements = rectify(analysis, elements, target)
     grow_panels(analysis, elements, target)   # zones follow the content the rectifier moved
+    _keep_headline_largest(elements, source, analysis)
     _finalize(elements, analysis, target)
     return {"canvas": {"width": int(target.w), "height": int(target.h)}, "elements": elements}
 
@@ -177,6 +188,26 @@ def _fit_text(new: dict[str, Any], src: dict[str, Any], scale: float,
             new["height"] = needed
             return float(int(wanted))
     return size
+
+
+def _keep_headline_largest(elements: list[dict[str, Any]], source: dict[str, Any], analysis: Analysis) -> None:
+    """The headline stays the largest text in the output, as it was in the
+    source: any text that was smaller than the headline there and comes out
+    bigger here (a short label the fitter could grow, a badge number) is
+    capped at the headline's size. Text the designer made bigger than the
+    headline (a date in a sticker) keeps that right."""
+    src = {el["id"]: el for el in source["elements"]}
+    heads = [el for el in elements if analysis.roles.get(el["id"]) == HEADLINE and el["type"] == "text"]
+    if not heads:
+        return
+    head = heads[0]
+    h_src = float(src[head["id"]]["font_size"])
+    h_out = float(head["font_size"])
+    for el in elements:
+        if el["type"] != "text" or el is head or el["id"] not in src:
+            continue
+        if float(src[el["id"]]["font_size"]) < h_src and float(el["font_size"]) > h_out:
+            apply_font_size(el, h_out)
 
 
 def _finalize(elements: list[dict[str, Any]], analysis: Analysis, target: Box) -> None:

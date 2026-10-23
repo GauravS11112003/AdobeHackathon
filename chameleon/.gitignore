@@ -23,3 +23,6 @@ output/*
 
 # Eval harness cache (Crello slice, converted designs, run results)
 eval/data/
+
+# VLM weights (GGUF, several GB) are fetched at Docker build time, see Dockerfile
+models/

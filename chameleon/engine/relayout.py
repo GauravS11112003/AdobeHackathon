@@ -20,6 +20,7 @@ import math
 
 from engine.analyze import Analysis, BACKGROUND, DECORATIVE, PANEL, PANEL_EDGE, Unit
 from engine.geometry import Box, clamp
+from engine.textfit import TextMeasurer, default_measurer
 
 CONTENT_MARGIN_FRAC = 0.03   # keep important things at least this far from the edge
 PANEL_PAD_FRAC = 0.02        # minimum breathing room between a panel's edge and the content on it
@@ -144,7 +145,8 @@ def _place_members(unit: Unit, new: Box, s: float, out: Placement) -> None:
 # panels: flat colour zones laid out around the content they carried
 
 
-def place_panels(analysis: Analysis, out: Placement, target: Box, mode: str) -> None:
+def place_panels(analysis: Analysis, out: Placement, target: Box, mode: str,
+                 measurer: TextMeasurer | None = None) -> None:
     """Place every panel unit after the content.
 
     mode "stretch" (anchor path): the panel keeps its fractional geometry
@@ -156,6 +158,7 @@ def place_panels(analysis: Analysis, out: Placement, target: Box, mode: str) -> 
     Either way a side that touched a canvas edge in the source touches it
     again (a split background stays split, a bar stays a bar)."""
     src = analysis.canvas
+    m = measurer or default_measurer()
     sx, sy = target.w / src.w, target.h / src.h
     s = min(sx, sy)
     ps = clamp(math.sqrt(target.area / src.area), 0.25, 2.5)   # padding scale
@@ -166,7 +169,7 @@ def place_panels(analysis: Analysis, out: Placement, target: Box, mode: str) -> 
         rect = _is_rect(unit, analysis)
         touch = _edges_touched(sb, src)
         carried = [u for u in analysis.carried(unit.key) if all(i in out.boxes for i in u.ids)]
-        hull_now = Box.union(out.boxes[i] for u in carried for i in u.ids) if carried else None
+        hull_now = Box.union(_placed_visible(u, out, analysis, m) for u in carried) if carried else None
         base = Box(sb.x * sx, sb.y * sy, sb.w * sx, sb.h * sy)
         if not rect:
             base = _uniform_at_fraction(sb, src, target, s)
@@ -183,7 +186,7 @@ def place_panels(analysis: Analysis, out: Placement, target: Box, mode: str) -> 
         if rect:
             new = _stick_edges(new, touch, target)
             new = _clip(new, target)
-            obstacles = [Box.union(out.boxes[i] for i in u.ids)
+            obstacles = [_placed_visible(u, out, analysis, m)
                          for u in _strangers(analysis, unit) if all(i in out.boxes for i in u.ids)]
             new = _avoid(new, obstacles, hull_now, pad_min)
         else:
@@ -195,11 +198,13 @@ def place_panels(analysis: Analysis, out: Placement, target: Box, mode: str) -> 
         out.font_scale[eid] = s
 
 
-def grow_panels(analysis: Analysis, elements: list[dict[str, Any]], target: Box) -> None:
+def grow_panels(analysis: Analysis, elements: list[dict[str, Any]], target: Box,
+                measurer: TextMeasurer | None = None) -> None:
     """After the rectifier moved content around: grow each panel (in place,
     on materialized elements) so it still covers the units it carried, with
     a small pad, keeping the canvas edges it touches."""
     by_id = {el["id"]: el for el in elements}
+    m = measurer or default_measurer()
     pad = clamp(PANEL_PAD_FRAC * min(target.w, target.h), 2.0, 16.0)
     for unit in analysis.panels():
         el = by_id.get(unit.ids[0])
@@ -208,7 +213,7 @@ def grow_panels(analysis: Analysis, elements: list[dict[str, Any]], target: Box)
         carried = [u for u in analysis.carried(unit.key) if all(i in by_id for i in u.ids)]
         if not carried:
             continue
-        hull = Box.union(_drawn_box(by_id[i]) for u in carried for i in u.ids)
+        hull = Box.union(_material_visible(u, by_id, m) for u in carried)
         cur = Box.of(el)
         want = Box.union([cur, Box(hull.x - pad, hull.y - pad, hull.w + 2 * pad, hull.h + 2 * pad)])
         if not _is_rect(unit, analysis):
@@ -220,10 +225,51 @@ def grow_panels(analysis: Analysis, elements: list[dict[str, Any]], target: Box)
         else:
             touch = _edges_touched(cur, target, tol=0.5 / max(target.w, target.h))
             want = _clip(_stick_edges(want, touch, target), target)
-            obstacles = [Box.union(_drawn_box(by_id[i]) for i in u.ids)
+            obstacles = [_material_visible(u, by_id, m)
                          for u in _strangers(analysis, unit) if all(i in by_id for i in u.ids)]
             want = _avoid(want, obstacles, hull, pad)
         el["x"], el["y"], el["width"], el["height"] = want.x, want.y, want.w, want.h
+
+
+def _visible(el: dict[str, Any], box: Box, font: float | None, m: TextMeasurer) -> Box:
+    """What the viewer sees of an element at `box`: the painted extent of a
+    text (caps to descenders, aligned lines), the drawn extent of anything
+    else (rotation about the centre). Panels wrap and avoid *that*, not the
+    boxes, which for text are taller and often wider than the glyphs."""
+    rot = float(el.get("rotation", 0.0) or 0.0)
+    if el["type"] == "text" and str(el.get("content", "")).strip():
+        try:
+            p = m.painted(el, font if font else float(el["font_size"]), max(box.w, 1.0))
+            box = Box(box.x + p.x, box.y + p.top, max(p.w, 1.0), max(p.h, 1.0))
+        except Exception:  # pragma: no cover - odd text element
+            pass
+    if not rot:
+        return box
+    a = math.radians(rot)
+    w = box.w * abs(math.cos(a)) + box.h * abs(math.sin(a))
+    h = box.w * abs(math.sin(a)) + box.h * abs(math.cos(a))
+    return Box(box.cx - w / 2.0, box.cy - h / 2.0, w, h)
+
+
+def _placed_visible(unit: Unit, out: Placement, analysis: Analysis, m: TextMeasurer) -> Box:
+    """Visible box of a unit in a Placement (fonts from the placement)."""
+    parts = []
+    for eid in unit.ids:
+        el = analysis.source_elements.get(eid)
+        b = out.boxes[eid]
+        if el is None:
+            parts.append(b)
+            continue
+        font = out.font_size.get(eid)
+        if font is None and el["type"] == "text":
+            font = float(el["font_size"]) * out.font_scale.get(eid, 1.0)
+        parts.append(_visible(el, b, font, m))
+    return Box.union(parts)
+
+
+def _material_visible(unit: Unit, by_id: dict[str, dict[str, Any]], m: TextMeasurer) -> Box:
+    """Visible box of a unit in a materialized element list."""
+    return Box.union(_visible(by_id[i], Box.of(by_id[i]), None, m) for i in unit.ids)
 
 
 def _strangers(analysis: Analysis, panel: Unit) -> list[Unit]:

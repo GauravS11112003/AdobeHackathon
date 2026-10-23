@@ -9,6 +9,7 @@ import pytest
 from engine import analyze as A
 from engine.floorplan import BANNER, SQUARE, TALL, WIDE, ratio_family
 from engine.geometry import Box
+from engine.rectify import unwanted_overlaps
 from engine.resize import resize
 from engine.textfit import default_measurer
 
@@ -46,16 +47,11 @@ def test_all_ids_present_once(case):
 
 
 def test_no_new_overlaps_between_content_units(case):
+    """The engine's own definition (engine.rectify.unwanted_overlaps): visible
+    boxes, per part of a sibling row, worse than the source by > 1.5 pp."""
     source, target, out = case
     analysis = A.analyze(source)
-    before = _unit_boxes(analysis, source["elements"])
-    after = _unit_boxes(analysis, out["elements"])
-    units = analysis.content_units()
-    for i, a in enumerate(units):
-        for b in units[i + 1:]:
-            if before[a.key].overlaps(before[b.key], tol=1.0):
-                continue   # intentional in the source
-            assert not after[a.key].overlaps(after[b.key], tol=1.0), f"{a.key} overlaps {b.key}"
+    assert unwanted_overlaps(analysis, out["elements"]) == []
 
 
 def test_text_fits_its_box(case):

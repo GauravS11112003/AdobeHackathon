@@ -29,6 +29,7 @@ from engine.analyze import BACKGROUND, DECORATIVE, CTA, HEADLINE, Analysis, anal
 from engine.floorplan import Metrics, ratio_family
 from engine.geometry import Box
 from engine.rectify import rotated_extent, unwanted_overlaps
+from engine.score import below_floor
 from engine.textfit import TextMeasurer, default_measurer
 
 ASPECT_TOL = 0.05
@@ -149,6 +150,7 @@ def text_metrics(source: dict[str, Any], output: dict[str, Any], target: dict[st
     n_text = 0
     src_by_id = {e["id"]: e for e in source["elements"]}
     ratios: list[float] = []
+    area_scale = math.sqrt(tgt.area / analysis.canvas.area)
     for e in output.get("elements") or []:
         if e.get("type") != "text":
             continue
@@ -161,14 +163,14 @@ def text_metrics(source: dict[str, Any], output: dict[str, Any], target: dict[st
         except Exception:
             overflow.append(e["id"])
         role = analysis.roles.get(e["id"])
+        s = src_by_id.get(e["id"])
         if role in (HEADLINE, CTA):
             min_primary = min(min_primary, font)
-            if font < met.min_font(role) - 0.5:
+            src_font = _f(s.get("font_size")) if s else font
+            if below_floor(font, role, src_font, met, area_scale):
                 below.append(e["id"])
-        s = src_by_id.get(e["id"])
         if s and _f(s.get("font_size")) > 0:
             ratios.append(font / _f(s["font_size"]))
-    area_scale = math.sqrt(tgt.area / analysis.canvas.area)
     return {
         "n_text": n_text,
         "overflow_n": len(overflow),
