@@ -225,6 +225,15 @@ def _finalize(elements: list[dict[str, Any]], analysis: Analysis, target: Box) -
             # on canvas is its rotated extent (the renderer rotates about the
             # box centre), so slide it rather than clipping the frame box.
             ext = rotated_extent(Box.of(el), rot)
+            if el["type"] != "text" and (ext.w > target.w + 0.01 or ext.h > target.h + 0.01):
+                # A shape or image whose rotated extent is bigger than the
+                # canvas (a 1-degree panel stretched to the full height, v5)
+                # shrinks about its centre until the extent fits.
+                f = min(target.w / max(ext.w, 1e-6), target.h / max(ext.h, 1e-6))
+                cx, cy = float(el["x"]) + float(el["width"]) / 2.0, float(el["y"]) + float(el["height"]) / 2.0
+                el["width"], el["height"] = float(el["width"]) * f, float(el["height"]) * f
+                el["x"], el["y"] = cx - el["width"] / 2.0, cy - el["height"] / 2.0
+                ext = rotated_extent(Box.of(el), rot)
             nx = min(max(ext.x, 0.0), max(0.0, target.w - ext.w))
             ny = min(max(ext.y, 0.0), max(0.0, target.h - ext.h))
             el["x"] = float(el["x"]) + (nx - ext.x)

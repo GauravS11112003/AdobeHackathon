@@ -49,7 +49,7 @@ from engine.analyze import (
 )
 from engine.geometry import Box, clamp
 from engine.relayout import Placement, _cover_box, _map_decorative, _place_members, place_panels
-from engine.textfit import TextMeasurer, default_measurer
+from engine.textfit import TextMeasurer, default_measurer, scaled_letter_spacing
 
 TALL = "tall"
 SQUARE = "square"
@@ -84,6 +84,20 @@ HERO_FLOOR_FRAC = 0.30
 STAMP_FLOOR_FRAC = 0.08
 CHIP_MAX_SHARE = 0.18       # a chip's ideal height is at most this share of the canvas height
 
+# Tall strips (v5): on a canvas narrower than STRIP_MAX_RATIO x its height
+# the fonts also have a floor relative to the *width* (a 160 px skyscraper
+# is read at arm's length like any other 160 px wide thing), and a hero in
+# a column takes the height the width-bound text leaves over, up to
+# HERO_MAX_SHARE of the canvas height.
+STRIP_MAX_RATIO = 0.5
+STRIP_FONT_FRAC = {HEADLINE: 0.045, CTA: 0.035, FINE_PRINT: 0.025, BADGE: 0.022}
+STRIP_FONT_FRAC_DEFAULT = 0.03
+HERO_MAX_SHARE = 0.55
+VERTICAL_LEN_SHARE = 0.5    # a vertical text in a column runs along at most this share of the column height
+                            # before it wraps onto a second line (a spine label), and never over the whole column
+RAIL_W_FRAC = 0.3           # a vertical text beside the hero (a rail) takes at most this share of the width
+RAIL_LEN_SHARE = 0.6        # ... and may run past the hero up to this share of the column height to stay on one line
+
 # Ambition (v4): the plans may size things past the source-proportional size
 # when the canvas has room. The scorer credits primary units up to AMBITION x
 # sqrt(target area / source area) (tailsgit's 1.2 cap); candidates with a
@@ -93,6 +107,24 @@ HERO_SHARES = (0.45, 0.36, 0.28)   # wide plan: hero width shares tried, biggest
 HEAD_MAX_LINES = 3                 # ... until the headline wraps on at most this many lines
 HERO_SHARE_K_TOL = 0.9             # ... as long as the column keeps this share of the best k found
 BANNER_COLUMN_MIN_H = 160.0        # a banner at least this tall may also use the hero-beside-column plan
+
+# Cohesion (v5): leftover width in a banner row is not spread evenly between
+# the items (two units ended up at the far edges with 80 % empty strip
+# between them); each gap grows to at most max(MAX_GAP_MULT x the base gap,
+# MAX_GAP_FRAC x the canvas width) and the clustered row is centred.
+MAX_GAP_MULT = 3.0
+MAX_GAP_FRAC = 0.08
+
+# Importance tiers (v5): when even the floors do not fit, floors are lowered
+# tier by tier from the least important items up (water-filling: everyone
+# keeps a minimum, the headline / logo / CTA keep theirs and take the room
+# that the search then finds). RESCUE_STEPS is tried in order until the
+# floors fit; the primary tier is never lowered (an overflowing plan with a
+# readable headline beats one with a 4 px headline).
+TIER_PRIMARY, TIER_HERO, TIER_SECONDARY, TIER_MINOR = 0, 1, 2, 3
+RESCUE_STEPS = ((TIER_MINOR, 0.55), (TIER_SECONDARY, 0.55), (TIER_MINOR, 0.55), (TIER_HERO, 0.55),
+                (TIER_SECONDARY, 0.55))
+ABS_MIN_FONT = 4.0          # rescue mode never lowers a text floor below this (a floor that was lower stays)
 
 
 @dataclass(frozen=True)
@@ -200,6 +232,8 @@ class Metrics:
         else:
             base = 10.0 if not self.short else _round(clamp(0.08 * h, 6.0, 10.0))
         rel = max(5.0, FONT_FLOOR_LONG * max(self.target.w, self.target.h)) * FONT_FLOOR_MULT.get(role, 1.0)
+        if self.target.w / max(self.target.h, 1.0) <= STRIP_MAX_RATIO:
+            rel = max(rel, STRIP_FONT_FRAC.get(role, STRIP_FONT_FRAC_DEFAULT) * self.target.w)
         return max(base, _round(rel))
 
     @property
@@ -217,6 +251,7 @@ def _round(v: float) -> float:
 
 class _Item:
     prio: float = PRIO_PRIMARY
+    tier: int = TIER_PRIMARY   # importance tier for rescue mode (independent of the shrink speed)
     w_frac: float = 1.0        # share of the available width this item may use
     applies_w_frac: bool = False   # True: size() applies w_frac itself; else the caller does
     w: float = 0.0
@@ -228,15 +263,28 @@ class _Item:
     def place(self, x: float, y: float, w: float, h: float, out: Placement) -> None:
         raise NotImplementedError
 
-    def relax(self, factor: float) -> None:
-        """Rescue mode: lower this item's floors by `factor` (secondary and
-        minor items only; the headline, logo and CTA keep theirs)."""
+    def relax(self, factor: float, tier: int = TIER_SECONDARY) -> None:
+        """Rescue mode: lower the floors of this item by `factor` when its
+        importance tier is `tier` or lower (bigger number). Primary items
+        (headline, logo, CTA) are never asked."""
         return None
+
+
+def tier_of(prio: float) -> int:
+    """Importance tier from the nominal shrink speed (before `fill` makes
+    every speed uniform)."""
+    if prio >= PRIO_MINOR:
+        return TIER_MINOR
+    if prio >= PRIO_SECONDARY:
+        return TIER_SECONDARY
+    if prio >= PRIO_HERO:
+        return TIER_HERO
+    return TIER_PRIMARY
 
 
 BUTTON_LABEL_INSIDE = 0.8   # a label is "in" its pill when this much of its box is (analyze.INSIDE_FRAC)
 MIN_TEXT_BOX_H = 1.8        # a text box never drops below this height (a 1 px font needs ~1.4 px)
-RESCUE_FACTOR = 0.55        # floors of secondary / minor items in rescue mode (when the floors do not fit)
+RESCUE_FACTOR = 0.55        # kept for reference: v3's single rescue step (v5 uses RESCUE_STEPS, tier by tier)
 
 
 class _Scaled(_Item):
@@ -252,9 +300,11 @@ class _Scaled(_Item):
 
     def __init__(self, unit: Unit, elements: dict[str, dict[str, Any]], ideal_s: float,
                  floor_s: float, prio: float = PRIO_PRIMARY, w_frac: float = 1.0,
-                 m: TextMeasurer | None = None, label_floor: float = 0.0):
+                 m: TextMeasurer | None = None, label_floor: float = 0.0, tier: int | None = None):
         self.unit = unit
         self.elements = elements
+        self.tier = tier_of(prio) if tier is None else tier
+        self.cap_s = float("inf")      # ceiling on the scale (set by the builder; `grow` respects it)
         self.ext_w, self.ext_h = _extents(unit, elements)
         # every member box stays >= 1 px (the official renderer rejects a 0 px
         # text box) and every text member tall enough for a 1 px font to fit
@@ -286,10 +336,20 @@ class _Scaled(_Item):
         self.w, self.h = self.ext_w * self.s, self.ext_h * self.s
         return self.w, self.h
 
-    def relax(self, factor: float) -> None:
-        if self.prio >= PRIO_SECONDARY:
+    def relax(self, factor: float, tier: int = TIER_SECONDARY) -> None:
+        if self.tier >= tier:
             self.floor_s *= factor
-            self.label_floor = max(1.0, self.label_floor * factor)
+            self.label_floor = max(min(ABS_MIN_FONT, self.label_floor), self.label_floor * factor)
+
+    def grow(self, max_h: float, max_w: float) -> None:
+        """Take leftover room (v5): scale up to `max_h` x `max_w`, never past
+        the builder's ceiling (`cap_s`); a squeezed button stays as it is."""
+        if self.squeezed:
+            return
+        s = min(max_h / self.ext_h, max_w / self.ext_w, self.cap_s)
+        if s > self.s + 1e-6:
+            self.s = s
+            self.w, self.h = self.ext_w * s, self.ext_h * s
 
     def _squeeze(self, k: float, slot_w: float, slot_h: float) -> bool:
         el = self.elements[self.label]
@@ -399,13 +459,16 @@ class _TextItem(_Item):
     attachments scale with it uniformly."""
 
     def __init__(self, unit: Unit, el: dict[str, Any], m: TextMeasurer, cap: float,
-                 floor: float, prio: float, natural_width: bool = False, hard_w: float = 0.0):
+                 floor: float, prio: float, natural_width: bool = False, hard_w: float = 0.0,
+                 tier: int | None = None):
         self.unit = unit
         self.el = el
         self.m = m
         self.floor = float(floor)
         self.cap = max(float(int(cap)), self.floor)
         self.prio = prio
+        self.tier = tier_of(prio) if tier is None else tier
+        self.len_share = 1.0        # vertical text: share of the slot height its lines may run along
         self.natural_width = natural_width
         self.hard_w = float(hard_w)     # a line never wider than this (the canvas), floor or not
         self.font = self.cap
@@ -443,14 +506,27 @@ class _TextItem(_Item):
     def font_at(self, k: float) -> float:
         return max(self.floor, float(int(self.cap * k ** self.prio)))
 
-    def relax(self, factor: float) -> None:
-        if self.prio >= PRIO_SECONDARY:
-            self.floor = max(1.0, float(int(self.floor * factor)))
+    def relax(self, factor: float, tier: int = TIER_SECONDARY) -> None:
+        if self.tier >= tier:
+            self.floor = max(min(ABS_MIN_FONT, self.floor), float(int(self.floor * factor)))
 
     def size(self, k: float, aw: float, ah: float) -> tuple[float, float]:
-        # Budgets in the element's own frame.
-        bw, bh = (ah, aw) if self.vertical else (aw, ah)
+        # Budgets in the element's own frame. A vertical text runs along the
+        # slot's height; in a column it may take only `len_share` of it and
+        # wraps onto a second (third) line beyond that, like a spine label.
+        bw, bh = (ah * self.len_share, aw) if self.vertical else (aw, ah)
+        return self._size_at(self.font_at(k), bw, bh)
+
+    def rail_size(self, k: float, thick_budget: float, len_budget: float) -> tuple[float, float]:
+        """A vertical text beside the hero (v5): one line along `len_budget`
+        at the largest font from font_at(k) down to the floor; it wraps only
+        when the single line is still longer at the floor."""
         font = self.font_at(k)
+        while font > self.floor and _single_line_width(self.m, self.el, font) + 2.0 > len_budget:
+            font = max(self.floor, font - 1.0)
+        return self._size_at(font, len_budget, thick_budget)
+
+    def _size_at(self, font: float, bw: float, bh: float) -> tuple[float, float]:
         # An over-wide single word overflows the box in the renderer: shrink first.
         while font > self.floor and self.m.layout(self.el, font, bw).max_width > bw + 0.5:
             font = max(self.floor, font - 1.0)
@@ -477,6 +553,20 @@ class _TextItem(_Item):
             # box takes the real width so the font the plan chose really fits
             # and the plan sees the true footprint.
             w = lay.max_width + 1.0
+        elif not self.rotation:
+            # The box hugs the wrapped lines (v5): greedy wrapping at the widest
+            # line's width reproduces the same lines, and a box no wider than
+            # its ink cannot start off canvas when the ink is placed at the
+            # slot's edge (the rectifier then dragged box and ink into the
+            # neighbour). The renderer wraps on glyph widths without letter
+            # spacing (a negatively spaced line needs its glyph width) and
+            # counts the space after a line's last word before it breaks, so
+            # the box keeps room for one space.
+            hug = lay.max_width
+            if scaled_letter_spacing(self.el, font) < 0.0:
+                hug = self.m.layout(dict(self.el, letter_spacing=0.0), font, w).max_width
+            space = self.m.layout(dict(self.el, content=" ", letter_spacing=0.0), font, 1e7).max_width
+            w = max(1.0, min(w, hug + space + 1.0))
         self.font = font
         self.own_w, self.own_h = w, h
         self.att_boxes = {}
@@ -490,8 +580,9 @@ class _TextItem(_Item):
         pb = Box(painted.x, painted.top, painted.w, painted.h)      # relative to the box
         boxes = [pb]
         rel: dict[str, Box] = {}
+        room = max(1.0, bh - pb.h)      # height the slot leaves for attachments above / below the text (v5)
         for eid, dx, dy, aw_f, ah_f, align, vref in self.att:
-            a_w, a_h = min(aw_f * font, max(w, 1.0)), ah_f * font
+            a_w, a_h = min(aw_f * font, max(w, 1.0)), min(ah_f * font, room)
             if align == "center":
                 ax = pb.cx + dx * font - a_w / 2.0
             elif align == "right":
@@ -499,6 +590,12 @@ class _TextItem(_Item):
             else:
                 ax = pb.x + dx * font
             ay = (pb.y if vref == "top" else pb.bottom) + dy * font
+            # An attachment much taller than its text (a bar that ran along
+            # a whole list) never makes the footprint taller than the slot.
+            if vref == "bottom":
+                ay = min(ay, pb.bottom + room - a_h)
+            else:
+                ay = max(ay, pb.bottom - bh)
             rel[eid] = Box(ax, ay, a_w, a_h)
             boxes.append(rel[eid])
         foot = Box.union(boxes)
@@ -552,18 +649,26 @@ def _rotated_extent(w: float, h: float, rotation: float) -> tuple[float, float]:
 class _TextColumn(_Item):
     """Headline + subhead (+ body, fine print) stacked in a column whose width
     is chosen so the headline wraps on at most `max_lines` lines and the
-    whole stack fits the available height. Used by the banner plan."""
+    whole stack fits the available height. Used by the banner plan.
+
+    v5: when even the widest single column is taller than the strip, the
+    texts flow into several columns side by side (reading order kept, each
+    column as tall as the strip allows) instead of shrinking to nothing: a
+    90 px banner holds the headline in one column and the rest beside it."""
 
     applies_w_frac = True
 
     def __init__(self, texts: list[_TextItem], head: _TextItem, gap: Callable[[float], float],
-                 w_frac: float, max_lines: int = 2):
+                 w_frac: float, max_lines: int = 2, flow: bool = True):
         self.texts = texts
         self.head = head
         self.gap = gap
         self.w_frac = w_frac
         self.max_lines = max_lines
         self.over = False
+        self.flow = flow
+        self.columns: list[list[_TextItem]] = [list(texts)]
+        self.col_w: list[float] = []
 
     def _height(self, k: float, w: float, ah: float) -> float:
         total = 0.0
@@ -580,6 +685,8 @@ class _TextColumn(_Item):
                 continue   # its footprint width is its line height; size() handles it
             lo = max(lo, min(max_w, _longest_word_width(t.m, t.el, t.font_at(k)) + 1.0))
         lo = min(lo, max_w)
+        self.columns = [list(self.texts)]
+        self.col_w = []
         if self._height(k, lo, ah) <= ah + 0.5:
             w = lo
             self.over = False
@@ -588,6 +695,8 @@ class _TextColumn(_Item):
             if self._height(k, b, ah) > ah + 0.5:
                 w = max_w
                 self.over = True
+                if self.flow and len(self.texts) > 1:
+                    return self._flow(k, lo, max_w, ah)
             else:
                 for _ in range(12):
                     mid = (a + b) / 2.0
@@ -601,15 +710,41 @@ class _TextColumn(_Item):
         self.w = self._ink(w)
         return self.w, self.h
 
+    def _flow(self, k: float, lo: float, max_w: float, ah: float) -> tuple[float, float]:
+        """Pack the texts into the fewest columns whose stacks fit `ah`, each
+        text at the column width `lo` (the narrowest width the headline's
+        line policy allows); a text taller than the strip on its own gets a
+        column of its own and overflows it (the plan's k search shrinks it)."""
+        w = max(1.0, lo)
+        g = self.gap(self.head.font)
+        cols: list[list[_TextItem]] = [[]]
+        run = 0.0
+        for t in self.texts:
+            h = t.size(k, w, ah)[1]
+            add = h + (g if cols[-1] else 0.0)
+            if cols[-1] and run + add > ah + 0.5:
+                cols.append([t])
+                run = h
+            else:
+                cols[-1].append(t)
+                run += add
+        self.columns = cols
+        self.col_w = [max(min(w, max((t.ink_w for t in c), default=w) + 1.0), max(t.w for t in c)) for c in cols]
+        heights = [sum(t.h for t in c) + g * (len(c) - 1) for c in cols]
+        self.over = max(heights) > ah + 0.5
+        self.w = sum(self.col_w) + 2.0 * g * (len(cols) - 1)
+        self.h = max(heights)
+        return self.w, self.h
+
     def _ink(self, wrap_w: float) -> float:
         """Box width that keeps the wrap found at `wrap_w` but hugs the glyphs,
         so the gaps a viewer sees are the gaps the plan intended."""
         ink = max((t.ink_w for t in self.texts), default=wrap_w)
         return max(min(wrap_w, ink + 1.0), max((t.w for t in self.texts), default=0.0))
 
-    def relax(self, factor: float) -> None:
+    def relax(self, factor: float, tier: int = TIER_SECONDARY) -> None:
         for t in self.texts:
-            t.relax(factor)
+            t.relax(factor, tier)
 
     def comfortable_width(self, k: float, max_w: float) -> float:
         """Width at which the headline sits on one line and the rest on two."""
@@ -620,15 +755,26 @@ class _TextColumn(_Item):
         return min(best, max_w)
 
     def widen(self, k: float, w: float, ah: float) -> None:
-        if w > self.w:
+        if w > self.w and len(self.columns) == 1:
             self.h = self._height(k, w, ah)
             self.w = self._ink(w)
 
     def place(self, x: float, y: float, w: float, h: float, out: Placement) -> None:
-        cy = y + (h - self.h) / 2.0
-        for t in self.texts:
-            t.place(x + (w - self.w) / 2.0, cy, self.w, t.h, out)
-            cy += t.h + self.gap(self.head.font)
+        g = self.gap(self.head.font)
+        if len(self.columns) == 1:
+            cy = y + (h - self.h) / 2.0
+            for t in self.texts:
+                t.place(x + (w - self.w) / 2.0, cy, self.w, t.h, out)
+                cy += t.h + g
+            return
+        cx = x + (w - self.w) / 2.0
+        for col, cw in zip(self.columns, self.col_w):
+            ch = sum(t.h for t in col) + g * (len(col) - 1)
+            cy = y + (h - ch) / 2.0
+            for t in col:
+                t.place(cx, cy, cw, t.h, out)
+                cy += t.h + g
+            cx += cw + 2.0 * g
 
 
 class _Chips(_Item):
@@ -701,15 +847,102 @@ class _Chips(_Item):
                     y += c.h + g
                 x += lw + g
 
-    def relax(self, factor: float) -> None:
+    def relax(self, factor: float, tier: int = TIER_SECONDARY) -> None:
         for c in self.chips:
-            c.relax(factor)
+            c.relax(factor, tier)
 
     def place(self, x: float, y: float, w: float, h: float, out: Placement) -> None:
         x0 = x + (w - self.w) / 2.0
         y0 = y + (h - self.h) / 2.0
         for c, (dx, dy) in zip(self.chips, self.offsets):
             c.place(x0 + dx, y0 + dy, c.w, c.h, out)
+
+
+class _HeroRails(_Item):
+    """The hero with vertical texts running along its sides (v5): the rails
+    a poster designer sets beside a photo stay beside it instead of being
+    stacked into the column, where their length ate the column's height.
+    The rails take their line budget from the hero's height and wrap onto
+    a second line when they are longer; the hero gets the width they leave."""
+
+    applies_w_frac = True
+
+    def __init__(self, hero: _Scaled, rails: list[_TextItem], gap: float, hero_box: Box):
+        self.hero = hero
+        self.rails = rails
+        self.gap = gap
+        self.prio = hero.prio
+        self.tier = hero.tier
+        self.unit = hero.unit
+        self.sides = {id(r): ("left" if _drawn_extent(r.unit, r.el).cx < hero_box.cx else "right") for r in rails}
+        self.k = 1.0
+
+    def _rails_w(self) -> float:
+        return sum(r.w + self.gap for r in self.rails)
+
+    def _fit_rails(self, k: float, aw: float, ah: float) -> None:
+        # A rail may run a little past the hero (up to RAIL_LEN_SHARE of the
+        # column) so that it stays on one line at a readable size.
+        budget = max(self.hero.h, RAIL_LEN_SHARE * ah)
+        for r in self.rails:
+            r.rail_size(k, aw * RAIL_W_FRAC, budget)
+
+    def size(self, k: float, aw: float, ah: float) -> tuple[float, float]:
+        self.k = k
+        self.ah = ah
+        rails_w = getattr(self, "_last_rails_w", 0.0)
+        for _ in range(2):
+            self.hero.size(k, max(1.0, aw - rails_w), ah)
+            self._fit_rails(k, aw, ah)
+            rails_w = self._rails_w()
+        self.hero.size(k, max(1.0, aw - rails_w), ah)
+        self._last_rails_w = rails_w
+        self.w = self.hero.w + rails_w
+        self.h = max([self.hero.h] + [r.h for r in self.rails])
+        return self.w, self.h
+
+    def grow(self, max_h: float, max_w: float) -> None:
+        self.hero.grow(max_h, max(1.0, max_w - self._rails_w()))
+        self._fit_rails(self.k, max_w, getattr(self, "ah", max_h))
+        self.w = self.hero.w + self._rails_w()
+        self.h = max([self.hero.h] + [r.h for r in self.rails])
+
+    def relax(self, factor: float, tier: int = TIER_SECONDARY) -> None:
+        self.hero.relax(factor, tier)
+        for r in self.rails:
+            r.relax(factor, tier)
+
+    def place(self, x: float, y: float, w: float, h: float, out: Placement) -> None:
+        cx = x + (w - self.w) / 2.0
+        left = [r for r in self.rails if self.sides[id(r)] == "left"]
+        right = [r for r in self.rails if self.sides[id(r)] != "left"]
+        for r in left:
+            r.place(cx, y + (h - r.h) / 2.0, r.w, r.h, out)
+            cx += r.w + self.gap
+        self.hero.place(cx, y + (h - self.hero.h) / 2.0, self.hero.w, self.hero.h, out)
+        cx += self.hero.w + self.gap
+        for r in right:
+            r.place(cx, y + (h - r.h) / 2.0, r.w, r.h, out)
+            cx += r.w + self.gap
+
+
+def _drawn_extent(unit: Unit, el: dict[str, Any]) -> Box:
+    """Axis-aligned extent of a unit's primary element as drawn in the source."""
+    b = unit.members.get(el["id"], unit.box)
+    rot = float(el.get("rotation", 0.0) or 0.0)
+    if not rot:
+        return b
+    w, h = _rotated_extent(b.w, b.h, rot)
+    return Box(b.cx - w / 2.0, b.cy - h / 2.0, w, h)
+
+
+def _beside(text: _TextItem, hero: Unit) -> bool:
+    """Did this vertical text run along the hero's side in the source?"""
+    ext = _drawn_extent(text.unit, text.el)
+    yo = min(ext.bottom, hero.box.bottom) - max(ext.y, hero.box.y)
+    if yo < 0.5 * max(ext.h, 1.0):
+        return False
+    return ext.cx < hero.box.x or ext.cx > hero.box.right
 
 
 class _Row(_Item):
@@ -733,9 +966,9 @@ class _Row(_Item):
             self.h = max(self.h, h)
         return self.w, self.h
 
-    def relax(self, factor: float) -> None:
+    def relax(self, factor: float, tier: int = TIER_SECONDARY) -> None:
         for it in self.items:
-            it.relax(factor)
+            it.relax(factor, tier)
 
     def place(self, x: float, y: float, w: float, h: float, out: Placement) -> None:
         cx = x + (w - self.w) / 2.0
@@ -801,7 +1034,7 @@ def _largest_k(fits: Callable[[float], bool], items: list[_Item] | None = None) 
     """Largest k in [0, 1] for which fits(k) holds (fits is monotone in k).
     Leaves every item sized at the returned k. The flag is False when even
     the floors (k = 0) do not fit; with `items` given, that case first
-    tries rescue mode (secondary / minor floors lowered by RESCUE_FACTOR):
+    tries rescue mode (floors lowered tier by tier, RESCUE_STEPS):
     a readable headline and CTA with small legal copy beat a layout whose
     pieces run into each other."""
     if fits(1.0):
@@ -809,9 +1042,15 @@ def _largest_k(fits: Callable[[float], bool], items: list[_Item] | None = None) 
     if not fits(0.0):
         if not items:
             return 0.0, False
-        for it in items:
-            it.relax(RESCUE_FACTOR)
-        if not fits(0.0):
+        # Water-filling (v5): the least important floors go first, tier by
+        # tier, until the floors fit; the search above the floors then hands
+        # the room to the headline / logo / CTA first (their shrink speed).
+        for tier, factor in RESCUE_STEPS:
+            for it in items:
+                it.relax(factor, tier)
+            if fits(0.0):
+                break
+        else:
             return 0.0, False
     lo, hi = 0.0, 1.0
     for _ in range(K_SEARCH_STEPS):
@@ -896,7 +1135,8 @@ class _Builder:
         el = self.elements[unit.primary or unit.ids[0]]
         cap = float(el["font_size"]) * self.met.cap_scale
         return _TextItem(unit, el, self.m, cap, self.met.min_font(unit.role), self.prio(prio), natural_width,
-                         hard_w=self.target.w)   # a line may run into the margins before it goes under the floor
+                         hard_w=self.target.w,   # a line may run into the margins before it goes under the floor
+                         tier=tier_of(prio))
 
     def text_items(self) -> list[_TextItem]:
         items = []
@@ -939,7 +1179,10 @@ class _Builder:
         if role_for_floor is not None:
             floor_s = max(floor_s, self._text_floor(unit, role_for_floor))
             label_floor = self.met.min_font(role_for_floor)
-        return _Scaled(unit, self.elements, ideal_s, floor_s, self.prio(prio), w_frac, self.m, label_floor)
+        it = _Scaled(unit, self.elements, ideal_s, floor_s, self.prio(prio), w_frac, self.m, label_floor,
+                     tier=tier_of(prio))
+        it.cap_s = self.met.cap_scale * cap_mult
+        return it
 
     def logo(self, ideal_h: float, floor_h: float, w_frac: float) -> _Scaled | None:
         if self.slots.logo is None:
@@ -1058,14 +1301,38 @@ def _column_items(b: _Builder, met: Metrics, H: float, with_hero: bool, tight: b
     logo = b.logo(ideal_h=logo_frac * H, floor_h=max(12.0, 0.035 * H), w_frac=0.5)
     if logo:
         items.append(logo)
-    if with_hero:
-        hero = b.hero(ideal_h=(0.36 if tight else 0.40) * H, floor_h=0.15 * H, w_frac=0.85)
-        if hero:
-            items.append(hero)
     texts = b.text_items()
     for t in texts:
         t.w_frac = 0.86 if tight else 0.9
-    items.extend(texts)
+        if t.vertical:
+            t.len_share = VERTICAL_LEN_SHARE
+    hero_item: _Item | None = None
+    if with_hero:
+        hero = b.hero(ideal_h=(0.36 if tight else 0.40) * H, floor_h=0.15 * H, w_frac=0.85)
+        if hero:
+            hero_item = hero
+            # Vertical texts that ran along the hero's sides stay there (v5).
+            rails = [t for t in texts if t.vertical and _beside(t, b.slots.hero)]
+            if rails:
+                texts = [t for t in texts if t not in rails]
+                hero_item = _HeroRails(hero, rails, max(3.0, met.gap * 0.5), b.slots.hero.box)
+                hero_item.w_frac = 0.9
+    # The hero keeps its place in the reading order (v5): a poster whose
+    # headline sat above the photo keeps the headline above it, and the
+    # lines that followed the photo follow it again.
+    head = next((t for t in texts if t.unit.role == HEADLINE), None)
+    hero_after = (hero_item is not None and head is not None
+                  and b.slots.hero.reading_index > head.unit.reading_index)
+    if hero_item is not None and not hero_after:
+        items.append(hero_item)
+        items.extend(texts)
+    elif hero_item is not None:
+        hero_idx = b.slots.hero.reading_index
+        items.extend(t for t in texts if t.unit.reading_index < hero_idx)
+        items.append(hero_item)
+        items.extend(t for t in texts if t.unit.reading_index >= hero_idx)
+    else:
+        items.extend(texts)
     chips = b.chips(badge_h=0.045 * H, image_h=0.07 * H, direction="row", w_frac=0.95)
     cta = b.cta(ideal_h=0.065 * H, w_frac=0.7)
     if cta:
@@ -1106,6 +1373,22 @@ def _column_items(b: _Builder, met: Metrics, H: float, with_hero: bool, tight: b
 def _mean_reading_index(units: list[Unit]) -> float:
     idx = [u.reading_index for u in units if u.reading_index >= 0]
     return sum(idx) / len(idx) if idx else 1e9
+
+
+def _absorb_leftover(items: list[_Item], gaps: list[float], aw: float, ah: float, met: Metrics) -> None:
+    """v5: when the column is shorter than its slot once everything is at
+    its ideal (a tall strip whose text is bound by the width), the hero
+    grows into the room, up to HERO_MAX_SHARE of the canvas height and its
+    own ceiling, instead of leaving the strip empty."""
+    hero = next((it for it in items if it.tier == TIER_HERO and hasattr(it, "grow")), None)
+    if hero is None:
+        return
+    total = sum(it.h for it in items) + sum(gaps)
+    leftover = ah - total
+    if leftover <= met.gap:
+        return
+    max_h = min(hero.h + leftover - met.gap, HERO_MAX_SHARE * met.target.h)
+    hero.grow(max_h, aw * (hero.w_frac if hero.applies_w_frac else 1.0))   # type: ignore[attr-defined]
 
 
 def _place_corner_chips(chips: _Chips, k: float, met: Metrics, area: Box, out: Placement) -> None:
@@ -1149,6 +1432,7 @@ def _plan_column(b: _Builder, met: Metrics, out: Placement, family: str,
     k = 1.0
     if items:
         k, _ = _largest_k(_column_fits(items, gaps, aw, ah), items + ([corner_chips] if corner_chips else []))
+        _absorb_leftover(items, gaps, aw, ah, met)
         top = bool(b.slots.logo) and isinstance(items[0], _Scaled) and items[0].unit is b.slots.logo
         bottom = bool(b.slots.fine) or _anchored_bottom(items[-1])
         _place_column(items, gaps, m, m, aw, ah, "center", met, out, top, bottom)
@@ -1307,9 +1591,13 @@ def _plan_banner(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = 
         leftover = aw - sum(it.w for it in items) - gap * (len(items) - 1)
     leftover = max(0.0, leftover)
 
+    # Cohesion (v5): gaps grow only up to a cap; the rest of the leftover
+    # centres the row instead of pushing its ends to the canvas edges.
     n = len(items)
     extra = leftover / (n - 1) if n > 1 else 0.0
-    x = m + (leftover / 2.0 if n == 1 else 0.0)
+    max_gap = max(MAX_GAP_MULT * gap, MAX_GAP_FRAC * t.w)
+    extra = min(extra, max(0.0, max_gap - gap))
+    x = m + (leftover - extra * (n - 1)) / 2.0
     for it in items:
         it.place(x, m + (ah - it.h) / 2.0, it.w, it.h, out)
         x += it.w + gap + extra

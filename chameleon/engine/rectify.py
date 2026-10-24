@@ -31,7 +31,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-from engine.analyze import Analysis, Unit
+from engine import contrast as contrast_est
+from engine.analyze import Analysis, BACKGROUND, FINE_PRINT, BADGE, Unit
 from engine.geometry import Box, clamp
 from engine.textfit import TextMeasurer, apply_font_size, default_measurer
 
@@ -43,6 +44,13 @@ MARGIN_FRAC = 0.015         # on-canvas margin for content, as a fraction of min
 SNAP_FRAC = 0.008           # snap tolerance, fraction of min(W, H)
 GAP_FRAC = 0.01             # minimum visible gap between pushed-apart units
 EVEN_GAP_RATIO = 1.6        # gaps closer than this ratio (max/min) are made equal
+GRAZE_EM = 0.9              # a source text-on-text overlap thinner than this x the smaller font is a collision
+                            # (lines that ran into each other), not a designed lockup: it is not carried over
+STRADDLE_MIN = 3.0          # a text straddles an edge when one slice of it reads under this ratio ...
+STRADDLE_MAX = 4.5          # ... and another slice at or above this ...
+STRADDLE_RATIO = 4.0        # ... and the best slice reads at least this many times better than the worst
+                            # (a sharp edge, not the glow of a gradient); engine/score.py uses the same rule
+STRADDLE_PASSES = 2         # the straddle pass runs in the first passes only (it costs a contrast estimate)
 
 
 @dataclass
@@ -188,6 +196,7 @@ class _Rectifier:
         self._vis: dict[str, Box] = {}
         self._parts: dict[str, list[Box]] = {}
         self.src_fonts = {eid: float(el["font_size"]) for eid, el in by_id.items() if el["type"] == "text"}
+        self.passes_run = 0
 
     # -- geometry helpers -----------------------------------------------------
 
@@ -289,9 +298,116 @@ class _Rectifier:
         self.fix_aspect()
         self.fix_overlaps()
         self.fix_on_canvas()
+        if self.passes_run < STRADDLE_PASSES:
+            self.fix_straddles()
+        self.passes_run += 1
         self.snap()
         self.even_gaps()
         return any(l.changed for l in self.lives)
+
+    # -- straddles (v5) ---------------------------------------------------------
+
+    def _snapshot(self) -> list[dict[str, Any]]:
+        """The elements with the units' current geometry (non-content
+        elements as they are), for the contrast estimate."""
+        cur: dict[str, tuple[Box, float | None]] = {}
+        for l in self.lives:
+            for eid, b in l.boxes.items():
+                cur[eid] = (b, l.fonts.get(eid))
+        out = []
+        for eid, el in self.by_id.items():
+            if eid in cur:
+                b, font = cur[eid]
+                el = dict(el, x=b.x, y=b.y, width=b.w, height=b.h)
+                if font is not None:
+                    el["font_size"] = font
+            out.append(el)
+        return out
+
+    def _source_straddles(self) -> set[str]:
+        s = getattr(self.analysis, "source_straddle", None)
+        if s is None:
+            src = {"canvas": {"width": self.analysis.canvas.w, "height": self.analysis.canvas.h},
+                   "elements": list(self.analysis.source_elements.values())}
+            ink = {}
+            for el in src["elements"]:
+                if el["type"] == "text" and str(el.get("content", "")).strip():
+                    ink[el["id"]] = visible_box(el, Box.of(el), float(el["font_size"]), self.m)
+            est = contrast_est.estimate(src, ink)
+            s = {k for k, v in est.items() if _is_straddle(v)}
+            self.analysis.source_straddle = s   # type: ignore[attr-defined]
+        return s
+
+    def fix_straddles(self) -> None:
+        """A text lying across the edge of a photo or a panel (one part on
+        the dark picture, the other on the white canvas) is slid fully onto
+        the side where it reads, when that spot is free and on canvas. Only
+        texts that did not straddle in the source; the contrast comes from
+        the JSON estimate (engine/contrast.py), so no pixels are needed."""
+        if not contrast_est.available():
+            return
+        elements = self._snapshot()
+        design = {"canvas": {"width": self.target.w, "height": self.target.h}, "elements": elements}
+        by_id = {el["id"]: el for el in elements}
+        texts: dict[str, Live] = {}
+        for l in self.lives:
+            if l.unit.role in (FINE_PRINT, BADGE):
+                continue
+            for eid in l.boxes:
+                el = by_id[eid]
+                if el["type"] == "text" and str(el.get("content", "")).strip():
+                    texts[eid] = l
+        if not texts:
+            return
+        ink = {eid: visible_box(by_id[eid], Box.of(by_id[eid]), float(by_id[eid]["font_size"]), self.m)
+               for eid in texts}
+        est = contrast_est.estimate(design, ink, ids=set(texts))
+        src = self._source_straddles()
+        order = contrast_est.draw_order(elements)
+        z = {el["id"]: i for i, el in enumerate(order)}
+        for eid, tc in est.items():
+            if not _is_straddle(tc) or eid in src:
+                continue
+            l = texts[eid]
+            box = ink[eid]
+            g = self.gap
+            moves: list[tuple[float, float]] = []
+            for el in elements:
+                if el["type"] == "text" or z[el["id"]] >= z[eid]:
+                    continue
+                role = self.analysis.roles.get(el["id"])
+                if role == BACKGROUND:
+                    continue
+                ext = rotated_extent(Box.of(el), float(el.get("rotation", 0.0) or 0.0))
+                if not ext.overlaps(box, tol=0.0) or ext.contains_fraction(box) >= 0.999:
+                    continue
+                for edge in (ext.x, ext.right):
+                    if box.x < edge < box.right:
+                        moves.append((edge - g - box.right, 0.0))   # fully left of the edge
+                        moves.append((edge + g - box.x, 0.0))       # fully right of it
+                for edge in (ext.y, ext.bottom):
+                    if box.y < edge < box.bottom:
+                        moves.append((0.0, edge - g - box.bottom))
+                        moves.append((0.0, edge + g - box.y))
+            best = None
+            for dx, dy in moves:
+                full = self.frame(l)
+                full = Box(full.x + dx, full.y + dy, full.w, full.h)
+                if not self.on_canvas(full):
+                    continue
+                vb = self.vis(l)
+                if self.collides(l, Box(vb.x + dx, vb.y + dy, vb.w, vb.h)):
+                    continue
+                moved = Box(box.x + dx, box.y + dy, box.w, box.h)
+                there = contrast_est.estimate(design, {eid: moved}, ids={eid}).get(eid)
+                if there is None or _is_straddle(there) or there.ratio < STRADDLE_MIN:
+                    continue
+                key = (-min(there.ratio, STRADDLE_MAX), abs(dx) + abs(dy))
+                if best is None or key < best[0]:
+                    best = (key, dx, dy)
+            if best is not None:
+                _, dx, dy = best
+                self.move(l, dx, dy)
 
     def fix_aspect(self) -> None:
         for l in self.lives:
@@ -543,6 +659,20 @@ def _pair_key(a: str, b: str) -> tuple[str, str]:
     return (a, b) if a <= b else (b, a)
 
 
+def _is_straddle(tc) -> bool:
+    return is_straddle(getattr(tc, "slices", None) or [])
+
+
+def is_straddle(slices: list[float]) -> bool:
+    """One slice of a text reads badly (< STRADDLE_MIN) while another reads
+    well (>= STRADDLE_MAX) and STRADDLE_RATIO times better: the text lies
+    across a sharp edge (a photo's border, a panel's side)."""
+    if not slices:
+        return False
+    lo, hi = min(slices), max(slices)
+    return lo < STRADDLE_MIN and hi >= STRADDLE_MAX and hi >= STRADDLE_RATIO * lo
+
+
 def overlap_fraction(a: Box, b: Box) -> float:
     """Shared area as a fraction of the smaller box (0 = disjoint)."""
     small = min(a.area, b.area)
@@ -574,12 +704,55 @@ def source_overlap_fractions(analysis: Analysis, measurer: TextMeasurer | None =
     vis = analysis.source_visible
     out: dict[tuple[str, str], float] = {}
     keys = list(vis)
+    units = {u.key: u for u in analysis.units}
     for i, a in enumerate(keys):
         for b in keys[i + 1:]:
             f = parts_overlap_fraction(vis[a], vis[b])
-            if f > 0.0:
+            if f > 0.0 and not text_graze(units[a], units[b], analysis.source_elements, m):
                 out[_pair_key(a, b)] = f
     return out
+
+
+def text_graze(a: Unit, b: Unit, by_id: dict[str, dict[str, Any]], m: TextMeasurer,
+               em: float = GRAZE_EM) -> bool:
+    """Is the source overlap of these two units only a sliver of text on
+    text? Two unrotated texts whose painted boxes intersect by less than
+    `em` x the smaller font (in either direction) ran into each other: the
+    last line of one over the first line of the next in a stack, a long
+    word grazing its neighbour (fonts substituted, boxes resized by a
+    template converter). A designed lockup (a script word over a caps
+    word, a number over its label) overlaps by a full line or more. A
+    graze is not a designed overlap: the output must not keep it, so the
+    source-overlap table leaves such pairs out and the rectifier pushes
+    them apart."""
+    ta = [i for i in a.ids if i in by_id and by_id[i]["type"] == "text"]
+    tb = [i for i in b.ids if i in by_id and by_id[i]["type"] == "text"]
+    if not ta or not tb:
+        return False
+    thin_seen = False
+    for ia in a.ids:
+        if ia not in by_id:
+            continue
+        ea = by_id[ia]
+        va = visible_box(ea, a.members[ia], None, m)
+        for ib in b.ids:
+            if ib not in by_id:
+                continue
+            eb = by_id[ib]
+            vb = visible_box(eb, b.members[ib], None, m)
+            if not va.overlaps(vb, tol=0.0):
+                continue
+            if ea["type"] != "text" or eb["type"] != "text":
+                return False          # a shape or image is involved: not a text graze
+            if float(ea.get("rotation", 0.0) or 0.0) or float(eb.get("rotation", 0.0) or 0.0):
+                return False
+            iw = min(va.right, vb.right) - max(va.x, vb.x)
+            ih = min(va.bottom, vb.bottom) - max(va.y, vb.y)
+            font = min(float(ea["font_size"]), float(eb["font_size"]))
+            if min(iw, ih) >= em * font:
+                return False          # a full line or more: a lockup
+            thin_seen = True
+    return thin_seen
 
 
 def unwanted_overlaps(analysis: Analysis, elements: list[dict[str, Any]],

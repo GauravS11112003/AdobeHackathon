@@ -177,6 +177,45 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   legal line is a convention). Hard fails, the drop rule and the source-relative rules are unchanged.
   Level 3 → 1584×396: headline 16 → 28 px, product 165 → 356 px, badges in one row, 0 hard fails.
   Cost: ~2× the v3 runtime (more candidates, up to 3 share searches in the wide plan).
+- **v5 generation fixes from human labels (2026-10-24, docs/EVAL_V5.md, docs/LABELS_V1.md,
+  tests/test_v5_labels.py)**, one mechanism per "both bad" pattern; the eval design ids are regression cases only:
+  - *Banner cohesion*: `_plan_banner` caps each gap at max(`MAX_GAP_MULT` 3 × gap, `MAX_GAP_FRAC` 8 % of the
+    width) and centres the clustered row; `score.layout.cohesion` (weight 4; read.size 11, layout.fill 7) is
+    the widest empty stretch between the runs of visible boxes along either axis, free up to the same cap, 0 at
+    half the span (fine print excluded).
+  - *Importance tiers / water-filling*: every `_Item` has a `tier` (primary / hero / secondary / minor, from the
+    nominal shrink speed, so `fill` variants keep it). When even the floors do not fit, `_largest_k` relaxes
+    floors by `RESCUE_STEPS` (minor ×0.55, secondary ×0.55, minor, hero, secondary), never the primary tier and
+    never below `ABS_MIN_FONT` (4 px); the k search then hands the room to the headline / logo / CTA first.
+    The banner `_TextColumn` *flows* into several columns (reading order kept) when one column cannot fit the
+    strip at the floors (`_flow`), and an attachment never makes a text's footprint taller than its slot (a bar
+    that ran along a list is capped at the room left). Eco-talks → 728×90: headline 10 → 32 px, 0 hard fails.
+  - *Rotated text*: a vertical text in a column runs along at most `VERTICAL_LEN_SHARE` (0.5) of the column and
+    wraps beyond (spine-label style); vertical texts that ran along the hero's sides in the source become *rails*
+    (`_HeroRails`, `_beside`): one line each, sized against the hero's height (up to `RAIL_LEN_SHARE` 0.6 of the
+    column), hero gets the width they leave. Column plans keep the hero in its source reading position (texts
+    that preceded it stay above, the rest below). NY Furniture Fair → 160×600: rails 5 → 10 px beside the photo.
+  - *Tall strips* (w/h ≤ `STRIP_MAX_RATIO` 0.5): font floors also relative to the width (`STRIP_FONT_FRAC`:
+    headline 4.5 %, CTA 3.5 %, other 3 %; the absolute 12 px still wins on 160 px); `_absorb_leftover` grows the
+    hero (`_Scaled.grow`, capped by the builder's `cap_s` and `HERO_MAX_SHARE` 0.55 of the height) when the
+    width-bound text leaves the column short.
+  - *Straddles*: `contrast.estimate` also reports the 25th-percentile ratio per `SLICES` (4) along the long side
+    and caps `ratio` by the worst slice; `rectify.is_straddle` = one slice < 3, another ≥ 4.5 and ≥ 4× the worst
+    (a sharp edge, not a gradient's glow). A straddling text that did not straddle in the source
+    (`Analysis.source_straddle`) is a hard fail in `score_design` (notes["straddles"]) and `rectify.fix_straddles`
+    (first 2 passes) slides the unit fully onto the side where the estimate reads, when free and on canvas.
+  - *Graze rule*: `rectify.text_graze`: a source text-on-text overlap thinner than `GRAZE_EM` (0.9) × the smaller
+    font in either direction (lines that ran into each other after font substitution) is left out of the
+    source-overlap table, so the output must not keep it (a lockup overlaps by a full line and is kept).
+  - *Layered panels*: `analyze._panel_stacks`: rectangular panels of about the same size (areas within 0.7, the
+    smaller ≥ 0.6 inside the larger, same fill or ≥ 0.85 inside) are one `kind="stack"` PANEL unit (top member
+    first); `relayout.stack_boxes` keeps each layer's inset from the hull (scaled by the padding scale) in
+    `place_panels` and `grow_panels`.
+  - Also: text boxes in floor plans hug their wrapped lines (`_TextItem._size_at`: widest line + one space, glyph
+    width for negative letter spacing: wrap-safe under the renderer's character-based wrap), the pre-judge
+    `resolve_vertical_collisions` compares a sibling row per part, and `_finalize` shrinks a rotated shape /
+    image whose extent is larger than the canvas. `eval/compare_runs.py` reports `layout.cohesion` and the
+    smallest font p50 / headline-CTA p05 / p50.
 
 ## Playground (dev tool, not shipped)
 - `chameleon/tools/playground.py` serves a local UI at http://localhost:8765: pick a sample, upload or paste a

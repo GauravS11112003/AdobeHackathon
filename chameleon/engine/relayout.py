@@ -194,8 +194,27 @@ def place_panels(analysis: Analysis, out: Placement, target: Box, mode: str,
             f = max(new.w / max(sb.w, 1e-6), new.h / max(sb.h, 1e-6))
             w, h = sb.w * f, sb.h * f
             new = Box(new.cx - w / 2.0, new.cy - h / 2.0, w, h)
-        out.boxes[eid] = new
-        out.font_scale[eid] = s
+        for mid, mb in stack_boxes(unit, new, ps).items():
+            out.boxes[mid] = mb
+            out.font_scale[mid] = s
+
+
+def stack_boxes(unit: Unit, new: Box, ps: float) -> dict[str, Box]:
+    """Member boxes of a panel unit placed at `new` (the unit's hull). A
+    layered stack (v5, `kind == "stack"`) keeps each layer's inset from the
+    hull, scaled by `ps`, so an offset double card stays a double card."""
+    if len(unit.ids) == 1:
+        return {unit.ids[0]: new}
+    sb = unit.box
+    out: dict[str, Box] = {}
+    for mid, mb in unit.members.items():
+        l, t = max(0.0, mb.x - sb.x) * ps, max(0.0, mb.y - sb.y) * ps
+        r, b = max(0.0, sb.right - mb.right) * ps, max(0.0, sb.bottom - mb.bottom) * ps
+        # insets never eat the whole box on a tiny canvas
+        fx = min(1.0, max(0.0, new.w - 2.0) / max(l + r, 1e-6)) if l + r > 0 else 1.0
+        fy = min(1.0, max(0.0, new.h - 2.0) / max(t + b, 1e-6)) if t + b > 0 else 1.0
+        out[mid] = Box(new.x + l * fx, new.y + t * fy, max(1.0, new.w - (l + r) * fx), max(1.0, new.h - (t + b) * fy))
+    return out
 
 
 def grow_panels(analysis: Analysis, elements: list[dict[str, Any]], target: Box,
@@ -206,15 +225,16 @@ def grow_panels(analysis: Analysis, elements: list[dict[str, Any]], target: Box,
     by_id = {el["id"]: el for el in elements}
     m = measurer or default_measurer()
     pad = clamp(PANEL_PAD_FRAC * min(target.w, target.h), 2.0, 16.0)
+    ps = clamp(math.sqrt(target.area / analysis.canvas.area), 0.25, 2.5)
     for unit in analysis.panels():
         el = by_id.get(unit.ids[0])
-        if el is None:
+        if el is None or not all(i in by_id for i in unit.ids):
             continue
         carried = [u for u in analysis.carried(unit.key) if all(i in by_id for i in u.ids)]
         if not carried:
             continue
         hull = Box.union(_material_visible(u, by_id, m) for u in carried)
-        cur = Box.of(el)
+        cur = Box.union(Box.of(by_id[i]) for i in unit.ids)
         want = Box.union([cur, Box(hull.x - pad, hull.y - pad, hull.w + 2 * pad, hull.h + 2 * pad)])
         if not _is_rect(unit, analysis):
             f = max(want.w / max(cur.w, 1e-6), want.h / max(cur.h, 1e-6))
@@ -228,7 +248,9 @@ def grow_panels(analysis: Analysis, elements: list[dict[str, Any]], target: Box,
             obstacles = [_material_visible(u, by_id, m)
                          for u in _strangers(analysis, unit) if all(i in by_id for i in u.ids)]
             want = _avoid(want, obstacles, hull, pad)
-        el["x"], el["y"], el["width"], el["height"] = want.x, want.y, want.w, want.h
+        for mid, mb in stack_boxes(unit, want, ps).items():
+            e = by_id[mid]
+            e["x"], e["y"], e["width"], e["height"] = mb.x, mb.y, mb.w, mb.h
 
 
 def _visible(el: dict[str, Any], box: Box, font: float | None, m: TextMeasurer) -> Box:
@@ -362,12 +384,20 @@ def resolve_vertical_collisions(analysis: Analysis, placement: Placement, target
     if there is no room below. Rotated elements are compared by bbox."""
     units = sorted(analysis.content_units(), key=lambda u: u.reading_index)
     boxes = {u.key: Box.union(placement.boxes[eid] for eid in u.ids) for u in units}
+
+    def parts(u: Unit) -> list[Box]:
+        # A sibling row counts per part (v5): a chip packed between the
+        # row's lines is not "under" the row's hull.
+        if u.is_row:
+            return [Box.union(placement.boxes[eid] for eid in p.ids) for p in u.parts]
+        return [boxes[u.key]]
+
     for i, a in enumerate(units):
         for b in units[i + 1:]:
             if a.box.overlaps(b.box, tol=1.0):
                 continue  # intentional in the source
             ba, bb = boxes[a.key], boxes[b.key]
-            if not ba.overlaps(bb, tol=1.0):
+            if not any(x.overlaps(y, tol=1.0) for x in parts(a) for y in parts(b)):
                 continue
             push = ba.bottom - bb.y + 4.0
             if bb.bottom + push <= target.h:

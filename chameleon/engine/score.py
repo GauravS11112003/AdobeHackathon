@@ -54,6 +54,7 @@ from engine.analyze import (
 from engine.floorplan import AMBITION, Metrics, ratio_family
 from engine.geometry import Box, clamp
 from engine.rectify import Live, _lives, unit_visible_box, unwanted_overlaps, visible_box
+from engine.rectify import is_straddle as _is_straddle_slices
 from engine.relayout import ratio_change
 from engine.render import image_scale, render_design
 from engine.textfit import TextMeasurer, default_measurer
@@ -68,19 +69,20 @@ BLEED_TOL = 0.01             # a unit may be off canvas by this fraction more th
 HIER_RATIO = 0.82            # higher-ranked text keeps >= min(this, source ratio) of the lower one's size
 
 WEIGHTS = {
-    # readability (27)
-    "read.size": 12.0,
+    # readability (32)
+    "read.size": 11.0,
     "read.lines": 7.0,
     "read.contrast": 8.0,
     "read.presence": 6.0,     # hero / logo keep their visual weight
-    # layout quality (41)
+    # layout quality (43)
     "layout.balance": 7.0,
     "layout.alignment": 7.0,
     "layout.spacing": 6.0,
-    "layout.fill": 9.0,
+    "layout.fill": 7.0,
     "layout.margins": 4.0,
     "layout.size": 8.0,       # v4: primary units up to AMBITION x the proportional size
-    # faithfulness to the source (32)
+    "layout.cohesion": 4.0,   # v5: no empty stretch between neighbours wider than the content needs
+    # faithfulness to the source (29)
     "faith.order": 12.0,
     "faith.anchors": 6.0,
     "faith.hierarchy": 8.0,
@@ -128,6 +130,9 @@ CONTRAST_DROP = 3.0          # a headline / CTA under this ratio ...
 CONTRAST_DROP_REL = 0.5      # ... and under this share of its own contrast in the source is a hard fail
 CONTRAST_FAIL = 1.3          # kept for reference: the old absolute rule (the drop rule replaces it)
 GOOD_FILL = 0.55             # content hull covering this much of the canvas is "filled"
+COHESION_GAP_MULT = 3.0      # layout.cohesion: a gap between neighbours up to max(this x the base gap, ...
+COHESION_GAP_FRAC = 0.08     # ... this x the canvas span) is free; beyond that the term drops (0 at half the span)
+# Straddles (v5): see engine/rectify.py (STRADDLE_MIN / STRADDLE_MAX / STRADDLE_RATIO, `is_straddle`).
 GOOD_DENSITY = 0.30          # visible boxes covering this share of the canvas is "used" (v4, fill's second half)
 DENSITY_SHARE = 0.4          # weight of the density half inside layout.fill
 SIZE_WEIGHTS = {HEADLINE: 1.0, HERO: 1.0, CTA: 0.8, LOGO: 0.5}   # layout.size: who counts, and how much
@@ -259,6 +264,14 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
         # own version (stand-in assets or a loosely built source are not our fault).
         if ratio < CONTRAST_DROP and (src_ratio is None or ratio < CONTRAST_DROP_REL * src_ratio):
             hard.append(f"{eid} unreadable contrast {ratio:.2f} (source {src_ratio if src_ratio is None else round(src_ratio, 2)})")
+    # Straddles (v5): a text half over a photo and half on the canvas reads
+    # badly whatever its 25th percentile says; the source-relative part
+    # excuses a text the designer already laid across an edge.
+    straddles = notes["straddles"] = straddling_texts(analysis, source, elements, design, m)
+    for eid in straddles:
+        role = analysis.roles.get(eid)
+        if role in (HEADLINE, CTA, SUBHEAD, BODY, TEXT):
+            hard.append(f"{eid} straddles an edge (one part readable, one not)")
 
     # ---- 3. layout quality ---------------------------------------------------
     # On what the viewer sees: painted text, rotated extents (a text box is
@@ -272,6 +285,7 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
     bd["layout.fill"] = _fill(boxes, target)
     bd["layout.margins"] = _margins(boxes, target)
     bd["layout.size"] = _primary_size(lives, analysis, by_id, src_by_id, target, area_scale)
+    bd["layout.cohesion"] = _cohesion([vis[l.unit.key] for l in lives if l.unit.role != FINE_PRINT], target)
 
     # ---- 4. faithfulness -----------------------------------------------------
     bd["faith.order"] = _order(lives, vis)
@@ -402,7 +416,26 @@ def source_contrast(analysis: Analysis, source: dict[str, Any], m: TextMeasurer)
     if analysis.source_contrast is None:
         est = contrast_est.estimate(source, _ink_boxes(source["elements"], m))
         analysis.source_contrast = {k: v.ratio for k, v in est.items()}
+        analysis.source_straddle = {k for k, v in est.items() if is_straddle(v)}
     return analysis.source_contrast
+
+
+def is_straddle(tc: "contrast_est.TextContrast") -> bool:
+    """The text lies across a sharp edge: one slice reads badly, another
+    well and several times better (engine/rectify.py has the figures)."""
+    return _is_straddle_slices(tc.slices or [])
+
+
+def straddling_texts(analysis: Analysis, source: dict[str, Any], elements: list[dict[str, Any]],
+                     design: dict[str, Any], m: TextMeasurer) -> list[str]:
+    """Ids of texts that straddle an edge in `design` but did not in the
+    source (estimate only: no pixels needed). Shared with the rectifier."""
+    est = contrast_est.estimate(design, _ink_boxes(elements, m))
+    if not est:
+        return []
+    source_contrast(analysis, source, m)
+    src = getattr(analysis, "source_straddle", None) or set()
+    return [eid for eid, tc in est.items() if is_straddle(tc) and eid not in src]
 
 
 def _contrast_terms(analysis: Analysis, source: dict[str, Any], elements: list[dict[str, Any]],
@@ -620,6 +653,34 @@ def _margins(boxes: list[Box], target: Box) -> float:
     mn = min(target.w, target.h)
     d = min(min(b.x, b.y, target.w - b.right, target.h - b.bottom) for b in boxes)
     return clamp(d / (0.03 * mn), 0.0, 1.0)
+
+
+def _cohesion(boxes: list[Box], target: Box) -> float:
+    """v5: the content holds together. Along each axis the boxes' projections
+    are merged into runs; the widest empty stretch between runs may be
+    max(COHESION_GAP_MULT x the base gap, COHESION_GAP_FRAC x the span)
+    for free and costs the full term at half the span. A column with a
+    bottom-anchored legal line is not judged here (fine print is left out
+    by the caller); a row spread to the banner's ends is."""
+    if len(boxes) < 2:
+        return 1.0
+    base_gap = clamp(0.035 * min(target.w, target.h), 4.0, 48.0)
+    score = 1.0
+    for axis in ("x", "y"):
+        span = target.w if axis == "x" else target.h
+        iv = sorted((b.x, b.right) if axis == "x" else (b.y, b.bottom) for b in boxes)
+        runs = [list(iv[0])]
+        for lo, hi in iv[1:]:
+            if lo <= runs[-1][1]:
+                runs[-1][1] = max(runs[-1][1], hi)
+            else:
+                runs.append([lo, hi])
+        if len(runs) < 2:
+            continue
+        widest = max(runs[i + 1][0] - runs[i][1] for i in range(len(runs) - 1))
+        allowed = max(COHESION_GAP_MULT * base_gap, COHESION_GAP_FRAC * span)
+        score = min(score, 1.0 - clamp((widest - allowed) / (0.5 * span), 0.0, 1.0))
+    return score
 
 
 # ---------------------------------------------------------------------------

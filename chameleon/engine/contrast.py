@@ -44,6 +44,7 @@ ASSETS_DIR = REPO_ROOT / "brand_kit" / "assets"
 
 GRID = (32, 8)              # sample points across x down the text's ink box (long side first)
 PERCENTILE = 25.0           # a text's contrast is this percentile of the point ratios
+SLICES = 4                  # ... and never better than the worst of this many slices along the long side (v5)
 RUN_MIN_SHARE = 0.10        # style-run colours covering less of the content are ignored
 ASSET_MAX_SIDE = 192        # assets are downsampled to this many px (longer side) for sampling
 PLACEHOLDER_RGB = (214.0, 214.0, 214.0)   # renderer/converter/assets.py `_placeholder`
@@ -53,10 +54,12 @@ FLAT_STD = 10.0             # an asset whose pixels vary less than this (0..255)
 
 @dataclass
 class TextContrast:
-    ratio: float            # 25th-percentile WCAG ratio of the text colour(s) against what is under it
+    ratio: float            # 25th-percentile WCAG ratio of the text colour(s) against what is under it,
+                            # capped by the worst slice (so half a line over a photo counts)
     busy: float             # spread of the composited background under the text (0..255)
     mean_lum: float         # mean luminance (0..1) under the text
     ratios: dict[str, float]   # per text colour (main colour first)
+    slices: list[float] = None  # type: ignore[assignment]  # 25th-percentile ratio per slice along the long side
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +149,16 @@ def _grid(box: Box):
     ys = box.y + (np.arange(ny, dtype=np.float32) + 0.5) * (box.h / ny)
     px, py = np.meshgrid(xs, ys)
     return px.ravel(), py.ravel()
+
+
+def _slice_index(box: Box):
+    """Which of the SLICES slices along the box's long side each grid point
+    belongs to (same point order as `_grid`)."""
+    nx, ny = GRID if box.w >= box.h else (GRID[1], GRID[0])
+    ix, iy = np.meshgrid(np.arange(nx), np.arange(ny))
+    along = ix if box.w >= box.h else iy
+    n = max(nx, ny)
+    return (along.ravel() * SLICES // n).astype(np.int32)
 
 
 def _local(px, py, box: Box, rotation: float):
@@ -295,6 +308,8 @@ def estimate(design: dict[str, Any], ink_boxes: dict[str, Box] | None = None,
             continue
         lum_bg = luminance(bg)
         ratios: dict[str, float] = {}
+        slices: list[float] = []
+        sidx = _slice_index(box)
         for label, rgb, alpha in text_colours(el):
             fg = np.empty_like(bg)
             fg[:] = rgb
@@ -302,10 +317,16 @@ def estimate(design: dict[str, Any], ink_boxes: dict[str, Box] | None = None,
             lum_fg = luminance(fg)
             hi, lo = np.maximum(lum_fg, lum_bg), np.minimum(lum_fg, lum_bg)
             r = (hi + 0.05) / (lo + 0.05)
-            ratios[label] = float(np.percentile(r, PERCENTILE))
+            # Worst region (v5): the 25th percentile over the whole box
+            # passes a line whose last third sits on the white canvas; the
+            # slices catch it.
+            per_slice = [float(np.percentile(r[sidx == s], PERCENTILE)) for s in range(SLICES) if (sidx == s).any()]
+            ratios[label] = min(float(np.percentile(r, PERCENTILE)), min(per_slice) if per_slice else float("inf"))
+            if label == "main":
+                slices = per_slice
         busy = float(bg.std(axis=0).mean())
         out[el["id"]] = TextContrast(ratio=min(ratios.values()), busy=busy,
-                                     mean_lum=float(lum_bg.mean()), ratios=ratios)
+                                     mean_lum=float(lum_bg.mean()), ratios=ratios, slices=slices)
     return out
 
 

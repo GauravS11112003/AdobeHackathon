@@ -101,6 +101,9 @@ ROW_HEIGHT_TOL = 0.25        # sibling rows: heights within this fraction of eac
 ROW_Y_OVERLAP = 0.6          # ... overlapping vertically by this share of the smaller height
 ROW_MAX_GAP = 1.5            # ... horizontal gap at most this x the taller height
 ROW_ROLES = (BADGE, IMAGE, SHAPE)   # chip-like roles that form rows
+PANEL_STACK_SIZE = 0.7       # layered panels (v5): areas within this ratio of each other ...
+PANEL_STACK_INSIDE = 0.6     # ... the smaller at least this much inside the larger ...
+PANEL_STACK_TIGHT = 0.85     # ... and the same fill colour, or this much inside (a card and its shadow)
 
 
 @dataclass
@@ -159,6 +162,7 @@ class Analysis:
     headline_font_size: float | None = None
     shape_types: dict[str, str] = field(default_factory=dict)   # shape id -> shape_type
     source_contrast: dict[str, Any] | None = None   # filled lazily by the scorer (engine/contrast.py)
+    source_straddle: set[str] | None = None         # texts that straddle an edge in the source (scorer fills it)
     source_elements: dict[str, dict[str, Any]] = field(default_factory=dict)   # id -> source element
     source_visible: dict[str, list[Box]] | None = None   # unit key -> painted part boxes in the source (rectify fills it)
 
@@ -214,6 +218,11 @@ def analyze(source: dict[str, Any]) -> Analysis:
         elif _is_decorative(el, canvas):
             roles[el["id"]] = DECORATIVE
     free = [el for el in elements if el["id"] not in roles]
+    # 1b. Layered panels (v5): two colour zones of about the same size lying
+    #     on each other (an offset double card, a card with its shadow) are
+    #     one zone that keeps its layering; re-laying them out as two
+    #     independent panels turned the offset into a stray bar.
+    stacks = _panel_stacks([el for el in elements if roles.get(el["id"]) == PANEL], boxes, z)
 
     # 2. Union-find clusters: schema groups, holders, frames, hosts, decorations.
     clusters = _cluster(free, by_id, boxes, z, canvas, roles)
@@ -246,6 +255,13 @@ def analyze(source: dict[str, Any]) -> Analysis:
     # 4. Build units.
     units: list[Unit] = []
     element_unit: dict[str, str] = {}
+    for ids in stacks:
+        mem = {i: boxes[i] for i in ids}
+        u = Unit(key=ids[0], ids=list(ids), role=PANEL, box=Box.union(mem.values()), members=mem,
+                 kind="stack", primary=ids[0])
+        units.append(u)
+        for i in ids:
+            element_unit[i] = u.key
     for el in elements:
         if el["id"] in roles and roles[el["id"]] in (BACKGROUND, PANEL, DECORATIVE) and el["id"] not in element_unit:
             # non-content: a unit of its own unless a cluster absorbed it
@@ -533,6 +549,38 @@ def _cluster(free: list[dict[str, Any]], by_id: dict[str, dict[str, Any]], boxes
             c.primary = c.ids[0]
         out.append(c)
     return out
+
+
+def _panel_stacks(panels: list[dict[str, Any]], boxes: dict[str, Box], z: dict[str, float]) -> list[list[str]]:
+    """Groups of rectangular panels that lie on each other at about the same
+    size (ids top-most first). Pairs qualify when the smaller is at least
+    PANEL_STACK_INSIDE inside the larger, their areas are within
+    PANEL_STACK_SIZE, and either the fills match or the smaller is
+    PANEL_STACK_TIGHT inside (a shadow in another colour)."""
+    rects = [el for el in panels
+             if str(el.get("shape_type", "rectangle") or "rectangle") == "rectangle" and boxes[el["id"]].area > 0]
+    parent = {el["id"]: el["id"] for el in rects}
+
+    def find(i: str) -> str:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i, a in enumerate(rects):
+        for b in rects[i + 1:]:
+            ba, bb = boxes[a["id"]], boxes[b["id"]]
+            small, big = (ba, bb) if ba.area <= bb.area else (bb, ba)
+            if small.area / big.area < PANEL_STACK_SIZE:
+                continue
+            inside = big.contains_fraction(small)
+            same = _rgb(a.get("fill_color")) == _rgb(b.get("fill_color"))
+            if inside >= PANEL_STACK_INSIDE and (same or inside >= PANEL_STACK_TIGHT):
+                parent[find(a["id"])] = find(b["id"])
+    groups: dict[str, list[str]] = {}
+    for el in rects:
+        groups.setdefault(find(el["id"]), []).append(el["id"])
+    return [sorted(ids, key=lambda i: -z[i]) for ids in groups.values() if len(ids) > 1]
 
 
 def _merge_rows(units: list[Unit], canvas: Box) -> list[Unit]:
