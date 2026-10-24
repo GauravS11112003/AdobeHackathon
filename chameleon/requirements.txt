@@ -1,2 +1,8 @@
 Pillow>=10.0
 git+https://github.com/CyberAgentAILab/cr-renderer
+
+# Local vision-language model (engine/vlm.py): llama.cpp through llama-cpp-python.
+# Prebuilt CPU wheels for linux x86_64 / aarch64 come from the project's own
+# index (the PyPI release is source-only and needs cmake + a C++ toolchain).
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+llama-cpp-python==0.3.36

@@ -1,0 +1,9 @@
+# keep the build context small: weights are downloaded inside the build,
+# the venv and eval data are dev-only
+models/
+.venv/
+eval/data/
+output/
+__pycache__/
+*.pyc
+.pytest_cache/
