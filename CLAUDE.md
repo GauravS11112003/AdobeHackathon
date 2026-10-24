@@ -158,6 +158,25 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   - Dev tools in `eval/`: `sanity_sheet.py <design> <dir>` (all-preset contact sheet, docs/sanity_v3),
     `contrast_check.py`, `remeasure.py` (re-judge an old run's outputs under the current metrics, used for
     the v2 baseline), `compare_runs.py` (before/after table on common cases).
+- **v4 size ambition (2026-10-24, docs/EVAL_V4.md, tests/test_v4_size.py)**: the engine uses the canvas when
+  it has room. `candidates.py` adds `scale_bias` 1.3 / 1.5 (`BOLD` / `BOLDER`) and a `fill` variant
+  (`PlanOptions.fill`: one shrink speed for everything, so the k search is a global-scale search from
+  1.5× proportional down) to every family, anchor boost 1.4, `MAX_CANDIDATES` 18; banners also try
+  `text_flow="column"` (the wide plan on a banner ≥ `BANNER_COLUMN_MIN_H` = 160 px tall: hero beside one
+  column with logo, text, chip row, CTA, legal) and keep the v3 stacked chips as `chips="stack"`.
+  `floorplan.py`: a scaled unit's ideal is at least `Metrics.prop` (sqrt of the area ratio) × `Metrics.bias`
+  (share-of-canvas ideals alone left a 6 % CTA at its floor on banners); the wide plan keeps the hero at full
+  size and tries `HERO_SHARES` (0.45/0.36/0.28 of the width), its fit test also requires the headline on
+  ≤ `HEAD_MAX_LINES` (3) lines; `_Chips` direction `"auto"` packs rows first and columns only when the rows
+  do not fit the height (banner default); a text line wider than the canvas shrinks below its floor instead
+  of overflowing (`_TextItem.hard_w`; the fitter would shrink it anyway but attached bars kept the bigger
+  font's offsets); `K_SEARCH_STEPS` 10. `score.py`: new `layout.size` (weight 8: headline / CTA font and
+  hero / logo linear size vs `AMBITION` (1.2) × proportional, clamped, so nothing past the cap is rewarded;
+  read.size 12, read.lines 7, balance 7, faith.scale 3 to keep the sum at 100), `layout.fill` is 60 % hull
+  + 40 % ink density (`GOOD_DENSITY` 0.30), fine print is left out of the spacing chains (a bottom-anchored
+  legal line is a convention). Hard fails, the drop rule and the source-relative rules are unchanged.
+  Level 3 → 1584×396: headline 16 → 28 px, product 165 → 356 px, badges in one row, 0 hard fails.
+  Cost: ~2× the v3 runtime (more candidates, up to 3 share searches in the wide plan).
 
 ## Playground (dev tool, not shipped)
 - `chameleon/tools/playground.py` serves a local UI at http://localhost:8765: pick a sample, upload or paste a
@@ -271,3 +290,22 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   `tools/eval_role_model.py` (samples with ids stripped, Boynton, agreement with the rules),
   tables `tools/role_model_report.py`. Tests: `tests/test_role_model.py` (offline, tiny fixture in
   `tests/fixtures/roles_tiny*`). Changing `FEATURE_NAMES` requires rebuilding the dataset and retraining.
+
+## Scorer calibration on human labels (S2, dev tool; docs/CALIBRATION.md)
+- `tools/playground.py` serves **/label**: two renders (A / B) of the same source and target, source
+  thumbnail, buttons + keys `a` / `b` / `t` (tie) / `x` (both bad) / `s` (skip) / `z` (undo), `r` reveals names
+  and scores; the next pair is pre-rendered. Sampling in `eval/labeling.py`: balanced over target and source
+  families, two non-fallback candidates with close totals, never a pair where only one side has a hard fail;
+  mode "two harness runs" compares two runs' outputs for the same case. Labels → `eval/data/labels.jsonl`
+  (one line per pair with both breakdowns **and both designs**, decision, timestamp). `--port` / `PORT`
+  pick another port (launch.json has `playground-8766`).
+- `eval/calibrate.py`: pairwise logistic regression on the labels (weights ≥ 5 % of the sum, sum 100,
+  hard fails + adaptation penalty pinned, free temperature, tie = soft 0.5, `both_bad` skipped, weak labels
+  × 0.3, L2 toward the hand weights, components with < 5 differing pairs frozen at their hand weight);
+  reports in-sample and leave-one-design-out agreement plus per-component agreement with the labels; writes
+  `engine/score_weights.json`. `engine/score.py` loads that file at import when present and complete
+  (`load_weights`, `HAND_WEIGHTS` keeps the defaults; `CHAMELEON_SCORE_WEIGHTS=0` ignores it, `=<path>`
+  reads another). **The file is not checked in**: the only fit so far is on 300 perturbation weak labels
+  (`python -m eval.labeling --n 300`, `eval/data/labels_weak.jsonl`), kept at
+  `eval/data/score_weights.weak.json`; while a weights file exists in `engine/`, hand edits to `WEIGHTS` are
+  overridden. Tests: `tests/test_calibrate.py`.

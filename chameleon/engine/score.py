@@ -13,7 +13,11 @@ Ordered like the rubric:
                    pixels under the text (sampled on a render without text)
                    and how busy those pixels are
   3. layout       Ngo-style balance, alignment, even spacing, white-space /
-                   fill, breathing room at the edges
+                   fill (content hull and ink density), breathing room at
+                   the edges, and (v4) the size of the primary units
+                   (headline, CTA, hero, logo) up to AMBITION x the
+                   source-proportional size: among clean layouts the one
+                   that uses the canvas wins
   4. faithfulness reading order, which edges things hug, size hierarchy, and
                    how uniformly everything scaled
 
@@ -24,8 +28,11 @@ without an image the contrast terms are neutral and the breakdown says so.
 
 from __future__ import annotations
 
+import json
 import math
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from engine import contrast as contrast_est
@@ -44,7 +51,7 @@ from engine.analyze import (
     _anchors,
     _rgb,
 )
-from engine.floorplan import Metrics, ratio_family
+from engine.floorplan import AMBITION, Metrics, ratio_family
 from engine.geometry import Box, clamp
 from engine.rectify import Live, _lives, unit_visible_box, unwanted_overlaps, visible_box
 from engine.relayout import ratio_change
@@ -61,23 +68,58 @@ BLEED_TOL = 0.01             # a unit may be off canvas by this fraction more th
 HIER_RATIO = 0.82            # higher-ranked text keeps >= min(this, source ratio) of the lower one's size
 
 WEIGHTS = {
-    # readability (30)
-    "read.size": 14.0,
-    "read.lines": 8.0,
+    # readability (27)
+    "read.size": 12.0,
+    "read.lines": 7.0,
     "read.contrast": 8.0,
     "read.presence": 6.0,     # hero / logo keep their visual weight
-    # layout quality (34)
-    "layout.balance": 8.0,
+    # layout quality (41)
+    "layout.balance": 7.0,
     "layout.alignment": 7.0,
     "layout.spacing": 6.0,
     "layout.fill": 9.0,
     "layout.margins": 4.0,
-    # faithfulness to the source (30)
+    "layout.size": 8.0,       # v4: primary units up to AMBITION x the proportional size
+    # faithfulness to the source (32)
     "faith.order": 12.0,
     "faith.anchors": 6.0,
     "faith.hierarchy": 8.0,
-    "faith.scale": 4.0,
+    "faith.scale": 3.0,
 }
+HAND_WEIGHTS = dict(WEIGHTS)                                  # the hand-set defaults above
+WEIGHTS_FILE = Path(__file__).with_name("score_weights.json")   # written by eval/calibrate.py
+
+
+def load_weights(path: str | os.PathLike | None = None) -> dict[str, float] | None:
+    """Weights fitted on human labels (eval/calibrate.py, docs/CALIBRATION.md)
+    when `path` (default engine/score_weights.json) exists and holds a
+    finite, non-negative value for every component; otherwise None and the
+    hand weights stay. CHAMELEON_SCORE_WEIGHTS=0 ignores the file,
+    CHAMELEON_SCORE_WEIGHTS=<path> reads another one."""
+    env = os.environ.get("CHAMELEON_SCORE_WEIGHTS", "")
+    if path is None:
+        if env.lower() in ("0", "false", "no", "off"):
+            return None
+        path = env or WEIGHTS_FILE
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return None
+    raw = data.get("weights", data) if isinstance(data, dict) else None
+    if not isinstance(raw, dict) or set(raw) != set(HAND_WEIGHTS):
+        return None
+    try:
+        w = {k: float(raw[k]) for k in HAND_WEIGHTS}
+    except (TypeError, ValueError):
+        return None
+    if any(not math.isfinite(v) or v < 0.0 for v in w.values()) or sum(w.values()) <= 0.0:
+        return None
+    return w
+
+
+_fitted = load_weights()
+if _fitted:
+    WEIGHTS.update(_fitted)
 
 ASPECT_TOL = 0.05
 CONTRAST_GOOD = 4.5          # WCAG AA for normal text
@@ -86,6 +128,9 @@ CONTRAST_DROP = 3.0          # a headline / CTA under this ratio ...
 CONTRAST_DROP_REL = 0.5      # ... and under this share of its own contrast in the source is a hard fail
 CONTRAST_FAIL = 1.3          # kept for reference: the old absolute rule (the drop rule replaces it)
 GOOD_FILL = 0.55             # content hull covering this much of the canvas is "filled"
+GOOD_DENSITY = 0.30          # visible boxes covering this share of the canvas is "used" (v4, fill's second half)
+DENSITY_SHARE = 0.4          # weight of the density half inside layout.fill
+SIZE_WEIGHTS = {HEADLINE: 1.0, HERO: 1.0, CTA: 0.8, LOGO: 0.5}   # layout.size: who counts, and how much
 TEXT_ROLES = (HEADLINE, SUBHEAD, BODY, CTA, BADGE, FINE_PRINT, TEXT)
 RANK = {HEADLINE: 4, SUBHEAD: 3, BODY: 2, CTA: 2, TEXT: 2, BADGE: 1, FINE_PRINT: 0}
 
@@ -221,9 +266,12 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
     boxes = [vis[l.unit.key] for l in lives]
     bd["layout.balance"] = _balance(lives, target, vis)
     bd["layout.alignment"] = _alignment(boxes, target)
-    bd["layout.spacing"] = _spacing(boxes)
+    # Legal copy sits on the bottom edge by convention; the gap above it is
+    # not a rhythm defect (v4: it cost hero-beside-column layouts 3 points).
+    bd["layout.spacing"] = _spacing([vis[l.unit.key] for l in lives if l.unit.role != FINE_PRINT])
     bd["layout.fill"] = _fill(boxes, target)
     bd["layout.margins"] = _margins(boxes, target)
+    bd["layout.size"] = _primary_size(lives, analysis, by_id, src_by_id, target, area_scale)
 
     # ---- 4. faithfulness -----------------------------------------------------
     bd["faith.order"] = _order(lives, vis)
@@ -257,6 +305,39 @@ def below_floor(font: float, role: str, src_font: float, met: Metrics, area_scal
     if font >= met.min_font(role) - 0.5:
         return False
     return font < FLOOR_REL * src_font * area_scale - 0.5
+
+
+def _primary_size(lives: list[Live], analysis: Analysis, by_id: dict[str, dict[str, Any]],
+                  src_by_id: dict[str, dict[str, Any]], target: Box, area_scale: float) -> float:
+    """How big the primary units came out, relative to AMBITION x the
+    source-proportional size (v4): a headline or CTA label by its font, a
+    hero or logo by its linear size on the canvas, each clamped at 1 so
+    nothing is rewarded past the cap. 1.0 when the design has no primary
+    unit. Unlike read.size this keeps paying above the proportional size,
+    so among clean candidates the one that uses the room wins; margins,
+    balance and the crowding penalty in fill keep it from going wall-to-wall."""
+    num = den = 0.0
+    for l in lives:
+        role = l.unit.role
+        w = SIZE_WEIGHTS.get(role)
+        if w is None:
+            continue
+        texts = [e for e in l.unit.ids if by_id[e]["type"] == "text" and e in src_by_id]
+        if role in (HEADLINE, CTA) and texts:
+            # the unit's biggest text in the source (the label of a pill)
+            eid = max(texts, key=lambda e: float(src_by_id[e]["font_size"]))
+            src_font = float(src_by_id[eid]["font_size"])
+            if src_font <= 0:
+                continue
+            ratio = float(by_id[eid]["font_size"]) / (src_font * area_scale)
+        else:
+            src_lin = math.sqrt(max(l.unit.box.area, 0.0) / analysis.canvas.area)
+            if src_lin <= 0:
+                continue
+            ratio = math.sqrt(max(l.box.area, 0.0) / target.area) / src_lin
+        num += w * clamp(ratio / AMBITION, 0.0, 1.0)
+        den += w
+    return num / den if den else 1.0
 
 
 def _presence(lives: list[Live], src_canvas: Box, target: Box) -> float:
@@ -526,8 +607,11 @@ def _fill(boxes: list[Box], target: Box) -> float:
                min(target.h, hull.bottom) - max(0.0, hull.y))
     fill = clamp(hull.area / target.area / GOOD_FILL, 0.0, 1.0)
     density = sum(b.area for b in boxes) / target.area
+    # v4: the hull alone saturates for a thin row across a banner; the ink
+    # density says whether the content actually uses the canvas.
+    used = clamp(density / GOOD_DENSITY, 0.0, 1.0)
     crowded = clamp((density - 0.7) / 0.3, 0.0, 1.0)
-    return fill * (1.0 - 0.5 * crowded)
+    return ((1.0 - DENSITY_SHARE) * fill + DENSITY_SHARE * used) * (1.0 - 0.5 * crowded)
 
 
 def _margins(boxes: list[Box], target: Box) -> float:

@@ -61,7 +61,7 @@ SQUARE_MAX_RATIO = 1.25
 WIDE_MAX_RATIO = 3.0
 
 SHORT_CANVAS = 300.0       # px tall; below this minimum font sizes scale with the height
-K_SEARCH_STEPS = 14
+K_SEARCH_STEPS = 10        # k to 1/1024: fonts are integers, finer steps only cost time (v4: was 14)
 VERTICAL_MIN_DEG = 60.0    # a text rotated at least this far is fitted in its own (vertical) frame
 
 # Shrink speeds: size(k) = ideal * k ** prio (never below the item's floor).
@@ -84,6 +84,16 @@ HERO_FLOOR_FRAC = 0.30
 STAMP_FLOOR_FRAC = 0.08
 CHIP_MAX_SHARE = 0.18       # a chip's ideal height is at most this share of the canvas height
 
+# Ambition (v4): the plans may size things past the source-proportional size
+# when the canvas has room. The scorer credits primary units up to AMBITION x
+# sqrt(target area / source area) (tailsgit's 1.2 cap); candidates with a
+# bigger `scale_bias` only win when they also fit and fill the canvas.
+AMBITION = 1.2
+HERO_SHARES = (0.45, 0.36, 0.28)   # wide plan: hero width shares tried, biggest first
+HEAD_MAX_LINES = 3                 # ... until the headline wraps on at most this many lines
+HERO_SHARE_K_TOL = 0.9             # ... as long as the column keeps this share of the best k found
+BANNER_COLUMN_MIN_H = 160.0        # a banner at least this tall may also use the hero-beside-column plan
+
 
 @dataclass(frozen=True)
 class PlanOptions:
@@ -100,8 +110,14 @@ class PlanOptions:
     chips       row | corner | beside_cta
                 badges & stickers: a row in the column (v1), pinned to the
                 canvas corners they came from, or in one row with the CTA
-    text_flow   stacked | inline
-                banner text: headline above the rest (v1) or beside it
+    text_flow   stacked | inline | column
+                banner text: headline above the rest (v1), beside it, or
+                (column) the whole content in one column beside the hero,
+                i.e. the wide plan on a banner canvas (v4)
+    fill        uniform shrink speeds: every item grows or shrinks at the same
+                rate, so the k search becomes a single global-scale search
+                (gk7494 / tailsgit style) on `scale_bias` x the proportional
+                size; with the default speeds minor items give up room first
     """
 
     hero_side: str = "auto"
@@ -109,6 +125,7 @@ class PlanOptions:
     scale_bias: float = 1.0
     chips: str = "row"
     text_flow: str = "stacked"
+    fill: bool = False
 
     @property
     def name(self) -> str:
@@ -118,6 +135,8 @@ class PlanOptions:
             v, d = getattr(self, f), getattr(DEFAULT_OPTIONS, f)
             if v != d:
                 parts.append(f"{f.replace('_side', '').replace('_flow', '').replace('_bias', '')}={v:g}" if isinstance(v, float) else f"{f.replace('_side', '').replace('_flow', '')}={v}")
+        if self.fill:
+            parts.append("fill")
         return ", ".join(parts) or "default"
 
 
@@ -146,6 +165,8 @@ class Metrics:
     gap: float
     cap_scale: float      # font multiplier at k = 1 (relative to the source font_size)
     short: bool           # short canvas: minimum font sizes scale with the height
+    prop: float = 1.0     # the source-proportional scale, sqrt(target area / source area)
+    bias: float = 1.0     # PlanOptions.scale_bias: ambition on top of the proportional size
 
     @classmethod
     def for_canvas(cls, src: Box, target: Box, family: str, spacing: float = 1.0,
@@ -153,11 +174,13 @@ class Metrics:
         mn = min(target.w, target.h)
         margin = clamp(0.05 * mn * spacing, 4.0, 60.0)
         gap = clamp(0.035 * mn * spacing, 4.0, 48.0)
-        cap = clamp(math.sqrt(target.area / src.area), 0.2, 2.5)
+        prop = clamp(math.sqrt(target.area / src.area), 0.2, 2.5)
+        cap = prop
         if family in (WIDE, BANNER):
             cap *= 1.15   # horizontal layouts give each line more room
         cap *= scale_bias
-        return cls(target=target, margin=margin, gap=gap, cap_scale=cap, short=target.h < SHORT_CANVAS)
+        return cls(target=target, margin=margin, gap=gap, cap_scale=cap, short=target.h < SHORT_CANVAS,
+                   prop=prop, bias=scale_bias)
 
     def min_font(self, role: str) -> float:
         """Smallest font size we are willing to emit for a role: an absolute
@@ -376,7 +399,7 @@ class _TextItem(_Item):
     attachments scale with it uniformly."""
 
     def __init__(self, unit: Unit, el: dict[str, Any], m: TextMeasurer, cap: float,
-                 floor: float, prio: float, natural_width: bool = False):
+                 floor: float, prio: float, natural_width: bool = False, hard_w: float = 0.0):
         self.unit = unit
         self.el = el
         self.m = m
@@ -384,6 +407,7 @@ class _TextItem(_Item):
         self.cap = max(float(int(cap)), self.floor)
         self.prio = prio
         self.natural_width = natural_width
+        self.hard_w = float(hard_w)     # a line never wider than this (the canvas), floor or not
         self.font = self.cap
         self.ink_w = 0.0            # widest wrapped line at the last size() (footprint width)
         self.rotation = float(el.get("rotation", 0.0) or 0.0)
@@ -430,6 +454,15 @@ class _TextItem(_Item):
         # An over-wide single word overflows the box in the renderer: shrink first.
         while font > self.floor and self.m.layout(self.el, font, bw).max_width > bw + 0.5:
             font = max(self.floor, font - 1.0)
+        # Below the floor only when the line would not even fit the canvas
+        # (a letter-spaced heading on a 160 px skyscraper): the fitter would
+        # shrink it anyway after the box is clamped, but then its attached
+        # bars would keep the offsets planned for the bigger font.
+        # Measured at the slot's wrap width: a letter-spaced line spills less
+        # when it breaks earlier, so the canvas is the limit, not the budget.
+        if self.hard_w > 0 and not self.vertical:
+            while font > 1.0 and self.m.layout(self.el, font, bw).max_width > self.hard_w + 0.5:
+                font -= 1.0
         natural = self.natural_width or self.vertical
         while True:
             w = min(bw, _single_line_width(self.m, self.el, font) + 2.0) if natural else bw
@@ -600,8 +633,11 @@ class _TextColumn(_Item):
 
 class _Chips(_Item):
     """Badges, secondary images and other small stuff packed into a cluster:
-    rows that wrap on the available width, or columns that wrap on the
-    available height (banners)."""
+    rows that wrap on the available width, columns that wrap on the
+    available height, or "auto" (v4): rows first, and columns only when the
+    wrapped rows would not fit the available height (a banner's chips sit
+    in a row like the designer's, and stack only when the strip is too
+    short for that)."""
 
     applies_w_frac = True
 
@@ -617,12 +653,21 @@ class _Chips(_Item):
         aw = aw * self.w_frac
         for c in self.chips:
             c.size(k, aw, ah)
+        if self.direction == "auto":
+            self._pack("row", aw, ah)
+            if self.h > ah + 0.5:
+                self._pack("col", aw, ah)
+            return self.w, self.h
+        self._pack(self.direction, aw, ah)
+        return self.w, self.h
+
+    def _pack(self, direction: str, aw: float, ah: float) -> None:
         g = self.gap
         lines: list[list[_Scaled]] = [[]]
         run = 0.0
         for c in self.chips:
-            extent = c.w if self.direction == "row" else c.h
-            limit = aw if self.direction == "row" else ah
+            extent = c.w if direction == "row" else c.h
+            limit = aw if direction == "row" else ah
             add = extent + (g if lines[-1] else 0.0)
             if lines[-1] and run + add > limit + 0.5:
                 lines.append([c])
@@ -631,7 +676,7 @@ class _Chips(_Item):
                 lines[-1].append(c)
                 run += add
         self.offsets = []
-        if self.direction == "row":
+        if direction == "row":
             widths = [sum(c.w for c in ln) + g * (len(ln) - 1) for ln in lines]
             heights = [max(c.h for c in ln) for ln in lines]
             self.w = max(widths)
@@ -655,7 +700,6 @@ class _Chips(_Item):
                     self.offsets.append((x + (lw - c.w) / 2.0, y))
                     y += c.h + g
                 x += lw + g
-        return self.w, self.h
 
     def relax(self, factor: float) -> None:
         for c in self.chips:
@@ -833,7 +877,7 @@ def _collect(analysis: Analysis, elements: dict[str, dict[str, Any]]) -> _Slots:
 
 class _Builder:
     def __init__(self, analysis: Analysis, elements: dict[str, dict[str, Any]],
-                 met: Metrics, m: TextMeasurer, family: str):
+                 met: Metrics, m: TextMeasurer, family: str, uniform: bool = False):
         self.analysis = analysis
         self.elements = elements
         self.met = met
@@ -841,13 +885,18 @@ class _Builder:
         self.family = family
         self.slots = _collect(analysis, elements)
         self.target = met.target
+        self.uniform = uniform      # PlanOptions.fill: one shrink speed for everything
+
+    def prio(self, p: float) -> float:
+        return PRIO_PRIMARY if self.uniform else p
 
     # -- text ------------------------------------------------------------
 
     def text(self, unit: Unit, prio: float, natural_width: bool = False) -> _TextItem:
         el = self.elements[unit.primary or unit.ids[0]]
         cap = float(el["font_size"]) * self.met.cap_scale
-        return _TextItem(unit, el, self.m, cap, self.met.min_font(unit.role), prio, natural_width)
+        return _TextItem(unit, el, self.m, cap, self.met.min_font(unit.role), self.prio(prio), natural_width,
+                         hard_w=self.target.w)   # a line may run into the margins before it goes under the floor
 
     def text_items(self) -> list[_TextItem]:
         items = []
@@ -876,9 +925,13 @@ class _Builder:
                role_for_floor: str | None = None, cap_mult: float = 1.0,
                floor_frac: float = 0.0) -> _Scaled:
         """`floor_frac`: the unit's larger dimension never drops below this
-        share of the canvas's short side (capped by the slot in size())."""
+        share of the canvas's short side (capped by the slot in size()).
+        The ideal is the slot's share of the canvas or, when that is less
+        (a 6 % CTA on a 396 px banner), the source-proportional scale times
+        the plan's ambition (v4); the cap keeps both under the font cap."""
         ext_w, ext_h = _extents(unit, self.elements)
-        ideal_s = min(ideal_h / ext_h, self.met.cap_scale * cap_mult)
+        wish = max(ideal_h / ext_h, self.met.prop * self.met.bias)
+        ideal_s = min(wish, self.met.cap_scale * cap_mult)
         floor_s = floor_h / ext_h
         if floor_frac > 0.0:
             floor_s = max(floor_s, floor_frac * self.met.short_side / max(ext_w, ext_h))
@@ -886,7 +939,7 @@ class _Builder:
         if role_for_floor is not None:
             floor_s = max(floor_s, self._text_floor(unit, role_for_floor))
             label_floor = self.met.min_font(role_for_floor)
-        return _Scaled(unit, self.elements, ideal_s, floor_s, prio, w_frac, self.m, label_floor)
+        return _Scaled(unit, self.elements, ideal_s, floor_s, self.prio(prio), w_frac, self.m, label_floor)
 
     def logo(self, ideal_h: float, floor_h: float, w_frac: float) -> _Scaled | None:
         if self.slots.logo is None:
@@ -930,7 +983,9 @@ class _Builder:
                                  floor_frac=STAMP_FLOOR_FRAC)
                 it.anchor_unit = u      # corner pinning follows the row, not the part
                 items.append(it)
-        return _Chips(items, direction, max(3.0, self.met.gap * 0.5), w_frac)
+        cluster = _Chips(items, direction, max(3.0, self.met.gap * 0.5), w_frac)
+        cluster.prio = self.prio(PRIO_MINOR)
+        return cluster
 
 
 # ---------------------------------------------------------------------------
@@ -1112,19 +1167,54 @@ def _plan_wide(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = DE
     align = b.slots.text_align if hero else "center"
     col_frac = 1.0 if hero else 0.8
 
-    def col_w(k: float) -> float:
+    share = HERO_SHARES[0]
+
+    def col_w() -> float:
         if hero is None:
             return aw * col_frac
-        hero.size(k, aw * 0.45, ah)
+        # The hero stands beside the column at its full size (the height and
+        # its share of the width bound it); only the column shrinks with k.
+        # v3 shrank the hero with the column's k although it never competed
+        # for the column's height.
+        hero.size(1.0, aw * share, ah)
         return aw - hero.w - met.gap
 
+    head = next((t for t in items if isinstance(t, _TextItem) and t.unit.role == HEADLINE
+                 and not t.rotation), None)
+
+    def head_lines() -> int:
+        return head.m.layout(head.el, head.font, max(1.0, head.own_w)).n_lines if head is not None else 0
+
     def fits(k: float) -> bool:
-        cw = col_w(k)
+        cw = col_w()
         if not items:
             return True
-        return _column_fits(items, gaps, cw, ah)(k)
+        if not _column_fits(items, gaps, cw, ah)(k):
+            return False
+        # A headline on more than HEAD_MAX_LINES lines is a defect to the
+        # judge however well it fits (v4): the search shrinks it (and the
+        # column's narrower share of the width is tried) before that.
+        return k <= 0.0 or head_lines() <= HEAD_MAX_LINES
 
-    k, _ = _largest_k(fits, items + ([hero] if hero else []) + ([corner_chips] if corner_chips else []))
+    # The hero takes the biggest share of the width that leaves the column
+    # most of its size (v4): a square product shot at 45 % of a 16:9 canvas
+    # squeezed the headline onto four lines in v3. Among the shares tried,
+    # the first whose column keeps >= HERO_SHARE_K_TOL of the best k wins.
+    k = 1.0
+    if hero is not None and items:
+        tried: list[tuple[float, float]] = []
+        for sh in HERO_SHARES:
+            share = sh
+            k, _ = _largest_k(fits, items + ([corner_chips] if corner_chips else []))
+            tried.append((sh, k))
+            if k >= 1.0:
+                break        # the biggest hero already leaves the column at full size
+        best_k = max(k for _, k in tried)
+        share = next(sh for sh, k in tried if k >= HERO_SHARE_K_TOL * best_k)
+        k, _ = _largest_k(fits, items + ([corner_chips] if corner_chips else []))
+    else:
+        k, _ = _largest_k(fits, items + ([corner_chips] if corner_chips else []))
+        col_w()
     cw = aw - hero.w - met.gap if hero is not None else aw * col_frac
     if hero is not None:
         hx = m if side == "left" else t.w - m - hero.w
@@ -1163,7 +1253,10 @@ def _plan_banner(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = 
             rest_column = _TextColumn(others, others[0], b.text_gap(), w_frac=0.3, max_lines=3)
         else:
             column = _TextColumn(texts, head, b.text_gap(), w_frac=0.6)
-    chips = b.chips(badge_h=0.26 * ah, image_h=0.3 * ah, direction="col", w_frac=0.3)
+    # Chips in a row first, like the designer's badge strip; they stack into
+    # columns only when the rows would not fit the banner's height (v4).
+    chips = b.chips(badge_h=0.26 * ah, image_h=0.3 * ah,
+                    direction="col" if opts.chips == "stack" else "auto", w_frac=0.3)
     cta = b.cta(ideal_h=0.38 * ah, w_frac=0.3, natural_width=True)
 
     if opts.hero_side == "right":
@@ -1191,8 +1284,9 @@ def _plan_banner(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = 
     # Fewest headline lines first, but only while the row is still roomy
     # (k above the threshold); a 1-line headline at half size loses to a
     # 2-line one at full size.
-    k, ok = _largest_k(fits)
-    if column is not None:
+    if column is None:
+        k, ok = _largest_k(fits)
+    else:
         chosen = None
         for max_lines, min_k in BANNER_LINE_POLICY:
             column.max_lines = max_lines
@@ -1250,12 +1344,14 @@ def floorplan_relayout(analysis: Analysis, target: Box, elements: dict[str, dict
             for eid in unit.ids:
                 out.font_scale[eid] = s
 
-    b = _Builder(analysis, elements, met, m, family)
+    b = _Builder(analysis, elements, met, m, family, uniform=opts.fill)
     plan = family
     if family == SQUARE and opts.hero_side in ("left", "right") and b.slots.hero is not None:
         plan = WIDE          # hero on one side, column on the other, on a square
     elif family == WIDE and opts.hero_side == "stack":
         plan = TALL          # one centred column on a wide canvas
+    elif family == BANNER and opts.text_flow == "column" and target.h >= BANNER_COLUMN_MIN_H:
+        plan = WIDE          # hero beside one column holding everything else (v4)
     if plan in (TALL, SQUARE):
         _plan_column(b, met, out, family, opts)
     elif plan == WIDE:

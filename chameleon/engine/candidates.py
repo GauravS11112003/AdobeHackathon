@@ -33,9 +33,11 @@ from engine.relayout import Placement, anchor_relayout, ratio_change, resolve_ve
 from engine.textfit import TextMeasurer, default_measurer
 
 SMALL_CHANGE_MAX = 1.75     # ratio_change() up to this: anchor variants compete unpenalised (score.ADAPT_RATIO)
-MAX_CANDIDATES = 12
-ANCHOR_SCALE_BOOSTS = (1.0, 1.12, 1.25)   # content scale = min(sx, sy) * boost, capped at max(sx, sy)
+MAX_CANDIDATES = 18
+ANCHOR_SCALE_BOOSTS = (1.0, 1.12, 1.25, 1.4)   # content scale = min(sx, sy) * boost, capped at max(sx, sy)
 TIGHT, LOOSE = 0.75, 1.3
+BOLD, BOLDER = 1.3, 1.5     # v4 scale_bias variants: ideal sizes past the proportional size when there is room
+FILL = 1.5                  # the "fill" variant: one global scale, searched from 1.5 x proportional down
 
 
 @dataclass
@@ -63,7 +65,7 @@ def generate_candidates(analysis: Analysis, source: dict[str, Any], target: Box,
         for s, label in anchor_scales(analysis.canvas, target):
             out.append(Candidate(f"anchor {label} scale={s:.3f}", "anchor",
                                  _anchor(analysis, target, s), scale=s))
-        plans = plan_variants(family)[:3]
+        plans = plan_variants(family)[:3] + [p for p in plan_variants(family) if p.scale_bias == BOLD][:1]
     else:
         plans = plan_variants(family)
 
@@ -97,20 +99,33 @@ def plan_variants(family: str) -> list[PlanOptions]:
     for small ratio changes). Duplicates that a design cannot realize
     (no chips, no hero) collapse in `dedupe`."""
     P = PlanOptions
+    # v4: every family also tries bolder ideals (scale_bias 1.3 / 1.5) and a
+    # "fill" variant (one global scale from 1.5 x proportional down); banners
+    # also try the hero-beside-column plan (text_flow="column") and keep the
+    # v3 stacked chip column as a variant (chips="stack").
     if family == TALL:
         return [P(), P(chips="corner"), P(chips="beside_cta"), P(spacing=TIGHT), P(spacing=LOOSE),
-                P(scale_bias=1.15), P(scale_bias=0.85), P(chips="corner", spacing=TIGHT)]
+                P(scale_bias=1.15), P(scale_bias=BOLD), P(scale_bias=BOLDER), P(scale_bias=FILL, fill=True),
+                P(scale_bias=0.85), P(chips="corner", spacing=TIGHT), P(chips="corner", scale_bias=BOLD)]
     if family == SQUARE:
         return [P(), P(chips="corner"), P(hero_side="left"), P(hero_side="right"),
                 P(chips="beside_cta"), P(spacing=TIGHT), P(spacing=LOOSE), P(scale_bias=1.15),
-                P(hero_side="left", chips="corner"), P(hero_side="right", chips="corner")]
+                P(scale_bias=BOLD), P(scale_bias=BOLDER), P(scale_bias=FILL, fill=True),
+                P(hero_side="left", chips="corner"), P(hero_side="right", chips="corner"),
+                P(hero_side="left", scale_bias=BOLD)]
     if family == WIDE:
         return [P(), P(hero_side="left"), P(hero_side="right"), P(chips="corner"),
                 P(chips="beside_cta"), P(hero_side="stack"), P(spacing=TIGHT), P(spacing=LOOSE),
-                P(scale_bias=1.15), P(hero_side="left", chips="corner"),
-                P(hero_side="right", chips="corner")]
-    return [P(), P(hero_side="right"), P(text_flow="inline"), P(hero_side="right", text_flow="inline"),
-            P(spacing=TIGHT), P(spacing=LOOSE), P(scale_bias=1.15), P(text_flow="inline", spacing=TIGHT)]
+                P(scale_bias=1.15), P(scale_bias=BOLD), P(scale_bias=BOLDER), P(scale_bias=FILL, fill=True),
+                P(hero_side="left", chips="corner"), P(hero_side="right", chips="corner"),
+                P(hero_side="left", scale_bias=BOLD), P(hero_side="right", scale_bias=BOLD),
+                P(hero_side="stack", scale_bias=BOLD)]
+    return [P(), P(text_flow="column"), P(text_flow="column", hero_side="right"), P(hero_side="right"),
+            P(text_flow="inline"), P(hero_side="right", text_flow="inline"),
+            P(spacing=TIGHT), P(spacing=LOOSE), P(scale_bias=1.15), P(scale_bias=BOLD),
+            P(scale_bias=BOLDER), P(scale_bias=FILL, fill=True),
+            P(text_flow="column", scale_bias=BOLD), P(text_flow="column", scale_bias=FILL, fill=True),
+            P(chips="stack"), P(text_flow="inline", spacing=TIGHT)]
 
 
 def _anchor(analysis: Analysis, target: Box, scale: float) -> Placement:

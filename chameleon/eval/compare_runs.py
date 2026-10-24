@@ -25,7 +25,7 @@ if str(ROOT) not in sys.path:
 from eval.run_eval import RUNS_DIR, _fail_flags, read_results  # noqa: E402
 
 COMPONENTS = ("read.size", "read.lines", "read.contrast", "read.presence", "layout.balance", "layout.alignment",
-              "layout.spacing", "layout.fill", "layout.margins", "faith.order", "faith.anchors",
+              "layout.spacing", "layout.fill", "layout.margins", "layout.size", "faith.order", "faith.anchors",
               "faith.hierarchy", "faith.scale")
 
 
