@@ -133,3 +133,73 @@ Behind on specific techniques listed below.
 - Single-candidate engines with no visual check (gk7494).
 - Trusting README numbers: fernando's 17.08 px headline is 16.58 in the committed output; gk7494's synthetic
   tests are not in the repo.
+
+---
+
+# Sweep 2 — 2026-10-24 (code-level reads, not READMEs)
+
+## Movement since 2026-10-23
+- **No new commits** on tailsgit, fernando-ace, gk7494, benso10-uw, AngeloLandiza.
+- **Joonseomoon/chameleon went private** (clone now fails). It had a team workflow (PRs, CI, iteration plans).
+  Assume a serious private entry.
+- 12 further repos triaged by cloning and measuring engine code (scratch, not kept): 7 are untouched
+  starters (PolymorphicTrio, preetham-ven, shivraj-jadeja, 4rd2, LakshyaDhingra, justacoderq, AngeloLandiza);
+  anishraj836 is a different challenge (brand-audit skill, India round); 4 have real code, below.
+
+## New entries with real code
+
+| Repo | Last commit | Size | ML | Candidates | Judging | Threat |
+|---|---|---|---|---|---|---|
+| **annniedong/chameleon** (kept in reference/) | 10-23, active | ~2k engine + tools | none, **plans a "vision-model reranker"** (comment in score.py) | 3–10 templates × minor-multiplier; **top 3 refined with z3** | hand-weighted geometric score, no render | high |
+| **anubhav-gupta-software/chameleon** (kept) | 10-16 | 1,702-line single file | none | ≤ 2 templates | box-only cost | medium-low |
+| fashton28/adobe-hacks | 10-16 | ~1.5k | none | a few dozen (DP row breaks × γ font exponent × splits) | lexicographic + hand score, no render | low ("slop", 6 px text at 728×90) |
+| rsingh135/chameleon | 10-19 | 1.3k eval only | none | **engine still the starter stretch** | plate-render contrast, 14 metrics, holdout synthetic families | unknown (engine elsewhere?) |
+
+### annniedong — techniques (engine/understand.py, templates.py, layout.py, solve.py, textmetrics.py)
+- Units: group_id, or text inside a shape/non-cover image < 25 % canvas (15 % slack, smallest host wins);
+  separator texts ("x", "+", "|") excluded. **Logo lockups vs sponsor strips**: small images on a row chained
+  by height ratio ≤ 1.8 and gap ≤ 3×height; "presented by / sponsored by" labels absorbed; primary logo chosen.
+- Roles: action-verb regex → CTA; rotated / > 70 % caps / ≤ 3 words → badge; legal regex or smallest-and-dim-or-low.
+- Templates by ratio (strip ≥ 2.6, split > 1.25, else column) × minor multipliers {1, 0.7, 0.45} (trade minor
+  units' size for the headline's). Flexbox-like tree (Rigid/Text/Column/Row/Wrap); one global k by bisection.
+- **z3 Optimize refinement** of the top 3: per unit x, y, scale ∈ [0.35, 1.6]; non-overlap pairs keep the side
+  the template chose (stays linear); text width modelled as `bw·s + A·(1−s)` with a per-glyph allowance;
+  **readability floors as tracked assumptions, unsat core → drop the least important unit's floor and re-solve**;
+  objective 100·imp·s − 40·imp·drift; 2.5 s timeout.
+- **Hinting-safe glyph widths**: width = max(platform width, unhinted linear width + 1 px) because FreeType on
+  Linux renders small bold text up to ~23 % wider than macOS skia measures. Quantise boxes up / fonts down
+  before the hard gate.
+- Four-layer fallback (reflow → letterbox+repair → clamp-only → pass-through), never raises.
+- Weak: overlap is never a hard gate, decorations unchecked, tall targets get only the column template, no
+  contrast term, no measured results.
+
+### anubhav-gupta — techniques (engine/resize.py)
+- **Water-filling allocation** when minimums don't fit: everyone gets 45 % of its minimum, the rest handed out
+  by importance (`_priority_allocate`).
+- Text height from real ascent + descent, not size × line_height (display serifs ≈ 1.4× size).
+- **Busy-background dodge on max-over-small-blocks** of the cover-cropped asset (catches a dot under one word),
+  scans a row at 5 offsets, accepts if gain > 0.2, then widens the box into free space.
+- Label-min → group-height conversion via the label's share of the group.
+- Weak: no tests, scorer inconsistent with fitter, dims secondary content to 32–60 % opacity (arguably a style
+  change the rubric may punish), slides text along rows breaking alignment.
+
+### fashton28 — techniques
+- Font exponent γ: `peak·k·(fs/peak)^γ` compresses hierarchy as a search axis; hierarchy penalty keeps ≥ √(source ratio).
+- Preserve-arrangement prior `3·exp(−2|log r|)` decaying with aspect change, weighed against layout shift.
+- Choppy-wrap penalty (< 14 chars/line); inflation cap so pills/logos don't outgrow the headline.
+
+### rsingh135 — eval ideas
+- Source-mined intentional overlaps/containment (only *new* collisions count); plate render (text stripped) for
+  contrast + busyness; synthetic generator with **holdout families and holdout targets** to measure
+  seen-vs-unseen gap; CI runs the offline Docker build.
+
+## Action items for us (new from this sweep)
+1. **Verify text metrics inside the Linux container.** Measure every sample's wrapped widths in the arm64 image vs
+   macOS; if Linux is wider, adopt max(hinted, linear+1 px) like annniedong or a slack margin like tailsgit.
+   Must happen before freeze (S5). Potential silent overflow on the judges' machine.
+2. Unsat-core style degradation order for floors (which floor to give up first) in our rescue mode.
+3. Water-filling allocation for the "nothing fits" regime in floor plans.
+4. Busy-background check on small blocks (we sample 32×8 points; add a max-over-blocks term).
+5. Choppy-wrap penalty and γ-style hierarchy compression as candidate knobs.
+6. Holdout families/targets in the synthetic corpus to report seen-vs-unseen gap.
+7. Someone else is planning a VLM reranker; our S1/S2 lead is real but not unique. Ship it.
