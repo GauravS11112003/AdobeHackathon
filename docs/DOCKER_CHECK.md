@@ -47,3 +47,16 @@ sed 's#^FROM --platform=linux/amd64 #FROM #' Dockerfile > /tmp/Dockerfile.arm64
 docker build --platform linux/arm64 -f /tmp/Dockerfile.arm64 -t my-chameleon-engine:arm64 .
 docker run --rm --network none --platform linux/arm64 -v "$(pwd)/input:/app/input" -v "$(pwd)/output:/app/output" my-chameleon-engine:arm64
 ```
+
+## Text metrics: macOS vs Linux container (2026-10-24)
+
+Measured the three samples' text elements with `engine.textfit.TextMeasurer` on macOS and inside the arm64
+image (same engine code, same fonts, skia in both). Linux widths are integer-hinted and **wider: mean +5.5 %,
+max +18 %**, worst for small bold text (CTA at 8 px +14.6 %, at 12 px +11.4 %; 60 px headline +1.2 %).
+
+What it means for us: the engine runs *inside* the Linux container at scoring time and measures with the
+same skia it renders with, so the output is self-consistent there (no overflow from this alone). The risk is
+that **our macOS eval numbers are optimistic**: on Linux the same designs get slightly smaller fonts or
+extra wraps, so defect rates and min-font stats must be re-measured by running the eval inside the container
+before freeze (S5). Rivals (annniedong, tailsgit) pad widths or add a slack line because they measure on
+macOS and render on Linux; we do not need padding, we need the in-container eval run.

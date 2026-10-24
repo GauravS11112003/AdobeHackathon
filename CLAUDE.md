@@ -96,6 +96,14 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   secondary images are sized as badge-like "chips"; the logo asset's transparent padding makes logos look small.
 - `textfit.py` — `TextMeasurer` mirrors cr-renderer: skia glyph widths, greedy wrap at spaces (no letter spacing),
   lines at font_size×line_height from box top, no clipping. `fit_font_size` binary-searches integer sizes.
+- `vlm.py` — local VLM adapter (llama-cpp-python 0.3.36, Qwen3-VL GGUF in `models/`, baked into the image by
+  the Dockerfile's weights stage with sha256 checks). `describe(image|[images], prompt, schema, max_tokens,
+  timeout_s, max_side)` → dict valid against the schema or None; never raises; grammar-constrained JSON,
+  temperature 0, fixed seed; cached by image+prompt hash (memory, plus disk with `CHAMELEON_VLM_CACHE_DIR`);
+  cooperative timeout; `CHAMELEON_VLM=0` switches it off (resize() does not import it yet, so output is
+  unchanged). Bench: `tools/vlm_bench.py` (set-of-marks roles vs analyzer, good-vs-perturbed judge probes);
+  numbers, model choice and the Docker/wheel findings in `docs/VLM_BENCH.md`. Weights are not in git;
+  `python -m engine.vlm input/*.json` is the smoke test. Tests: `tests/test_vlm.py` (stub backend).
 - `geometry.py` — `Box` helpers. Tests: `chameleon/tests/` (`.venv/bin/python -m pytest tests -q`, pytest is
   dev-only, not in requirements.txt). `tests/test_judge.py` covers the judge loop (winner defect-free,
   perturbed layout scores worse, rectifier removes an injected overlap, < 10 s per task).
@@ -164,11 +172,20 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   view renders source, our output and the designer's own version (ground-truth siblings) with defects and the
   judge's component bars; "Open in playground" hands the case over via localStorage. j/k step through cases.
 
-## Docker status (see docs/DOCKER_CHECK.md)
+## Docker status (see docs/DOCKER_CHECK.md, docs/VLM_BENCH.md)
+- The Dockerfile has three stages: weights download (sha256-pinned, `--build-arg VLM_BASE_URL=` for a local
+  mirror), an arm64-only rebuild of llama-cpp-python for ARMv8.2 (the prebuilt aarch64 wheel is generic
+  ARMv8 and 8x slower), and the engine image. `.dockerignore` keeps `models/`, `.venv/`, `eval/data/` out
+  of the context. Local arm64 build: `sed 's#^FROM --platform=linux/amd64 #FROM #' Dockerfile > /tmp/D &&
+  docker build --platform linux/arm64 -f /tmp/D --build-arg VLM_BASE_URL=http://host.docker.internal:8787 .`
+  with `python3 -m http.server 8787 --directory models` running.
 - The shipped `linux/amd64` image builds but **hangs at run time on Apple Silicon without Rosetta**: skia
   segfaults under QEMU, inside the organizers' own renderer. A native arm64 build of the same Dockerfile
   runs the three samples offline in 4 s. Open question for organizers; guard any in-engine rendering with
   a fallback so resize() still returns a layout if the renderer dies.
+- Text widths measured inside the Linux image are up to 18 % wider than on macOS (hinting, small bold text
+  worst). Engine is self-consistent in the container, but **macOS eval numbers are optimistic: run the full eval
+  inside the arm64 image before freeze** (docs/DOCKER_CHECK.md).
 
 ## Competitors (reference only)
 - `docs/COMPETITORS.md` compares public rival repos; full clones live in `reference/competitors/` (read-only,
