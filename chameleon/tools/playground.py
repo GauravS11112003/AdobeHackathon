@@ -10,6 +10,10 @@ self-check warnings, the output JSON, and an "all formats" gallery that runs
 the engine against every preset at once. Engine modules are reloaded on
 every run, so edits to engine/*.py show up without restarting.
 
+/eval is the eval browser (harness runs under eval/data/runs/), /label the
+pairwise labelling page for the scorer calibration (eval/labeling.py,
+eval/calibrate.py, docs/CALIBRATION.md).
+
 Dev tool only - not part of the submission (the Dockerfile does not copy tools/).
 """
 
@@ -267,6 +271,56 @@ def _eval_case(q: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# labelling page (eval/labeling.py does the sampling and the label store)
+
+LABEL_THUMB = 720
+
+
+def _labeling():
+    from eval import labeling
+
+    return labeling
+
+
+def _label_next(q: dict) -> dict:
+    """An unlabelled pair with renders. Reloads the engine first (edits to
+    engine/*.py show up), balances formats with the labels so far."""
+    import random
+
+    L = _labeling()
+    _reload_engine()
+    mode = q.get("mode", "candidates")
+    runs = (q.get("run_a", ""), q.get("run_b", "")) if mode == "runs" else None
+    seed = q.get("seed")
+    rng = random.Random(int(seed)) if seed else random.Random()
+    stats = L.label_stats()
+    rec = L.next_pair(mode, rng, stats=stats, runs=runs)
+    size = int(q.get("size", LABEL_THUMB))
+    t0 = time.time()
+    rec["a_png"] = _render_png_b64(rec["a"]["design"], max_size=size)
+    rec["b_png"] = _render_png_b64(rec["b"]["design"], max_size=size)
+    rec["source_png"] = _render_png_b64(_labeling().load_source({"file": rec["design_file"], "id": rec["design_id"]}),
+                                        max_size=360)
+    rec["render_elapsed"] = time.time() - t0
+    return rec
+
+
+def _label_save(req: dict) -> dict:
+    L = _labeling()
+    rec = dict(req["pair"])
+    for k in ("a_png", "b_png", "source_png", "render_elapsed"):
+        rec.pop(k, None)
+    saved = L.append_label(rec, req["decision"], seconds=req.get("seconds"))
+    return {"saved": L._brief(saved), "stats": L.label_stats()}
+
+
+def _label_undo() -> dict:
+    L = _labeling()
+    removed = L.undo_label()
+    return {"removed": L._brief(removed) if removed else None, "stats": L.label_stats()}
+
+
+# ---------------------------------------------------------------------------
 # http
 
 
@@ -305,6 +359,24 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif url.path == "/label":
+            body = LABEL_PAGE.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif url.path.startswith("/api/label/"):
+            q = {k: v[0] for k, v in parse_qs(url.query).items()}
+            try:
+                if url.path == "/api/label/next":
+                    self._json(200, _label_next(q))
+                elif url.path == "/api/label/stats":
+                    self._json(200, {"stats": _labeling().label_stats(), "runs": _eval_runs()})
+                else:
+                    self.send_error(404)
+            except Exception:
+                self._json(500, {"error": traceback.format_exc()})
         elif url.path.startswith("/api/eval/"):
             q = {k: v[0] for k, v in parse_qs(url.query).items()}
             try:
@@ -323,15 +395,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         url = urlparse(self.path)
-        if url.path != "/api/resize":
+        if url.path not in ("/api/resize", "/api/label/save", "/api/label/undo"):
             self.send_error(404)
             return
         n = int(self.headers.get("Content-Length", "0"))
         try:
             req = json.loads(self.rfile.read(n) or b"{}")
-            result = run_resize(req["source"], req["width"], req["height"],
-                                light=bool(req.get("light")), baseline=bool(req.get("baseline")))
-            self._json(200, result)
+            if url.path == "/api/label/save":
+                self._json(200, _label_save(req))
+            elif url.path == "/api/label/undo":
+                self._json(200, _label_undo())
+            else:
+                result = run_resize(req["source"], req["width"], req["height"],
+                                    light=bool(req.get("light")), baseline=bool(req.get("baseline")))
+                self._json(200, result)
         except Exception:
             self._json(500, {"error": traceback.format_exc()})
 
@@ -414,7 +491,7 @@ PAGE = r"""<!doctype html>
   .legend i { display:inline-block; width:10px; height:10px; border:2px solid; margin-right:4px; vertical-align:-1px; }
 </style></head>
 <body>
-<header><h1>Chameleon playground</h1><span>pick a design, pick a canvas, run the engine</span><span style="margin-left:auto"><a href="/eval" style="color:#f0c9a8">Eval browser →</a></span></header>
+<header><h1>Chameleon playground</h1><span>pick a design, pick a canvas, run the engine</span><span style="margin-left:auto"><a href="/eval" style="color:#f0c9a8">Eval browser →</a> &nbsp; <a href="/label" style="color:#f0c9a8">Label pairs →</a></span></header>
 <main>
   <aside class="panel">
     <label>Source design</label>
@@ -658,7 +735,7 @@ EVAL_PAGE = r"""<!doctype html>
   pre { font:11px/1.4 ui-monospace, Menlo, monospace; background:#fafafa; border:1px solid var(--line); border-radius:6px; padding:8px; max-height:320px; overflow:auto; }
 </style></head>
 <body>
-<header><h1>Eval browser</h1><span>browse every case the harness ran</span><span style="margin-left:auto"><a href="/">← Playground</a></span></header>
+<header><h1>Eval browser</h1><span>browse every case the harness ran</span><span style="margin-left:auto"><a href="/">← Playground</a> &nbsp; <a href="/label">Label pairs →</a></span></header>
 <main>
   <aside class="panel">
     <label>Run</label><select id="run"></select>
@@ -763,9 +840,184 @@ init();
 """
 
 
-def main() -> None:
-    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"Chameleon playground: http://localhost:{PORT}")
+LABEL_PAGE = r"""<!doctype html>
+<html><head><meta charset="utf-8"><title>Chameleon · label pairs</title>
+<style>
+  :root { --bg:#f5f1ea; --panel:#fff; --ink:#222; --muted:#777; --accent:#e86a3a; --line:#ddd; --ok:#1a9a55; --bad:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 -apple-system, Segoe UI, sans-serif; color:var(--ink); background:var(--bg); }
+  header { padding:10px 20px; background:#2b1b2e; color:#fff; display:flex; gap:16px; align-items:baseline; }
+  header h1 { font-size:18px; margin:0; font-weight:600; }
+  header span { color:#c9b8cc; font-size:13px; }
+  header a { color:#f0c9a8; }
+  main { padding:12px 20px; display:grid; gap:12px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; min-width:0; }
+  .top { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:16px; align-items:start; }
+  .top img { max-height:150px; max-width:260px; border:1px solid var(--line); background:#111; display:block; }
+  .info { font-size:13px; color:#444; line-height:1.6; }
+  .info b { font-weight:600; }
+  .ctl { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; font-size:12px; color:#444; }
+  .ctl select { padding:4px 6px; border:1px solid var(--line); border-radius:6px; font:inherit; }
+  .ctl label { display:inline-flex; gap:5px; align-items:center; cursor:pointer; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  figure { margin:0; min-width:0; position:relative; }
+  figure .tag { position:absolute; top:8px; left:8px; background:rgba(43,27,46,.85); color:#fff; font-weight:700; font-size:20px; width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; }
+  figure img { width:100%; max-height:66vh; object-fit:contain; border:1px solid var(--line); background:#111; display:block; }
+  figure.win img { outline:3px solid var(--ok); }
+  figcaption { font-size:12px; color:var(--muted); margin-top:5px; min-height:16px; display:flex; justify-content:space-between; gap:8px; }
+  .btns { display:grid; grid-template-columns:repeat(4, 1fr) auto auto; gap:8px; }
+  .btns button { padding:12px 10px; border:1px solid var(--line); background:#fafafa; border-radius:8px; cursor:pointer; font:inherit; font-weight:600; }
+  .btns button.a, .btns button.b { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btns button kbd { font:11px ui-monospace, Menlo, monospace; background:rgba(0,0,0,.12); padding:1px 5px; border-radius:4px; margin-left:6px; }
+  .btns button:disabled { opacity:.5; cursor:default; }
+  .stats { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12px; color:#444; }
+  .stats b { font-weight:600; }
+  .last { font-size:12px; color:#444; margin-top:6px; min-height:16px; }
+  .last .ok { color:var(--ok); } .last .bad { color:var(--bad); }
+  .err { background:#fdecec; color:#8a1f1f; padding:10px; border-radius:8px; white-space:pre-wrap; font-size:12px; }
+  .hint { color:var(--muted); font-size:13px; padding:30px; text-align:center; }
+  .bd { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:2px 12px; font-size:11px; color:#555; margin-top:6px; }
+  .hidden { display:none !important; }
+</style></head>
+<body>
+<header><h1>Label pairs</h1><span>which of the two looks better designed for this canvas?</span><span style="margin-left:auto"><a href="/">← Playground</a> &nbsp; <a href="/eval">Eval browser</a></span></header>
+<main>
+  <div class="panel ctl">
+    <label>Mode <select id="mode"><option value="candidates">two candidates of the engine</option><option value="runs">two harness runs</option></select></label>
+    <label id="runsCtl" class="hidden">A run <select id="runA"></select> &nbsp; B run <select id="runB"></select></label>
+    <label><input type="checkbox" id="reveal"> show names and scores before deciding</label>
+    <span style="margin-left:auto;color:var(--muted)">keys: <b>a</b> / <b>b</b> better · <b>t</b> tie · <b>x</b> both bad · <b>s</b> skip · <b>z</b> undo</span>
+  </div>
+  <div id="error"></div>
+  <div class="panel top">
+    <img id="srcImg" alt="source">
+    <div class="info" id="info">Loading the first pair…</div>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="panel">
+    <div class="pair">
+      <figure id="figA"><span class="tag">A</span><img id="imgA" alt="A"><figcaption id="capA"></figcaption></figure>
+      <figure id="figB"><span class="tag">B</span><img id="imgB" alt="B"><figcaption id="capB"></figcaption></figure>
+    </div>
+    <div class="bd hidden" id="bd"></div>
+  </div>
+  <div class="panel">
+    <div class="btns">
+      <button class="a" data-d="a">A better<kbd>a</kbd></button>
+      <button data-d="tie">Tie<kbd>t</kbd></button>
+      <button class="b" data-d="b">B better<kbd>b</kbd></button>
+      <button data-d="both_bad">Both bad<kbd>x</kbd></button>
+      <button id="skip">Skip<kbd>s</kbd></button>
+      <button id="undo">Undo<kbd>z</kbd></button>
+    </div>
+    <div class="last" id="last"></div>
+  </div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+let cur = null, nextP = null, shownAt = 0, busy = false, stats = null;
+function qs() { const p = new URLSearchParams(); p.set('mode', $('#mode').value); if ($('#mode').value === 'runs') { p.set('run_a', $('#runA').value); p.set('run_b', $('#runB').value); } return p.toString(); }
+function fetchPair() { return fetch('/api/label/next?' + qs()).then(r => r.json()); }
+function prefetch() { nextP = fetchPair(); }
+function fmtHard(h) { return h && h.length ? ` · <span style="color:var(--bad)">${h.length} hard</span>` : ''; }
+function renderStats(s) {
+  stats = s; if (!s) return;
+  const fam = Object.entries(s.by_tgt_family || {}).map(([k,v]) => `${k} ${v}`).join(' · ') || '—';
+  const agree = s.scorer_n ? `${s.scorer_agree}/${s.scorer_n} (${(100*s.scorer_agree/s.scorer_n).toFixed(0)}%)` : '—';
+  const dec = Object.entries(s.by_decision || {}).map(([k,v]) => `${k} ${v}`).join(' · ') || '—';
+  $('#stats').innerHTML = `<span><b>${s.n}</b> labels · ${s.designs} designs</span><span>scorer agrees <b>${agree}</b></span><span>by target: ${fam}</span><span>decisions: ${dec}</span>`;
+}
+function show(rec) {
+  cur = rec; shownAt = performance.now();
+  $('#error').innerHTML = '';
+  $('#srcImg').src = 'data:image/png;base64,' + rec.source_png;
+  $('#imgA').src = 'data:image/png;base64,' + rec.a_png;
+  $('#imgB').src = 'data:image/png;base64,' + rec.b_png;
+  const c = rec.a.design.canvas;
+  $('#info').innerHTML = `<b>${rec.title || rec.design_id}</b> <span style="color:var(--muted)">${rec.design_id}</span><br>${rec.src_family} source → <b>${rec.preset}</b> ${rec.target.width}×${rec.target.height} (${rec.tgt_family}, shape change ${(+rec.ratio_change).toFixed(2)}×)<br><span style="color:var(--muted)">${rec.mode === 'runs' ? 'runs ' + rec.runs.join(' vs ') : 'two engine candidates'} · rendered in ${(rec.render_elapsed*1000).toFixed(0)} ms</span>`;
+  ['A','B'].forEach(k => { $('#fig'+k).classList.remove('win'); });
+  reveal($('#reveal').checked);
+  document.querySelectorAll('.btns button').forEach(b => b.disabled = false);
+}
+function reveal(on) {
+  if (!cur) return;
+  const cap = (s) => on ? `<span>${s.name}</span><span>${(+s.total).toFixed(1)}${fmtHard(s.hard)}</span>` : '<span>&nbsp;</span>';
+  $('#capA').innerHTML = cap(cur.a); $('#capB').innerHTML = cap(cur.b);
+  $('#bd').classList.toggle('hidden', !on);
+  if (on) $('#bd').innerHTML = Object.keys(cur.a.breakdown).map(k => { const a = cur.a.breakdown[k], b = cur.b.breakdown[k]; const d = a - b; return `<span>${k}: ${a.toFixed(2)} vs ${b.toFixed(2)} <b style="color:${d>0.005?'var(--ok)':d<-0.005?'var(--bad)':'#999'}">${d>0?'+':''}${d.toFixed(2)}</b></span>`; }).join('');
+}
+async function advance() {
+  busy = true; document.querySelectorAll('.btns button').forEach(b => b.disabled = true);
+  $('#info').innerHTML = 'Rendering the next pair…';
+  try {
+    const rec = await (nextP || fetchPair());
+    nextP = null;
+    if (rec.error) throw new Error(rec.error);
+    show(rec);
+    prefetch();
+  } catch (e) {
+    $('#error').innerHTML = `<div class="err">${e.message}</div><button id="retry" style="margin-top:8px">Retry</button>`;
+    $('#retry').addEventListener('click', () => { nextP = null; advance(); });
+    $('#undo').disabled = false; $('#skip').disabled = false;
+  }
+  busy = false;
+}
+async function decide(d) {
+  if (!cur || busy) return;
+  busy = true;
+  const pair = cur, seconds = (performance.now() - shownAt) / 1000;
+  const r = await (await fetch('/api/label/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({pair, decision: d, seconds})})).json();
+  busy = false;
+  if (r.error) { $('#error').innerHTML = `<div class="err">${r.error}</div>`; return; }
+  renderStats(r.stats);
+  const s = r.saved, scorer = s.scorer, agree = (d === 'a' || d === 'b') ? (scorer === d ? '<span class="ok">scorer agreed</span>' : `<span class="bad">scorer picked ${scorer.toUpperCase()}</span>`) : `scorer picked ${scorer}`;
+  $('#last').innerHTML = `Saved: <b>${s.case_key}</b> — you said <b>${d}</b>, ${agree}. A = ${pair.a.name} (${(+pair.a.total).toFixed(1)}${pair.a.hard.length?', '+pair.a.hard.length+' hard':''}), B = ${pair.b.name} (${(+pair.b.total).toFixed(1)}${pair.b.hard.length?', '+pair.b.hard.length+' hard':''})`;
+  advance();
+}
+async function undo() {
+  if (busy) return;
+  const r = await (await fetch('/api/label/undo', {method:'POST'})).json();
+  if (r.error) { $('#error').innerHTML = `<div class="err">${r.error}</div>`; return; }
+  renderStats(r.stats);
+  $('#last').innerHTML = r.removed ? `Undone: <b>${r.removed.case_key}</b> (was <b>${r.removed.decision}</b>). ${r.stats.n} labels left.` : 'Nothing to undo.';
+}
+async function init() {
+  const d = await (await fetch('/api/label/stats')).json();
+  renderStats(d.stats);
+  const opts = (d.runs || []).map(r => `<option value="${r.name}">${r.name} (${r.cases})</option>`).join('');
+  $('#runA').innerHTML = opts; $('#runB').innerHTML = opts;
+  if (d.runs && d.runs.length > 1) $('#runB').selectedIndex = d.runs.length - 1;
+  $('#mode').addEventListener('change', () => { $('#runsCtl').classList.toggle('hidden', $('#mode').value !== 'runs'); nextP = null; advance(); });
+  ['#runA', '#runB'].forEach(s => $(s).addEventListener('change', () => { nextP = null; advance(); }));
+  $('#reveal').addEventListener('change', () => reveal($('#reveal').checked));
+  document.querySelectorAll('.btns button[data-d]').forEach(b => b.addEventListener('click', () => decide(b.dataset.d)));
+  $('#skip').addEventListener('click', () => { if (!busy) advance(); });
+  $('#undo').addEventListener('click', undo);
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.metaKey || e.ctrlKey) return;
+    const k = e.key.toLowerCase();
+    if (k === 'a' || k === 'arrowleft') decide('a'); else if (k === 'b' || k === 'arrowright') decide('b');
+    else if (k === 't') decide('tie'); else if (k === 'x') decide('both_bad');
+    else if (k === 's') { if (!busy) advance(); } else if (k === 'z') undo();
+    else if (k === 'r') { $('#reveal').checked = !$('#reveal').checked; reveal($('#reveal').checked); }
+  });
+  advance();
+}
+init();
+</script>
+</body></html>
+"""
+
+
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+    import os
+
+    ap = argparse.ArgumentParser(description="Chameleon playground / eval browser / labelling page")
+    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT") or PORT))
+    args = ap.parse_args(argv)
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    print(f"Chameleon playground: http://localhost:{args.port}  (eval browser /eval, labelling /label)")
     server.serve_forever()
 
 
