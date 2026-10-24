@@ -20,8 +20,8 @@ Raw results: `chameleon/eval/data/vlm_bench/<model>.json` (gitignored); example 
   position-locked. Everything else is position-locked or ties: the A|B composite fails even for the 4B
   (1/20), the 2B and the fast tier get 0–4/20, absolute 1–5 scores tie on most designs.
 - **Cost on CPU (M3 Pro, 8 threads):** 2B ≈ 3 s per call at 448 px, 4.5 s at 672 px; 4B ≈ 7 s at 448 px,
-  9 s at 672 px, 12 s for a two-image judge call. Inside Docker (arm64) with the optimised build the 2B takes
-  12–14 s per call (~2× native). The prebuilt aarch64 wheel is 8× slower (generic ARMv8, no dot-product
+  9 s at 672 px, 12 s for a two-image judge call. Inside Docker (arm64) with the optimised build a 672 px call takes
+  12–14 s for the 2B and 10–15 s for the 4B (prefill dominates; ~1.5–2× native). The prebuilt aarch64 wheel is 8× slower (generic ARMv8, no dot-product
   kernels), so the Dockerfile rebuilds llama.cpp for ARMv8.2 on arm64. Model load: 1–3 s.
 
 ## Candidates (GGUF)
@@ -143,7 +143,10 @@ Per call the adapter reports prefill (image encode + prompt eval), generation ti
 | smolvlm2-500m | | | hinted@672 | 0.13 | 0.26 | 1/20 | 1.5 | 0.5 | 111 | 2.0 / 2.3 |
 | smolvlm2-500m | | | plain@448 | 0.13 | 0.19 | 6/20 | 1.4 | 0.4 | 113 | 1.8 / 2.5 |
 | smolvlm2-500m | | | plain@672 | 0.14 | 0.20 | 6/20 | 1.4 | 0.4 | 114 | 1.9 / 2.2 |
-| moondream2 | 2.84 + 0.91 GB | 1.1 | all | [pending rerun] | | | ~5.4 | 1.3 | 30 | 6.7 |
+| moondream2 | 2.84 + 0.91 GB | 1.8 | hinted@448 | 0.14 | 0.29 | 4/20 | 5.7 | 1.7 | 29 | 7.5 / 13.9 |
+| moondream2 | | | hinted@672 | 0.14 | 0.29 | 4/20 | 5.7 | 1.8 | 29 | 7.6 / 13.1 |
+| moondream2 | | | plain@448 | 0.14 | 0.25 | 6/20 | 5.4 | 1.9 | 29 | 7.3 / 28.6 |
+| moondream2 | | | plain@672 | 0.14 | 0.25 | 6/20 | 5.4 | 1.8 | 30 | 7.2 / 14.8 |
 
 Reading the 4B's hinted@672 confusion: logo 3/3, badge 4/4, headline 15/20, cta 6/9, hero → "image" 9/11
 (the enum's hero/image distinction is ours, not the model's), subhead 5/14 and body 1/21 (the Crello
@@ -168,26 +171,32 @@ size (its preprocessor resizes to a fixed grid), so 448 and 672 cost the same.
 | qwen3vl-4b | absolute@672 | 5/20, 14 ties | 3/14 | – | 6.0 | 1.2 | 7.1 / 24.3 |
 | qwen3vl-2b | composite@672 | 0/20 | 0/14 | 20/20 | 2.6 | 1.0 | 3.7 / 27.9 |
 | qwen3vl-2b | two_images@672 | 4/20 | 4/14 | 14/20 | 5.7 | 1.0 | 6.7 / 17.7 |
-| qwen3vl-2b | absolute@672 | [rerun pending; first run: 2/20, 13 ties] | | – | 3.0 | 0.7 | 3.7 / 7.3 |
+| qwen3vl-2b | absolute@672 | 1/20, 17 ties | 1/14 | – | 3.0 | 0.7 | 3.7 / 7.4 |
 | lfm2vl-1.6b | composite@672 | 1/20 | 1/14 | 19/20 | 2.5 | 0.5 | 3.1 / 4.1 |
 | lfm2vl-1.6b | two_images@672 | 0/20 | 0/14 | 20/20 | 5.8 | 0.5 | 6.3 / 7.1 |
-| lfm2vl-1.6b | absolute@672 | [rerun pending] | | – | 3.0 | 0.3 | 3.3 / 3.9 |
+| lfm2vl-1.6b | absolute@672 | 4/20, 14 ties | 4/14 | – | 2.9 | 0.3 | 3.2 / 104.9 |
 | smolvlm2-500m | composite@672 | 0/20 | 0/14 | 20/20 | 1.3 | 0.4 | 1.7 / 2.0 |
 | smolvlm2-500m | two_images@672 | 0/20 | 0/14 | 20/20 | 2.5 | 0.3 | 2.9 / 3.2 |
-| smolvlm2-500m | absolute@672 | [rerun pending] | | – | 1.3 | 0.2 | 1.5 / 1.7 |
-| moondream2 | all | [pending rerun] | | | | | |
+| smolvlm2-500m | absolute@672 | 3/20, 15 ties | 3/14 | – | 1.3 | 0.2 | 1.6 / 1.8 |
+| moondream2 | composite@672 | 0/20 | 0/14 | 20/20 | 4.9 | 0.6 | 5.5 / 10.2 |
+| moondream2 | two_images@672 | 1/20 | 1/14 | 19/20 | 10.2 | 0.6 | 10.9 / 29.7 |
+| moondream2 | absolute@672 | 3/20, 16 ties | 2/14 | – | 5.0 | 0.8 | 5.8 / 15.2 |
 
 The 2B's composite answers are boilerplate ("Design A has a clean, balanced layout … while B has
-misaligned…") for every design regardless of content: it is not looking. The first absolute run used keys
+misaligned…") for every design regardless of content: it is not looking. The absolute rows are from a rerun: the first version used keys
 `collisions`/`readability`/… and the models answered "collisions: 0" (a count, not a 1–5 score), which the
-schema's `minimum` rejected — the rerun uses `overlap_free`/`readable`/`balanced`/`intentional`.
+schema's `minimum` rejected; with `overlap_free`/`readable`/`balanced`/`intentional` every call parses and
+the scores still tie on 14–17 of 20 designs for every model (the 104.9 s LFM2-VL outlier is one call whose
+grammar-constrained decode ran to `max_tokens` on repeated digits). Moondream2 ran once with the engine's
+per-task render budget exhausted (bench bug, fixed: `render.begin_task()` per design) and was rerun in full.
 
 ### Docker
 
 | image | build | size | 2B call in the container (`--network none`) |
 |---|---|---|---|
 | linux/arm64, prebuilt wheel (generic ARMv8) | ok | 4.42 GB on disk | 36–60 s per call (prefill 23–49 s, 2.5 tok/s) — 8× native, see above |
-| linux/arm64, llama.cpp rebuilt for ARMv8.2 (`DOTPROD, MATMUL_INT8, FP16_VA` confirmed in the image) | ok (compile 51 s) | 4.54 GB on disk | 12–14 s per call (prefill 7.6–10.2 s, 8–9 tok/s), load 1.3 s — ~2× native, the Docker VM's share |
+| linux/arm64, llama.cpp rebuilt for ARMv8.2 (`DOTPROD, MATMUL_INT8, FP16_VA` confirmed in the image), 2B weights | ok (compile 51 s) | 4.54 GB on disk | 12–14 s per call (prefill 7.6–10.2 s, 8–9 tok/s), load 1.3 s — ~2× native, the Docker VM's share |
+| linux/arm64, same build, **4B weights (the Dockerfile default now)** | ok | 7.32 GB on disk | 10–15 s per call at 672 px (prefill 9.6–11.1 s, 23 tok/s), load 3.1 s, 3/3 samples answered offline |
 | linux/amd64 (the organizers' build; AVX2 wheel, weights, llama.cpp imports under QEMU) | ok | 1.84 GB reported (shared layers) | not timed: QEMU, and skia segfaults there (docs/DOCKER_CHECK.md) |
 
 `python -m engine.main` with `CHAMELEON_VLM=0` in the arm64 container writes all three outputs (the two that
