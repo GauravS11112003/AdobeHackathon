@@ -1,0 +1,311 @@
+[
+ {
+  "id": "5952492d95a7a863ddcddfa0",
+  "title": "Citation about Handcrafted things",
+  "family": "tall",
+  "n": 7,
+  "nt": 1,
+  "roles": {
+   "headline": 1,
+   "hero": 1,
+   "background": 1
+  },
+  "arche": "product",
+  "cat": "handcraftArt",
+  "fmt": "Pinterest"
+ },
+ {
+  "id": "593112f495a7a863ddcdc5a7",
+  "title": "Natural skincare sale with lavender Soap",
+  "family": "tall",
+  "n": 13,
+  "nt": 7,
+  "roles": {
+   "body": 5,
+   "hero": 1,
+   "shape": 1,
+   "headline": 1,
+   "subhead": 1,
+   "background": 1
+  },
+  "arche": "editorial",
+  "cat": "beauty",
+  "fmt": "Poster US"
+ },
+ {
+  "id": "5c346ef7048d064dbc063111",
+  "title": "Woman in holiday red dress",
+  "family": "square",
+  "n": 7,
+  "nt": 2,
+  "roles": {
+   "shape": 2,
+   "body": 1,
+   "headline": 1,
+   "hero": 1,
+   "background": 2
+  },
+  "arche": "product",
+  "cat": "holidaysCelebration",
+  "fmt": "Instagram AD"
+ },
+ {
+  "id": "5e709a0f4b3890eb0783cb50",
+  "title": "New Vintage Collection Sale with Stylish Girl",
+  "family": "square",
+  "n": 7,
+  "nt": 3,
+  "roles": {
+   "logo": 1,
+   "hero": 1,
+   "headline": 1,
+   "image": 1,
+   "subhead": 1,
+   "body": 1,
+   "decorative": 1
+  },
+  "arche": "product",
+  "cat": "fashionStyle",
+  "fmt": "Instagram"
+ },
+ {
+  "id": "58a4091695a7a863ddcc6c53",
+  "title": "Successful Business Team at the Meeting",
+  "family": "tall",
+  "n": 9,
+  "nt": 5,
+  "roles": {
+   "badge": 1,
+   "body": 2,
+   "headline": 1,
+   "subhead": 1,
+   "background": 1
+  },
+  "arche": "typographic",
+  "cat": "businessFinance",
+  "fmt": "Poster"
+ },
+ {
+  "id": "5e68e28db04a3d1f19b3c3fc",
+  "title": "SEO Lifehacks with hands typing on Keyboard",
+  "family": "banner",
+  "n": 10,
+  "nt": 4,
+  "roles": {
+   "headline": 1,
+   "badge": 1,
+   "subhead": 1,
+   "shape": 1,
+   "body": 1,
+   "decorative": 2,
+   "panel": 2
+  },
+  "arche": "typographic",
+  "cat": "educationScience",
+  "fmt": "VK Community Cover"
+ },
+ {
+  "id": "59b27f4d1350e8329300daea",
+  "title": "Sparkling night event",
+  "family": "wide",
+  "n": 7,
+  "nt": 5,
+  "roles": {
+   "body": 3,
+   "hero": 1,
+   "headline": 1,
+   "subhead": 1,
+   "background": 1
+  },
+  "arche": "poster",
+  "cat": "leisureEntertainment",
+  "fmt": "Twitter"
+ },
+ {
+  "id": "59b27d591350e8329300d8b3",
+  "title": "Night Party Invitation Woman in Black Dress",
+  "family": "square",
+  "n": 15,
+  "nt": 6,
+  "roles": {
+   "body": 1,
+   "headline": 1,
+   "subhead": 1,
+   "badge": 2,
+   "cta": 1,
+   "background": 2,
+   "panel": 2
+  },
+  "arche": "editorial",
+  "cat": "leisureEntertainment",
+  "fmt": "Instagram AD"
+ },
+ {
+  "id": "59b26b291350e8329300d483",
+  "title": "Sparkling night event",
+  "family": "banner",
+  "n": 7,
+  "nt": 5,
+  "roles": {
+   "body": 4,
+   "hero": 1,
+   "headline": 1,
+   "background": 1
+  },
+  "arche": "poster",
+  "cat": "leisureEntertainment",
+  "fmt": "Twitter"
+ },
+ {
+  "id": "5e8d96cb4b3890eb071c683d",
+  "title": "#StayAtHome Social Distancing People connecting by Phone",
+  "family": "tall",
+  "n": 8,
+  "nt": 3,
+  "roles": {
+   "body": 1,
+   "headline": 1,
+   "hero": 1,
+   "shape": 1,
+   "image": 1,
+   "cta": 1,
+   "decorative": 1,
+   "panel": 1
+  },
+  "arche": "product",
+  "cat": "medical",
+  "fmt": "Instagram Story"
+ },
+ {
+  "id": "5888cec295a7a863ddcc24c9",
+  "title": "Corporate Charity Night",
+  "family": "tall",
+  "n": 11,
+  "nt": 8,
+  "roles": {
+   "badge": 1,
+   "headline": 1,
+   "subhead": 1,
+   "body": 2,
+   "hero": 1,
+   "cta": 1,
+   "fine_print": 1,
+   "panel": 1
+  },
+  "arche": "editorial",
+  "cat": "socialActivityCharity",
+  "fmt": "Pinterest"
+ },
+ {
+  "id": "5953611d95a7a863ddce13e0",
+  "title": "Puppy socialization class with Dog in pink",
+  "family": "square",
+  "n": 9,
+  "nt": 4,
+  "roles": {
+   "shape": 2,
+   "headline": 1,
+   "subhead": 1,
+   "body": 2,
+   "background": 1,
+   "panel": 1
+  },
+  "arche": "typographic",
+  "cat": "pets",
+  "fmt": "Instagram AD"
+ },
+ {
+  "id": "5952645b95a7a863ddcde7c9",
+  "title": "Furniture Expo invitation with modern Interior",
+  "family": "tall",
+  "n": 8,
+  "nt": 5,
+  "roles": {
+   "body": 2,
+   "badge": 1,
+   "headline": 1,
+   "hero": 1,
+   "subhead": 1,
+   "decorative": 1
+  },
+  "arche": "poster",
+  "cat": "homeStuff",
+  "fmt": "Graphic"
+ },
+ {
+  "id": "5ca7253923c829c8213e6cd2",
+  "title": "Medical Event announcement modern MRI Scanner",
+  "family": "wide",
+  "n": 11,
+  "nt": 4,
+  "roles": {
+   "body": 2,
+   "headline": 1,
+   "hero": 1,
+   "shape": 1,
+   "subhead": 1,
+   "panel": 1,
+   "decorative": 1
+  },
+  "arche": "product",
+  "cat": "medical",
+  "fmt": "FB event cover"
+ },
+ {
+  "id": "5952983995a7a863ddce040b",
+  "title": "BBQ party Annoucement",
+  "family": "wide",
+  "n": 11,
+  "nt": 7,
+  "roles": {
+   "fine_print": 4,
+   "headline": 1,
+   "body": 1,
+   "subhead": 1,
+   "background": 1,
+   "panel": 1
+  },
+  "arche": "editorial",
+  "cat": "holidaysCelebration",
+  "fmt": "Gift Certificate"
+ },
+ {
+  "id": "595256d795a7a863ddcde397",
+  "title": "Traditional ceramics workshop",
+  "family": "tall",
+  "n": 14,
+  "nt": 5,
+  "roles": {
+   "shape": 2,
+   "headline": 1,
+   "body": 1,
+   "logo": 1,
+   "badge": 1,
+   "cta": 1,
+   "image": 1,
+   "hero": 1,
+   "subhead": 1
+  },
+  "arche": "poster",
+  "cat": "homeStuff",
+  "fmt": "Poster"
+ },
+ {
+  "id": "59b27ce91350e8329300d847",
+  "title": "Video Games Championship announcement",
+  "family": "square",
+  "n": 7,
+  "nt": 5,
+  "roles": {
+   "headline": 1,
+   "hero": 1,
+   "body": 1,
+   "subhead": 1,
+   "fine_print": 2,
+   "background": 1
+  },
+  "arche": "poster",
+  "cat": "leisureEntertainment",
+  "fmt": "Facebook"
+ }
+]
