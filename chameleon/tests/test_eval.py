@@ -184,7 +184,7 @@ def test_metrics_on_shipped_samples(path):
     assert row["offcanvas_n"] == 0 and row["aspect_fail_n"] == 0 and row["overflow_n"] == 0
     assert row["overlap_n"] == 0 and row["below_floor_n"] == 0
     assert row["defect_n"] == 0
-    assert row["winner"] == judged[0].name and row["strategy"] in ("anchor", "floorplan")
+    assert row["winner"] == judged[0].name and row["strategy"] in ("anchor", "floorplan", "structure")
     assert row["n_candidates"] == len(judged) and row["min_font"] >= 1   # L3 -> 728x90 keeps 3px badge labels on purpose
     assert set(k for k in row if k.startswith(("read.", "layout.", "faith."))) == set(judged[0].score.breakdown)
     # the metrics do flag damage: push the headline off canvas and squash an image

@@ -127,6 +127,7 @@ def test_understand_is_a_noop_by_default(monkeypatch):
 def test_output_is_byte_identical_to_v5_with_the_flags_off(golden, monkeypatch):
     monkeypatch.delenv("CHAMELEON_VLM", raising=False)
     monkeypatch.delenv("CHAMELEON_ROLE_MODEL", raising=False)
+    monkeypatch.setenv("CHAMELEON_OPTIMIZE", "0")      # v7: the energy optimiser is on by default
     stem, size = golden.stem.rsplit("_", 1)
     w, h = (int(v) for v in size.split("x"))
     out = RZ.resize(load(stem), {"width": w, "height": h})
