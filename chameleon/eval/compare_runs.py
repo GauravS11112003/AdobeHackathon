@@ -25,7 +25,7 @@ if str(ROOT) not in sys.path:
 from eval.run_eval import RUNS_DIR, _fail_flags, read_results  # noqa: E402
 
 COMPONENTS = ("read.size", "read.lines", "read.contrast", "read.presence", "layout.balance", "layout.alignment",
-              "layout.spacing", "layout.fill", "layout.margins", "layout.size", "faith.order", "faith.anchors",
+              "layout.spacing", "layout.fill", "layout.margins", "layout.size", "layout.cohesion", "faith.order", "faith.anchors",
               "faith.hierarchy", "faith.scale")
 
 
@@ -67,6 +67,9 @@ def table(runs: dict[str, dict[str, dict[str, Any]]], presets: list[str] | None)
     row("runtime p50 (s)", lambda rows: _p([rows[k]["elapsed"] for k in keys if rows[k].get("elapsed") is not None], 0.5), "{:.2f}")
     row("runtime p95 (s)", lambda rows: _p([rows[k]["elapsed"] for k in keys if rows[k].get("elapsed") is not None], 0.95), "{:.2f}")
     row("smallest font p05 (px)", lambda rows: _p([rows[k]["min_font"] for k in keys if rows[k].get("min_font") is not None], 0.05), "{:.1f}")
+    row("smallest font p50 (px)", lambda rows: _p([rows[k]["min_font"] for k in keys if rows[k].get("min_font") is not None], 0.5), "{:.1f}")
+    row("smallest headline/CTA font p05 (px)", lambda rows: _p([rows[k]["min_font_primary"] for k in keys if rows[k].get("min_font_primary") is not None], 0.05), "{:.1f}")
+    row("smallest headline/CTA font p50 (px)", lambda rows: _p([rows[k]["min_font_primary"] for k in keys if rows[k].get("min_font_primary") is not None], 0.5), "{:.1f}")
     gt = [k for k in keys if str(runs[names[0]][k].get("preset", "")).startswith("gt:") and runs[names[0]][k].get("gt_n")]
     for col, label in (("gt_pos_err", "gt centre error"), ("gt_order_tau", "gt reading-order tau"),
                        ("gt_size_rho", "gt size rho"), ("gt_font_ratio", "gt font ratio (median)")):
