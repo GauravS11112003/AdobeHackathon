@@ -240,6 +240,20 @@ def source_quality(source: dict[str, Any], *, max_panel_share: float = 0.55) -> 
                               for e in source["elements"] if e is not el)
                 if not covered:
                     issues.append(f"large blank panel ({share:.0%}): {el['id']}")
+    # Unreadable in the source: a primary text (>= 60 % of the largest font) whose
+    # colour barely differs from what lies under it (white on a yellow stand-in
+    # panel, 'IENCE / LIGION' in round 1). Our output cannot be judged on that.
+    try:
+        from engine.contrast import estimate
+        if texts:
+            top = max(float(t["font_size"]) for t in texts)
+            primary = {t["id"] for t in texts if float(t["font_size"]) >= 0.6 * top}
+            for tid, tc in estimate(source, ids=primary).items():
+                if tc.ratio < 1.6:
+                    issues.append(f"unreadable in source (contrast {tc.ratio:.2f}): {tid}")
+                    break
+    except Exception:
+        pass
     # Text-box overlap is deliberately NOT a reason: designers stack and lock up
     # text boxes all the time ("17" over "JULY", a date under a weekday); the
     # truncated-text case is already caught by the overflow check above.
