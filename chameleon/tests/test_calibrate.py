@@ -238,3 +238,20 @@ def test_perturb_moves_content_and_keeps_ids():
     for e in bad["elements"]:
         assert 0 <= e["x"] and e["x"] + e["width"] <= 1000 + 1e-6
         assert 0 <= e["y"] and e["y"] + e["height"] <= 1000 + 1e-6
+
+
+def test_source_quality_filters_broken_sources():
+    import copy, json
+    from pathlib import Path
+    from eval.labeling import source_quality
+
+    src = json.loads((Path(__file__).resolve().parent.parent / "input" / "chameleon_sample_level1_warmup.json").read_text())["source"]
+    assert source_quality(src) == []
+    cramped = copy.deepcopy(src)
+    for el in cramped["elements"]:
+        if el["id"] == "headline":
+            el["width"], el["height"] = 120, 20          # 60 px headline cannot fit here
+    assert any("overflows" in r for r in source_quality(cramped))
+    ghost = copy.deepcopy(src)
+    ghost["elements"][1]["asset_id"] = "does_not_exist.png"
+    assert any("missing asset" in r for r in source_quality(ghost))

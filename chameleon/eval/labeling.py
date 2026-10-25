@@ -193,6 +193,58 @@ def _record(mode: str, row: dict[str, Any], preset: str, target: dict[str, int],
             "a": a, "b": b, **extra}
 
 
+
+# ---------------------------------------------------------------------------
+# source quality: skip designs the harness itself broke (stand-in assets,
+# truncated text) so human labels judge the engine, not the eval data
+
+
+def source_quality(source: dict[str, Any], *, max_panel_share: float = 0.55) -> list[str]:
+    """Reasons this *source* is not a fair test. Empty list = fine.
+
+    - a text whose content does not fit its own box at its own font (truncated
+      or wrapped off the box: 'IENCE / LIGION' in the labels round-1 sheets);
+    - an image whose asset file is missing (renders as the grey placeholder);
+    - an opaque non-background shape covering a large share of the canvas
+      (a photo that the Crello conversion replaced by a blank panel);
+    """
+    from engine.textfit import default_measurer
+    from engine.geometry import Box
+    from engine.contrast import ASSETS_DIR
+
+    issues: list[str] = []
+    c = source["canvas"]; cw, ch = float(c["width"]), float(c["height"]); area = cw * ch
+    m = default_measurer()
+    texts = []
+    for el in source["elements"]:
+        t = el.get("type")
+        if t == "text":
+            try:
+                if not m.fits(el, float(el["font_size"]), float(el["width"]), float(el["height"]), slack=2.0):
+                    issues.append(f"source text overflows its box: {el['id']}")
+            except Exception:
+                pass
+            texts.append(el)
+        elif t == "image":
+            aid = el.get("asset_id")
+            if aid and not (Path(ASSETS_DIR) / str(aid)).is_file():
+                issues.append(f"missing asset: {el['id']}")
+        elif t == "shape":
+            b = Box.of(el)
+            share = min(b.area, area) / area
+            alpha = float(el.get("opacity", 1.0))
+            if max_panel_share <= share < 0.85 and alpha >= 0.9 and str(el.get("shape_type")) == "rectangle":
+                # a card with text on it is design; a big empty rectangle is a photo the
+                # conversion replaced (nothing is drawn on it)
+                covered = any(e.get("type") in ("text", "image") and b.contains_fraction(Box.of(e)) >= 0.5
+                              for e in source["elements"] if e is not el)
+                if not covered:
+                    issues.append(f"large blank panel ({share:.0%}): {el['id']}")
+    # Text-box overlap is deliberately NOT a reason: designers stack and lock up
+    # text boxes all the time ("17" over "JULY", a date under a weekday); the
+    # truncated-text case is already caught by the overflow check above.
+    return issues
+
 # ---------------------------------------------------------------------------
 # pair sampling
 
@@ -235,6 +287,10 @@ def next_pair(mode: str = "candidates", rng: random.Random | None = None, *, dat
         target = {"width": w, "height": h}
         try:
             source = load_source(row, data_dir)
+            issues = source_quality(source)
+            if issues:
+                last_err = f"{row['id']}: unfair source ({issues[0]})"
+                continue
             pair = judge_pair(source, target, rng)
         except Exception as exc:  # a broken design is skipped, not fatal
             last_err = f"{row['id']}: {exc!r}"
