@@ -328,6 +328,23 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   Reloads `engine/*` on every run. Start with the "playground" entry in `.claude/launch.json` (preview_start)
   or `cd chameleon && .venv/bin/python tools/playground.py`. It depends on `resize_with_candidates` /
   `Judged.summary()` and `engine.render.render_design(design, max_size)`; keep those stable.
+- **Design picker** (next to the sample dropdown, "Browse designs"): filter by title / id / format / archetype,
+  family chips, "designer refs only", ↓/↑ + Enter in the filter box; a click loads the design's source into the
+  JSON textarea, keeps the current target and runs. `GET /api/designs` → compact list (id, title, w, h, family,
+  n, nt, format, kind eval | sample | docs, arch, refs = number of designer formats, batch, holdout), built once
+  and cached (`?refresh=1` rebuilds) from `eval/data/index.json` (falls back to scanning `eval/data/designs/`)
+  plus the designer folders: `docs/designer{,2}/out/<id>__<WxH>.json` give the refs, `manifest.json` /
+  `picks.json` titles and archetypes, `designer2/holdout_ids.json` the hold-out flag, `src_NN_<id>.json` the
+  sources of designs that are not in eval/data (the three samples, or everything when eval/data is absent:
+  60 rows from docs alone, `[]` when neither exists). `GET /api/design?id=` → `{id, title, source, meta,
+  target (samples only), holdout, refs: [{size, w, h, batch}]}` (404 `{error}` for an unknown id; ids are
+  `[A-Za-z0-9_-]+`). When the loaded design has designer layouts, `POST /api/resize` takes the page's `design_id`
+  and adds `designer` (`{size, available, holdout, batch, canvas, png}`, `png` null when the current target is
+  not one of the 12 designer formats; rendered in the same request) and the page shows a "Designer's version"
+  row under the output with the available formats as chips (click = set that target and run, click the image =
+  enlarge). The id is dropped when the JSON is edited by hand or uploaded; the sample dropdown and the eval
+  browser's "Open in playground" (which now also sends `id`) keep it. A stale response from an earlier run is
+  ignored (`runSeq`).
 - The same server has an **eval browser** at http://localhost:8765/eval: filters every case of a harness run
   (`eval/data/runs/<run>/results.jsonl`) by format, shape family, defect type, strategy, text search; detail
   view renders source, our output and the designer's own version (ground-truth siblings) with defects and the

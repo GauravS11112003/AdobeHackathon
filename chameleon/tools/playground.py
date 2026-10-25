@@ -24,6 +24,7 @@ import copy
 import importlib
 import io
 import json
+import re
 import sys
 import tempfile
 import time
@@ -148,7 +149,7 @@ def _judged_candidates(resize_mod, source: dict, target: dict):
 
 
 def run_resize(source: dict, width: int, height: int, *, light: bool = False,
-               baseline: bool = False) -> dict:
+               baseline: bool = False, design_id: str | None = None) -> dict:
     resize_mod, analyze_mod = _reload_engine()
     target = {"width": int(width), "height": int(height)}
     t0 = time.time()
@@ -175,7 +176,170 @@ def run_resize(source: dict, width: int, height: int, *, light: bool = False,
             result["candidates"].append({**summ, "design": j.design,
                                          "png": _render_png_b64(j.design, max_size=480)})
     result["render_elapsed"] = time.time() - t1
+    if design_id and not light:
+        # The designer's own layout at this size, when the loaded design has one (rendered in this
+        # request, not a second one: two renders in flight at once is what the page would otherwise do).
+        try:
+            result["designer"] = _designer_ref(design_id, int(width), int(height))
+        except Exception as e:  # never let the comparison row break a run
+            result["designer"] = {"id": design_id, "error": f"{type(e).__name__}: {e}"}
     return result
+
+
+# ---------------------------------------------------------------------------
+# design picker: eval designs + designer references (eval/data is gitignored, docs/designer* is not)
+
+DOCS_DIR = ROOT.parent / "docs"
+DESIGNS_DIR = ROOT / "eval" / "data" / "designs"
+DESIGNER_BATCHES = ("designer", "designer2")  # docs/<batch>/out/<id>__<W>x<H>.json = the designer's layouts
+_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+_SIZE_RE = re.compile(r"^(\d{1,5})x(\d{1,5})$")
+_picker_cache: dict | None = None
+
+
+def _read_json(path: Path):
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return None
+
+
+def _family(w: float, h: float) -> str:
+    r = w / h if h else 1.0
+    return "tall" if r <= 0.8 else "square" if r <= 1.25 else "wide" if r <= 3 else "banner"
+
+
+def _size_key(size: str) -> tuple:
+    w, h = (int(v) for v in size.split("x"))
+    return (w * h, w)
+
+
+def _designer_refs() -> dict[str, dict[str, str]]:
+    """design id -> {"WxH": batch} from the out/ folders (the .report.json / .png siblings are skipped)."""
+    refs: dict[str, dict[str, str]] = {}
+    for batch in DESIGNER_BATCHES:
+        out = DOCS_DIR / batch / "out"
+        for p in sorted(out.glob("*__*.json")) if out.is_dir() else []:
+            did, _, size = p.stem.rpartition("__")
+            if did and _SIZE_RE.match(size):
+                refs.setdefault(did, {})[size] = batch
+    return refs
+
+
+def _designer_sources() -> dict[str, dict]:
+    """Designer source designs by id (manifest titles + the src_NN_<id>.json copies in docs/)."""
+    picks = {p.get("id"): p for p in (_read_json(DOCS_DIR / "designer" / "picks.json") or []) if isinstance(p, dict)}
+    out: dict[str, dict] = {}
+    for batch in DESIGNER_BATCHES:
+        base = DOCS_DIR / batch
+        for m in _read_json(base / "manifest.json") or []:
+            did = m.get("name")
+            if not did:
+                continue
+            els = m.get("elements") or []
+            c = m.get("canvas") or {}
+            out[did] = {"title": m.get("title") or did, "canvas": c, "family": m.get("family"),
+                        "arch": m.get("archetype") or (picks.get(did) or {}).get("arche"),
+                        "n": len(els), "nt": sum(1 for e in els if e.get("type") == "text"), "batch": batch}
+        for p in sorted(base.glob("src_*.json")):
+            parts = p.stem.split("_", 2)
+            if len(parts) == 3:
+                out.setdefault(parts[2], {"batch": batch})["src"] = p
+    return out
+
+
+def _picker(refresh: bool = False) -> dict:
+    """Everything the picker knows, built once and kept in memory (GET /api/designs?refresh=1 rebuilds):
+    rows (the list the page shows), refs (id -> {size: batch}), held (hold-out ids), docs (designer sources)."""
+    global _picker_cache
+    if _picker_cache is not None and not refresh:
+        return _picker_cache
+    refs = _designer_refs()
+    held = set(_read_json(DOCS_DIR / "designer2" / "holdout_ids.json") or [])
+    docs = _designer_sources()
+    rows: dict[str, dict] = {}
+
+    def add(did, title, w, h, family, n, nt, fmt, kind, arch=None):
+        r = refs.get(did) or {}
+        rows[did] = {"id": did, "title": title or did, "w": w, "h": h, "family": family or _family(w, h),
+                     "n": n, "nt": nt, "format": fmt or "", "kind": kind, "arch": arch or "",
+                     "refs": len(r), "batch": next(iter(r.values()), ""), "holdout": did in held}
+
+    index = _read_json(EVAL_DATA / "index.json")
+    if isinstance(index, list):
+        for e in index:
+            c = e.get("canvas") or {}
+            if e.get("id") and c.get("width") and c.get("height"):
+                add(e["id"], e.get("title"), c["width"], c["height"], e.get("family"), e.get("n_elements", 0),
+                    e.get("n_text", 0), e.get("format"), "eval", (docs.get(e["id"]) or {}).get("arch"))
+    elif DESIGNS_DIR.is_dir():  # no index.json: read every design's meta
+        for p in sorted(DESIGNS_DIR.glob("*.json")):
+            doc = _read_json(p)
+            src = doc.get("source") if isinstance(doc, dict) else None
+            if not isinstance(src, dict) or "canvas" not in src:
+                continue
+            m, els = doc.get("meta") or {}, src.get("elements") or []
+            add(p.stem, m.get("title"), src["canvas"]["width"], src["canvas"]["height"], m.get("family"),
+                len(els), sum(1 for e in els if e.get("type") == "text"), m.get("format"), "eval",
+                (docs.get(p.stem) or {}).get("arch"))
+    for did, d in docs.items():  # designer sources that are not eval designs (the three samples, or no eval data)
+        if did in rows or "src" not in d:
+            continue
+        c = d.get("canvas") or {}
+        if not (c.get("width") and c.get("height")):
+            continue
+        sample = (INPUT_DIR / f"chameleon_sample_{did}.json").is_file()
+        add(did, d.get("title"), c["width"], c["height"], d.get("family"), d.get("n", 0), d.get("nt", 0), "",
+            "sample" if sample else "docs", d.get("arch"))
+    ordered = sorted(rows.values(), key=lambda r: (not r["refs"], r["title"].lower(), r["id"]))
+    _picker_cache = {"rows": ordered, "refs": refs, "held": held, "docs": docs}
+    return _picker_cache
+
+
+def _load_design(did: str) -> tuple[dict, dict, dict | None]:
+    """(source, meta, sample target or None) for a picker id: eval design, shipped sample, designer source."""
+    if not _ID_RE.match(did or ""):
+        raise KeyError(f"bad design id {did!r}")
+    doc = _read_json(DESIGNS_DIR / f"{did}.json")
+    if isinstance(doc, dict) and "source" in doc:
+        return doc["source"], doc.get("meta") or {}, None
+    task = _read_json(INPUT_DIR / f"chameleon_sample_{did}.json")
+    if isinstance(task, dict) and "source" in task:
+        title = (_picker()["docs"].get(did) or {}).get("title") or did
+        return task["source"], {"title": title, "difficulty": task.get("difficulty", "")}, task.get("target_canvas")
+    d = _picker()["docs"].get(did) or {}
+    src = _read_json(d["src"]) if d.get("src") else None
+    if isinstance(src, dict) and "canvas" in src:
+        return src, {"title": d.get("title") or did, "family": d.get("family")}, None
+    raise KeyError(f"no design {did!r}")
+
+
+def _design_payload(did: str) -> dict:
+    source, meta, target = _load_design(did)
+    pk = _picker()
+    refs = pk["refs"].get(did) or {}
+    return {"id": did, "title": meta.get("title") or did, "source": source, "meta": meta, "target": target,
+            "holdout": did in pk["held"],
+            "refs": [{"size": s, "w": int(s.split("x")[0]), "h": int(s.split("x")[1]), "batch": refs[s]}
+                     for s in sorted(refs, key=_size_key)]}
+
+
+def _designer_ref(did: str, width: int, height: int) -> dict | None:
+    """The designer's layout of `did` at width x height, rendered; None when the design has no references.
+    `png` is None (with `available` listing the formats there are) when this size is not one of them."""
+    if not _ID_RE.match(did or ""):
+        return None
+    pk = _picker()
+    refs = pk["refs"].get(did)
+    if not refs:
+        return None
+    size = f"{width}x{height}"
+    out = {"id": did, "size": size, "available": sorted(refs, key=_size_key), "holdout": did in pk["held"], "png": None}
+    batch = refs.get(size)
+    if batch:
+        design = json.loads((DOCS_DIR / batch / "out" / f"{did}__{size}.json").read_text())
+        out.update(batch=batch, canvas=design.get("canvas"), png=_render_png_b64(design))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -373,6 +537,17 @@ class Handler(BaseHTTPRequestHandler):
                 tasks.append({"name": p.name, "difficulty": t.get("difficulty", ""),
                               "target": t.get("target_canvas"), "source": t["source"]})
             self._json(200, {"tasks": tasks, "presets": PRESETS})
+        elif url.path in ("/api/designs", "/api/design"):
+            q = {k: v[0] for k, v in parse_qs(url.query).items()}
+            try:
+                if url.path == "/api/designs":
+                    self._json(200, _picker(refresh=bool(q.get("refresh")))["rows"])
+                else:
+                    self._json(200, _design_payload(q.get("id", "")))
+            except KeyError as e:
+                self._json(404, {"error": str(e.args[0]) if e.args else "not found"})
+            except Exception:
+                self._json(500, {"error": traceback.format_exc()})
         elif url.path == "/eval":
             body = EVAL_PAGE.encode()
             self.send_response(200)
@@ -428,7 +603,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, _label_undo())
             else:
                 result = run_resize(req["source"], req["width"], req["height"],
-                                    light=bool(req.get("light")), baseline=bool(req.get("baseline")))
+                                    light=bool(req.get("light")), baseline=bool(req.get("baseline")),
+                                    design_id=req.get("design_id") or None)
                 self._json(200, result)
         except Exception:
             self._json(500, {"error": traceback.format_exc()})
@@ -510,6 +686,33 @@ PAGE = r"""<!doctype html>
   .gcell.bad { border-color:#e0a0a0; }
   .legend { display:flex; flex-wrap:wrap; gap:6px 12px; font-size:11px; color:#555; margin-top:6px; }
   .legend i { display:inline-block; width:10px; height:10px; border:2px solid; margin-right:4px; vertical-align:-1px; }
+  .browse { margin-top:8px; }
+  .browse > summary { padding:6px 9px; border:1px solid var(--line); border-radius:6px; background:#fafafa; color:var(--ink); font-size:13px; font-weight:600; }
+  .browse[open] > summary { border-color:var(--accent); }
+  .browse input[type=search] { width:100%; margin-top:8px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; }
+  .browse .chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
+  .browse .chk { display:flex; gap:5px; align-items:center; margin:7px 0 0; text-transform:none; letter-spacing:0; font-size:12px; color:#444; cursor:pointer; }
+  .blist { margin-top:7px; max-height:280px; overflow:auto; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .bitem { padding:5px 8px; border-bottom:1px solid #eee; cursor:pointer; font-size:12px; }
+  .bitem:last-child { border-bottom:0; }
+  .bitem:hover, .bitem.hi { background:#fbf7f1; }
+  .bitem.sel { background:#fde3d6; }
+  .bitem .bt { display:flex; justify-content:space-between; gap:6px; font-weight:600; }
+  .bitem .bn { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bitem .bt > span:last-child { flex:none; white-space:nowrap; }
+  .bitem .bg { font-weight:500; color:var(--ok); font-size:11px; }
+  .bitem .bg.ho { color:#8a3312; }
+  .bitem .bm { color:var(--muted); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bnote { padding:8px; color:var(--muted); font-size:12px; }
+  .refrow { margin-top:14px; padding-top:12px; border-top:1px dashed var(--line); display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; }
+  .refrow figure { margin:0; min-width:0; max-width:100%; }
+  .refrow figcaption { font-size:12px; color:var(--muted); margin-bottom:6px; display:flex; justify-content:space-between; gap:12px; }
+  .refrow .frame img { max-height:260px; cursor:zoom-in; }
+  .refrow.big .frame img { max-height:62vh; cursor:zoom-out; }
+  .refrow.one2one { display:block; overflow-x:auto; }
+  .refrow.one2one .frame img { max-width:none; max-height:none; }
+  .refrow .info { font-size:12px; color:#444; flex:1 1 200px; min-width:180px; }
+  .sizes { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
 </style></head>
 <body>
 <header><h1>Chameleon playground</h1><span>pick a design, pick a canvas, run the engine</span><span style="margin-left:auto"><a href="/eval" style="color:#f0c9a8">Eval browser →</a> &nbsp; <a href="/label" style="color:#f0c9a8">Label pairs →</a></span></header>
@@ -521,6 +724,13 @@ PAGE = r"""<!doctype html>
       <label class="btn">Upload JSON<input type="file" id="file" accept=".json,application/json" class="hidden"></label>
       <button id="reset">Reset to sample</button>
     </div>
+    <details class="browse hidden" id="browse">
+      <summary>Browse designs <span id="browseCount" class="stat"></span></summary>
+      <input type="search" id="bq" placeholder="filter by title or id" autocomplete="off">
+      <div class="chips" id="bfam"></div>
+      <label class="chk"><input type="checkbox" id="bref"> designer refs only</label>
+      <div class="blist" id="blist"></div>
+    </details>
     <label>Target format</label>
     <div class="presets" id="presets"></div>
     <label>Custom size</label>
@@ -547,6 +757,7 @@ PAGE = r"""<!doctype html>
         <figure id="baseFig" class="hidden"><figcaption><span>Stretch baseline (starter kit)</span><span id="baseDim"></span></figcaption><div class="frame"><img id="baseImg" alt=""></div></figure>
         <figure><figcaption><span id="outLabel">Output</span><span id="outDim"></span></figcaption><div class="frame"><img id="outImg" alt=""><svg id="outOv"></svg></div></figure>
       </div>
+      <div class="refrow hidden" id="refRow"></div>
       <div class="warn" id="warnings"></div>
     </div>
     <div class="panel" id="candPanel">
@@ -567,7 +778,10 @@ PAGE = r"""<!doctype html>
 </main>
 <script>
 let tasks = [], presets = [], last = null, roles = {}, shownOutput = null;
+let designs = [], byId = {}, currentId = null, famSel = '', runSeq = 0;   // design picker state (currentId = design the textarea holds)
 const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sampleId = name => name.replace(/^chameleon_sample_/, '').replace(/\.json$/, '');
 const ROLE_COLOR = { headline:'#ff8a4c', cta:'#ff5e3a', logo:'#ffd166', hero:'#4cc9f0', image:'#4cc9f0',
   badge:'#c77dff', subhead:'#b8c0ff', body:'#b8c0ff', fine_print:'#9aa0b4', text:'#b8c0ff', shape:'#b8c0ff',
   background:'#666', decorative:'#888' };
@@ -590,12 +804,20 @@ async function init() {
   $('#runAll').addEventListener('click', runAll);
   $('#optBoxes').addEventListener('change', drawOverlays);
   $('#optBaseline').addEventListener('change', ()=>{ if (last && !last.baseline_png && $('#optBaseline').checked) run(); else showBaseline(); });
-  $('#optOne').addEventListener('change', ()=> $('#renders').classList.toggle('one2one', $('#optOne').checked));
+  $('#optOne').addEventListener('change', ()=> { $('#renders').classList.toggle('one2one', $('#optOne').checked); $('#refRow').classList.toggle('one2one', $('#optOne').checked); });
+  $('#src').addEventListener('input', ()=> { currentId = null; markBrowse(); showDesigner(null); });   // edited by hand: no longer the designer's source
+  $('#refRow').addEventListener('click', e => {
+    if (e.target.id === 'refImg') { $('#refRow').classList.toggle('big'); return; }
+    const b = e.target.closest('button[data-s]'); if (!b) return;
+    const [w, h] = b.dataset.s.split('x'); $('#w').value = w; $('#h').value = h;
+    markPreset([...document.querySelectorAll('#presets button')].find(x => x.dataset.w === w && x.dataset.h === h) || null); run();
+  });
+  loadDesigns();
   $('#dlJson').addEventListener('click', ()=> shownOutput && download('design_'+shownOutput.canvas.width+'x'+shownOutput.canvas.height+'.json', 'data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(shownOutput,null,2))));
   $('#dlPng').addEventListener('click', ()=> $('#outImg').src && download('design_'+$('#outDim').textContent+'.png', $('#outImg').src));
   // Hand-off from the eval browser: {source, width, height} parked in localStorage.
   let handoff = null; try { handoff = JSON.parse(localStorage.getItem('chameleon_load') || 'null'); localStorage.removeItem('chameleon_load'); } catch(e) {}
-  if (handoff && handoff.source) { $('#src').value = JSON.stringify(handoff.source, null, 2); $('#w').value = handoff.width; $('#h').value = handoff.height; run(); }
+  if (handoff && handoff.source) { $('#src').value = JSON.stringify(handoff.source, null, 2); $('#w').value = handoff.width; $('#h').value = handoff.height; currentId = handoff.id || null; run(); }
   else loadTask();
 }
 function markPreset(b){ document.querySelectorAll('.presets button').forEach(x=>x.classList.toggle('on', x===b)); }
@@ -604,6 +826,7 @@ function loadTask() {
   const t = tasks[$('#task').value];
   $('#src').value = JSON.stringify(t.source, null, 2);
   $('#w').value = t.target.width; $('#h').value = t.target.height;
+  currentId = sampleId(t.name); markBrowse();
   markPreset(null); run();
 }
 function loadFile(e) {
@@ -612,7 +835,7 @@ function loadFile(e) {
     let j; try { j = JSON.parse(txt); } catch(err) { showErr('Not valid JSON: '+err.message); return; }
     const design = j.source || j;
     if (!design.canvas || !design.elements) { showErr('Expected {canvas, elements} or a task file with "source".'); return; }
-    $('#src').value = JSON.stringify(design, null, 2);
+    $('#src').value = JSON.stringify(design, null, 2); currentId = null; markBrowse();
     if (j.target_canvas) { $('#w').value = j.target_canvas.width; $('#h').value = j.target_canvas.height; }
     markPreset(null); run();
   });
@@ -623,10 +846,12 @@ function currentSource(){ try { return JSON.parse($('#src').value); } catch(e) {
 
 async function run() {
   const source = currentSource(); if (!source) return;
+  const seq = ++runSeq;
   $('#run').disabled = true; $('#timing').textContent = 'running…'; $('#error').innerHTML = '';
   const r = await fetch('/api/resize', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({source, width:+$('#w').value, height:+$('#h').value, baseline: $('#optBaseline').checked})});
+    body: JSON.stringify({source, width:+$('#w').value, height:+$('#h').value, baseline: $('#optBaseline').checked, design_id: currentId})});
   const d = await r.json();
+  if (seq !== runSeq) return;   // a newer run was started meanwhile (browsing quickly): show only that one
   $('#run').disabled = false;
   if (d.error) { showErr(d.error); $('#timing').textContent=''; return; }
   last = d; last.source = source;
@@ -635,6 +860,7 @@ async function run() {
   $('#srcDim').textContent = `${source.canvas.width}×${source.canvas.height}`;
   showOutput(d.output, d.output_png, 'Output (judge\'s pick)');
   showBaseline();
+  showDesigner(d.designer);
   const n = source.elements.length, rc = Math.max(+$('#w').value/source.canvas.width, +$('#h').value/source.canvas.height) / Math.min(+$('#w').value/source.canvas.width, +$('#h').value/source.canvas.height);
   $('#timing').textContent = `${n} elements · ratio change ${rc.toFixed(2)}× · resize ${(d.elapsed*1000).toFixed(0)} ms · render ${(d.render_elapsed*1000).toFixed(0)} ms`;
   $('#warnings').textContent = d.warnings.length ? 'Self-check: ' + d.warnings.join('\n') : '';
@@ -690,6 +916,62 @@ function overlay(svg, design) {
   }).join('');
 }
 function drawOverlays() { overlay($('#srcOv'), last && last.source); overlay($('#outOv'), shownOutput); }
+
+async function loadDesigns() {
+  try { designs = await (await fetch('/api/designs')).json(); } catch(e) { designs = []; }
+  if (!Array.isArray(designs)) designs = [];
+  byId = Object.fromEntries(designs.map(d => [d.id, d]));
+  if (!designs.length) return;   // no eval data and no designer sources: nothing to browse
+  $('#browse').classList.remove('hidden');
+  $('#browseCount').textContent = `${designs.length} · ${designs.filter(d => d.refs).length} with designer refs`;
+  const order = ['tall', 'square', 'wide', 'banner'], fams = [...new Set(designs.map(d => d.family))].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  $('#bfam').innerHTML = ['', ...fams].map(f => `<button class="chip${f === famSel ? ' on' : ''}" data-f="${esc(f)}">${f || 'all'} ${designs.filter(d => !f || d.family === f).length}</button>`).join('');
+  $('#bfam').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; famSel = b.dataset.f;
+    document.querySelectorAll('#bfam .chip').forEach(x => x.classList.toggle('on', x === b)); renderBrowse(); });
+  $('#bq').addEventListener('input', renderBrowse);
+  $('#bref').addEventListener('change', renderBrowse);
+  $('#bq').addEventListener('keydown', e => {   // ↓/↑ move through the list, Enter loads
+    const items = [...$('#blist').querySelectorAll('.bitem')]; if (!items.length) return;
+    let i = items.findIndex(x => x.classList.contains('hi'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); i = Math.max(0, Math.min(items.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+      items.forEach((x, k) => x.classList.toggle('hi', k === i)); items[i].scrollIntoView({block:'nearest'}); }
+    else if (e.key === 'Enter') { e.preventDefault(); pickDesign(items[Math.max(i, 0)].dataset.id); }
+  });
+  $('#blist').addEventListener('click', e => { const it = e.target.closest('.bitem'); if (it) pickDesign(it.dataset.id); });
+  renderBrowse();
+}
+function renderBrowse() {
+  const q = $('#bq').value.trim().toLowerCase(), refsOnly = $('#bref').checked, cap = 400;
+  const shown = designs.filter(d => (!famSel || d.family === famSel) && (!refsOnly || d.refs) &&
+    (!q || `${d.title} ${d.id} ${d.format} ${d.arch}`.toLowerCase().includes(q)));
+  $('#blist').innerHTML = !shown.length ? '<div class="bnote">no design matches</div>'
+    : shown.slice(0, cap).map(d => {
+      const tags = (d.refs ? `<span class="bg" title="designer layouts at ${d.refs} formats (docs/${esc(d.batch)})">★ ${d.refs}</span>` : '')
+        + (d.holdout ? ' <span class="bg ho" title="sealed hold-out design">hold-out</span>' : '');
+      return `<div class="bitem${d.id === currentId ? ' sel' : ''}" data-id="${esc(d.id)}" title="${esc(d.title)} · ${esc(d.id)}"><div class="bt"><span class="bn">${esc(d.title)}</span><span>${tags}</span></div>`
+        + `<div class="bm">${d.w}×${d.h} · ${esc(d.family)} · ${d.n} el${d.format ? ' · ' + esc(d.format) : ''}${d.arch ? ' · ' + esc(d.arch) : ''}${d.kind !== 'eval' ? ' · ' + esc(d.kind) : ''}</div></div>`;
+    }).join('') + (shown.length > cap ? `<div class="bnote">${shown.length - cap} more: narrow the filter</div>` : '');
+}
+function markBrowse() { document.querySelectorAll('#blist .bitem').forEach(x => x.classList.toggle('sel', x.dataset.id === currentId)); }
+async function pickDesign(id) {
+  $('#timing').textContent = 'loading design…';
+  let d; try { d = await (await fetch('/api/design?id=' + encodeURIComponent(id))).json(); } catch(e) { d = {error: String(e)}; }
+  if (d.error) { showErr(esc(d.error)); $('#timing').textContent = ''; return; }
+  $('#src').value = JSON.stringify(d.source, null, 2);   // the target size stays as it is
+  currentId = d.id; markBrowse(); run();
+}
+function showDesigner(r) {
+  const row = $('#refRow');
+  row.classList.toggle('hidden', !r); row.classList.toggle('one2one', !!r && $('#optOne').checked);
+  if (!r) { row.innerHTML = ''; return; }
+  const tag = r.holdout ? ' <span class="role" style="background:#fde3d6;color:#8a3312">hold-out</span>' : '';
+  if (r.error) { row.innerHTML = `<div class="info"><b>Designer's version</b>: ${esc(r.error)}</div>`; return; }
+  const sizes = `<div class="sizes">${r.available.map(s => `<button class="chip${s === r.size ? ' on' : ''}" data-s="${s}">${s}</button>`).join('')}</div>`;
+  row.innerHTML = r.png
+    ? `<figure><figcaption><span>Designer's version${tag} · ${esc(r.batch)}</span><span>${r.canvas.width}×${r.canvas.height}</span></figcaption><div class="frame"><img id="refImg" src="data:image/png;base64,${r.png}" title="click to enlarge / shrink" alt=""></div></figure>`
+      + `<div class="info">The designer's own layout at ${r.size}, to compare with the output above. Designer formats for this design:${sizes}</div>`
+    : `<div class="info"><b>Designer's version</b>${tag}: none at ${r.size}. This design has designer layouts at:${sizes}</div>`;
+}
 
 async function runAll() {
   const source = currentSource(); if (!source) return;
@@ -862,7 +1144,7 @@ async function show(key) {
       ${d.sidecar ? `<details><summary>Original fonts / assets (before brand-kit substitution)</summary><pre>${JSON.stringify(d.sidecar, null, 2)}</pre></details>` : ''}
       <details><summary>Output JSON</summary><pre>${d.output ? JSON.stringify(d.output, null, 2) : '—'}</pre></details>
     </div>`;
-  $('#openPg').addEventListener('click', () => { localStorage.setItem('chameleon_load', JSON.stringify({source: d.source, width: r.tgt_w, height: r.tgt_h})); window.open('/', '_blank'); });
+  $('#openPg').addEventListener('click', () => { localStorage.setItem('chameleon_load', JSON.stringify({source: d.source, width: r.tgt_w, height: r.tgt_h, id: r.design_id})); window.open('/', '_blank'); });
   $('#dl').addEventListener('click', () => { if (!d.output) return; const a = document.createElement('a'); a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(d.output, null, 2)); a.download = key.replace(/[|:/ ]/g,'_') + '.json'; a.click(); });
 }
 init();
