@@ -188,10 +188,11 @@ def _loss_grad(theta: np.ndarray, P: Pairs, floor_abs: float, l2: float, prior: 
 
 def fit_weights(P: Pairs, *, floor: float = DEFAULT_FLOOR, l2: float = DEFAULT_L2,
                 prior: dict[str, float] | None = None, min_pairs: int = DEFAULT_MIN_PAIRS,
-                iters: int = 400) -> Fit:
+                iters: int = 400, freeze: Iterable[str] = ()) -> Fit:
     """Non-negative weights (sum 100, each >= floor * 100) and a temperature
     by L-BFGS on the weighted logistic loss, starting at the hand weights.
-    Components that differ in fewer than `min_pairs` decisive pairs are
+    Components that differ in fewer than `min_pairs` decisive pairs, and the
+    ones named in `freeze` (v8: terms the labels cannot speak about), are
     frozen at their (normalised) hand weight."""
     from scipy.optimize import minimize
 
@@ -203,6 +204,8 @@ def fit_weights(P: Pairs, *, floor: float = DEFAULT_FLOOR, l2: float = DEFAULT_L
     prior_w = prior_w * TOTAL / prior_w.sum()
     evidence = ((np.abs(P.X) > 1e-9) & P.decisive[:, None]).sum(axis=0) if len(P) else np.zeros(K, dtype=int)
     free = evidence >= max(1, min_pairs)
+    freeze = set(freeze)
+    free = np.array([f and c not in freeze for c, f in zip(P.components, free)], dtype=bool)
     frozen = [c for c, f in zip(P.components, free) if not f]
     if not free.any():
         return Fit({c: round(float(v), 4) for c, v in zip(P.components, prior_w)}, 0.3, float("nan"), len(P),

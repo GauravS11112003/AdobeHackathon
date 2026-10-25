@@ -44,15 +44,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from engine.analyze import BACKGROUND, DECORATIVE, HEADLINE, Analysis, analyze
+from engine.analyze import BACKGROUND, CTA, DECORATIVE, HEADLINE, Analysis, analyze
 from engine.candidates import SMALL_CHANGE_MAX, Candidate, generate_candidates
 from engine.geometry import Box
 from engine import render as judge_render
 from engine import optimize as opt
 from engine.rectify import rectify, rotated_extent
+from engine.floorplan import Metrics, ratio_family
 from engine.relayout import Placement, grow_panels, ratio_change
 from engine import role_merge
-from engine.score import Score, score_design
+from engine.score import Score, score_design, structure_prior, structure_survives
 from engine.textfit import MIN_FONT_SIZE, apply_font_size, default_measurer
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,7 @@ JUDGE_RENDER = os.environ.get("CHAMELEON_NO_RENDER", "") not in ("1", "true", "y
 TOP_RENDER = 3                     # candidates re-judged with pixels after the no-render pass
 OPTIMIZE_TOP_K = 3                 # v7: seeds refined by the energy optimiser (CHAMELEON_OPTIMIZE_K overrides)
 SAME_SHAPE_MAX = 1.02              # ... except when the target has the source's shape (ratio_change up to this)
+SCARCE_FONT = 1.25                 # v8: a refinement never shrinks a headline / CTA font within this x of its floor
 DUMP_DIR = os.environ.get("CHAMELEON_DUMP_DIR") or None
 LAST_JUDGED: list["Judged"] = []     # every candidate of the most recent resize(), best first
 LAST_ANALYSIS: Analysis | None = None   # the analysis the most recent resize() laid out (roles after the vote)
@@ -133,6 +135,19 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
         priors[cand.name] = cand.prior
     if not judged:
         raise RuntimeError("no candidate could be realized")
+    # v8: when the source's own composition survives the shape change (a
+    # preserve-structure candidate with no hard fail whose text still reads,
+    # score.structure_survives), template layouts pay a small prior
+    # (score.STRUCTURE_PRIOR); it rides in `priors` so refined copies and the
+    # pixel re-judging carry it too.
+    change = ratio_change(analysis.canvas, target)
+    survives = {j.name: j.strategy == "structure" and not j.fallback and structure_survives(j.score) for j in judged}
+    clean_structure = any(survives.values())
+    for j in judged:
+        sp = structure_prior(j.strategy, change, clean_structure, survives[j.name])
+        if sp:
+            _apply_prior(j.score, prior=sp, note="structure_prior")
+            priors[j.name] = priors.get(j.name, 0.0) + sp
     # Best first; sort is stable, so earlier (default) candidates win exact
     # ties. The anchor safety net on a big shape change carries the scorer's
     # adaptation penalty, so it only wins when every real layout has a defect.
@@ -142,7 +157,7 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
     # its own, so the judge still has the last word. CHAMELEON_OPTIMIZE=0
     # skips this and leaves the output byte-identical to the v6 engine.
     enabled, top_k = optimize_settings()
-    if enabled and top_k > 0 and ratio_change(analysis.canvas, target) > SAME_SHAPE_MAX:
+    if enabled and top_k > 0 and change > SAME_SHAPE_MAX:
         # A canvas of the same shape (identity, a pure scale) already holds a
         # finished design: nothing to re-arrange, the proportional copy is it.
         judged = refine(judged, analysis, source, target, priors, roles_info, top_k)
@@ -151,7 +166,7 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
             t0 = time.time()
             try:
                 j.score = score_design(analysis, source, j.design, target, render=True, strategy=j.strategy)
-                _apply_prior(j.score, prior=priors.get(j.name, 0.0))
+                _apply_prior(j.score, prior=priors.get(j.name, 0.0), note="prior")
             except Exception:
                 logger.exception("re-judging %s with pixels failed; keeping the estimate", j.name)
             j.elapsed += time.time() - t0
@@ -179,8 +194,12 @@ def refine(judged: list[Judged], analysis: Analysis, source: dict[str, Any], tar
     result as a candidate "<seed> +opt" (same strategy and prior), then
     re-sort. A refined layout is dropped when the judge finds a hard fail
     its seed did not have (the optimiser's own invariant covers its energy;
-    this covers the final rounding and the judge's exact rules)."""
+    this covers the final rounding and the judge's exact rules), or when it
+    spent legibility that was already scarce (v8): a headline / CTA font
+    within SCARCE_FONT x of its readable floor may not get smaller than in
+    the seed (an aesthetic move is never worth a 7 px button on a banner)."""
     extra: list[Judged] = []
+    met = Metrics.for_canvas(analysis.canvas, target, ratio_family(target))
     for j in [x for x in judged if not x.fallback][:top_k]:
         t0 = time.time()
         try:
@@ -193,10 +212,13 @@ def refine(judged: list[Judged], analysis: Analysis, source: dict[str, Any], tar
             _finalize(elements, analysis, target)
             design = {"canvas": {"width": int(target.w), "height": int(target.h)}, "elements": elements}
             sc = score_design(analysis, source, design, target, render=False, strategy=j.strategy)
-            _apply_prior(sc, prior=priors.get(j.name, 0.0))
+            _apply_prior(sc, prior=priors.get(j.name, 0.0), note="prior")
             seed_hard = {_hard_key(h) for h in j.score.hard}
             if any(_hard_key(h) not in seed_hard for h in sc.hard):
                 logger.debug("refined %s dropped: new hard fail %s", j.name, sc.hard)
+                continue
+            if _spent_scarce_font(j.design["elements"], elements, analysis, met):
+                logger.debug("refined %s dropped: shrank a headline / CTA at its floor", j.name)
                 continue
             sc.notes["optimize"] = res.summary()
             name = f"{j.name} +opt"
@@ -208,6 +230,23 @@ def refine(judged: list[Judged], analysis: Analysis, source: dict[str, Any], tar
         judged = judged + extra
         judged.sort(key=lambda j: -j.score.total)
     return judged
+
+
+def _spent_scarce_font(seed: list[dict[str, Any]], refined: list[dict[str, Any]], analysis: Analysis,
+                       met: Metrics) -> bool:
+    """Did the refinement make a headline / CTA that was already within
+    SCARCE_FONT x of its readable floor smaller than it was in the seed?"""
+    before = {el["id"]: float(el["font_size"]) for el in seed if el["type"] == "text"}
+    for el in refined:
+        if el["type"] != "text" or el["id"] not in before:
+            continue
+        role = analysis.roles.get(el["id"])
+        if role not in (HEADLINE, CTA):
+            continue
+        was, now = before[el["id"]], float(el["font_size"])
+        if now < was - 1e-6 and was < SCARCE_FONT * met.min_font(role):
+            return True
+    return False
 
 
 def _hard_key(h: str) -> str:
@@ -246,14 +285,17 @@ def roles_summary(analysis: Analysis) -> dict[str, Any] | None:
             "changed": p.get("changed", 0)}
 
 
-def _apply_prior(sc: Score, cand: Candidate | None = None, prior: float | None = None) -> None:
-    """A candidate's archetype prior (engine/candidates.py) is a soft penalty
-    outside the 0-100 breakdown, like the adaptation penalty."""
+def _apply_prior(sc: Score, cand: Candidate | None = None, prior: float | None = None,
+                 note: str = "archetype_penalty") -> None:
+    """A candidate's archetype prior (engine/candidates.py) or structure prior
+    (engine/score.py, v8) is a soft penalty outside the 0-100 breakdown, like
+    the adaptation penalty. `note` names it in the score's notes ("prior" when
+    a re-scored candidate gets the sum of its priors back in one go)."""
     v = float(cand.prior if cand is not None else (prior or 0.0))
     if v:
         sc.total -= v
         sc.penalty += v
-        sc.notes["archetype_penalty"] = round(v, 2)
+        sc.notes[note] = round(v, 2)
 
 
 def realize(source: dict[str, Any], analysis: Analysis, placement: Placement, target: Box) -> dict[str, Any]:

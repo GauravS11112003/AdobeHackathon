@@ -37,6 +37,9 @@ from typing import Any
 
 from engine import contrast as contrast_est
 from engine.analyze import (
+    ROW_HEIGHT_TOL,
+    ROW_MAX_GAP,
+    ROW_Y_OVERLAP,
     Analysis,
     BADGE,
     BODY,
@@ -53,7 +56,7 @@ from engine.analyze import (
 )
 from engine.floorplan import AMBITION, Metrics, ratio_family
 from engine.geometry import Box, clamp
-from engine.rectify import Live, _lives, unit_visible_box, unwanted_overlaps, visible_box
+from engine.rectify import Live, _lives, unit_visible_box, unit_visible_parts, unwanted_overlaps, visible_box
 from engine.rectify import is_straddle as _is_straddle_slices
 from engine.relayout import ratio_change
 from engine.render import image_scale, render_design
@@ -72,18 +75,49 @@ BLEED_CAP = 0.25             # ... but never more than this share of itself (not
 BIG_UNIT_FRAC = 0.15         # v6: a picture / shape unit covering this share of the canvas is a block, not a margin matter
 OVERFLOW_SLACK = 0.5         # px of painted ink past the box that still counts as fitting (the designer DSL's tolerance)
 HIER_RATIO = 0.82            # higher-ranked text keeps >= min(this, source ratio) of the lower one's size
+# v8: row integrity (faith.rows). A sibling row the analyzer found in the
+# source (chips side by side: badges, thumbnails, icons) stays one line of
+# parts: consecutive parts overlap on the cross axis by ROW_KEEP_OVERLAP of
+# the smaller one (a row may become a column on a strip), no gap wider than
+# ROW_KEEP_GAP x the larger part (or the source's own ratio x ROW_KEEP_GROW),
+# cross-axis extents within ROW_KEEP_SPREAD (or the source's spread), and gaps
+# as even as the source's plus ROW_KEEP_CV. A row that wraps into a compact
+# cluster (2 + 1 on a banner) is kept too: every part has a neighbour within
+# the same gap allowance (nearest-neighbour gap relative to the parts'
+# thickness). Two chips pinned to opposite corners fail both tests.
+ROW_KEEP_OVERLAP = 0.5
+ROW_KEEP_GAP = ROW_MAX_GAP          # 1.5 x the larger part (the analyzer's row criterion)
+ROW_KEEP_GROW = 1.25                # a gap may grow this much past the source's gap-to-height ratio
+ROW_KEEP_SPREAD = ROW_HEIGHT_TOL    # 0.25
+ROW_KEEP_CV = 0.15
+# v8: structure prior. When a preserve-structure candidate *survives* a big
+# shape change (ratio change >= ADAPT_RATIO) - no hard fail, and its
+# readability block holds: read.size, read.lines and read.presence (text at
+# its proportional size, headline / CTA line counts, hero and logo keeping
+# their weight) all at least STRUCTURE_READ_MIN - the
+# template (floor plan) candidates, and the structure variants that did not
+# survive themselves, pay this: the source's own composition, re-proportioned,
+# is the better default than a template, and the designer references say so
+# (docs/EVAL_V8.md). A composition that only fits by halving its copy, wrapping
+# the headline on five lines or shrinking the product to a 12 px sticker has
+# not survived: it earns nothing and,
+# when no variant survived, the templates compete unpenalised. Applied by
+# engine/resize.py like the adaptation penalty (it needs the whole set).
+STRUCTURE_PRIOR = 3.0
+STRUCTURE_READ_MIN = 0.8
+SURVIVAL_TERMS = ("read.size", "read.lines", "read.presence")
 
 WEIGHTS = {
     # readability (32)
     "read.size": 11.0,
-    "read.lines": 7.0,
+    "read.lines": 6.0,
     "read.contrast": 8.0,
     "read.presence": 6.0,     # hero / logo keep their visual weight
     # layout quality (43)
-    "layout.balance": 7.0,
+    "layout.balance": 6.0,
     "layout.alignment": 7.0,
-    "layout.spacing": 6.0,
-    "layout.fill": 7.0,
+    "layout.spacing": 5.0,
+    "layout.fill": 6.0,
     "layout.margins": 4.0,
     "layout.size": 8.0,       # v4: primary units up to AMBITION x the proportional size
     "layout.cohesion": 4.0,   # v5: no empty stretch between neighbours wider than the content needs
@@ -92,6 +126,7 @@ WEIGHTS = {
     "faith.anchors": 6.0,
     "faith.hierarchy": 8.0,
     "faith.scale": 3.0,
+    "faith.rows": 4.0,        # v8: a sibling row stays a row (or a column), no corner scatter
 }
 HAND_WEIGHTS = dict(WEIGHTS)                                  # the hand-set defaults above
 WEIGHTS_FILE = Path(__file__).with_name("score_weights.json")   # written by eval/calibrate.py
@@ -304,6 +339,7 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
     bd["faith.anchors"] = _anchor_keep(lives, target)
     bd["faith.hierarchy"] = _hierarchy(elements, src_by_id, analysis.roles)
     bd["faith.scale"] = _scale_consistency(lives)
+    bd["faith.rows"] = _row_integrity(lives, analysis, by_id, m)
 
     # ---- 5. adaptation -----------------------------------------------------
     # A layout that only slid things to their anchors is not a design for a
@@ -886,6 +922,138 @@ def _hierarchy(elements: list[dict[str, Any]], src_by_id: dict[str, dict[str, An
                 tot += 1
                 ok += Box.of(b).area >= Box.of(a).area
     return ok / tot if tot else 1.0
+
+
+def structure_survives(sc: "Score") -> bool:
+    """v8: does this (structure) candidate's score say the source's
+    composition survived the shape change? No hard fail, and the readability
+    block (text size vs the canvas, headline / CTA line counts, hero / logo
+    presence) at least STRUCTURE_READ_MIN on every term."""
+    bd = sc.breakdown
+    return not sc.hard and min(bd.get(k, 1.0) for k in SURVIVAL_TERMS) >= STRUCTURE_READ_MIN
+
+
+def structure_prior(strategy: str | None, change: float, clean_structure: bool, survives: bool = False) -> float:
+    """v8: the penalty a candidate pays because a surviving preserve-structure
+    candidate (`structure_survives`) exists for this task: on a big shape
+    change the template (floor plan) layouts and the structure variants that
+    did not survive (`survives` is this candidate's own verdict) pay
+    STRUCTURE_PRIOR; survivors and anchors (which carry the adaptation
+    penalty) pay nothing. The caller (engine/resize.py) knows the candidate
+    set; this is the rule."""
+    if not clean_structure or change < ADAPT_RATIO:
+        return 0.0
+    if strategy == "floorplan" or (strategy == "structure" and not survives):
+        return STRUCTURE_PRIOR
+    return 0.0
+
+
+def _line_stats(parts: list[Box], axis: str) -> tuple[float, list[float], list[float]]:
+    """Parts sorted along `axis`: (share of consecutive pairs that overlap on
+    the cross axis by ROW_KEEP_OVERLAP of the smaller extent, the gaps along
+    the axis as a share of the larger neighbour's cross extent, the cross
+    extents)."""
+    if axis == "x":
+        order = sorted(parts, key=lambda b: b.x)
+        cross = [b.h for b in order]
+        ov = [min(a.bottom, b.bottom) - max(a.y, b.y) for a, b in zip(order, order[1:])]
+        gaps = [b.x - a.right for a, b in zip(order, order[1:])]
+    else:
+        order = sorted(parts, key=lambda b: b.y)
+        cross = [b.w for b in order]
+        ov = [min(a.right, b.right) - max(a.x, b.x) for a, b in zip(order, order[1:])]
+        gaps = [b.y - a.bottom for a, b in zip(order, order[1:])]
+    pairs = len(order) - 1
+    inline = sum(o >= ROW_KEEP_OVERLAP * max(1.0, min(ca, cb)) for o, ca, cb in zip(ov, cross, cross[1:])) / pairs
+    rel = [g / max(1.0, max(ca, cb)) for g, ca, cb in zip(gaps, cross, cross[1:])]
+    return inline, rel, cross
+
+
+def _cv(xs: list[float]) -> float:
+    xs = [max(0.0, x) for x in xs]
+    mean = sum(xs) / len(xs) if xs else 0.0
+    if mean <= 0:
+        return 0.0
+    return math.sqrt(sum((x - mean) ** 2 for x in xs) / len(xs)) / mean
+
+
+def row_shape(parts: list[Box]) -> dict[str, float]:
+    """The shape of a line of parts: the better of the row and the column
+    reading. `inline` is the share of consecutive pairs on one line, `gap`
+    the widest gap relative to its neighbours' cross extent, `spread` the
+    cross-extent spread (max - min) / max, `cv` the gap unevenness."""
+    best = None
+    thick = max(1.0, max(min(b.w, b.h) for b in parts))
+    nn = max(min(_box_gap(a, b) for b in parts if b is not a) for a in parts) / thick
+    for axis in ("x", "y"):
+        inline, rel, cross = _line_stats(parts, axis)
+        d = {"axis": 0.0 if axis == "x" else 1.0, "inline": inline, "gap": max(rel) if rel else 0.0,
+             "spread": (max(cross) - min(cross)) / max(1e-6, max(cross)), "cv": _cv(rel) if len(rel) >= 2 else 0.0,
+             "nn": nn}
+        if best is None or (d["inline"], -d["gap"]) > (best["inline"], -best["gap"]):
+            best = d
+    return best or {"axis": 0.0, "inline": 1.0, "gap": 0.0, "spread": 0.0, "cv": 0.0, "nn": 0.0}
+
+
+def _box_gap(a: Box, b: Box) -> float:
+    """Chebyshev gap between two boxes (0 when they touch or overlap)."""
+    dx = max(0.0, max(a.x, b.x) - min(a.right, b.right))
+    dy = max(0.0, max(a.y, b.y) - min(a.bottom, b.bottom))
+    return max(dx, dy)
+
+
+def source_row_shapes(analysis: Analysis, m: TextMeasurer) -> dict[str, dict[str, float]]:
+    """`row_shape` of every sibling row in the source (visible parts), cached
+    on the analysis: what the designer's own row looked like is the baseline."""
+    cached = getattr(analysis, "_source_row_shapes", None)
+    if cached is not None:
+        return cached
+    out: dict[str, dict[str, float]] = {}
+    by_id = analysis.source_elements
+    for u in analysis.units:
+        if not u.is_row or len(u.parts) < 2:
+            continue
+        try:
+            live = Live(u, {eid: u.members[eid] for eid in u.ids if eid in by_id},
+                        {eid: float(by_id[eid]["font_size"]) for eid in u.ids if eid in by_id and by_id[eid]["type"] == "text"})
+            parts = unit_visible_parts(live, by_id, m)
+        except Exception:  # pragma: no cover - odd source element
+            parts = [p.box for p in u.parts]
+        if len(parts) >= 2:
+            out[u.key] = row_shape(parts)
+    analysis._source_row_shapes = out   # type: ignore[attr-defined]
+    return out
+
+
+def _row_integrity(lives: list[Live], analysis: Analysis, by_id: dict[str, dict[str, Any]],
+                   m: TextMeasurer) -> float:
+    """v8: every sibling row of the source is still one line of parts (see
+    ROW_KEEP_*), importance-weighted; 1.0 when the design has no rows. Each
+    row scores max(inline x gap x evenness, cluster) x spread, every
+    factor graded and source-relative (the designer's own row costs nothing)."""
+    src = source_row_shapes(analysis, m)
+    num = den = 0.0
+    for l in lives:
+        u = l.unit
+        if not u.is_row or u.key not in src:
+            continue
+        parts = unit_visible_parts(l, by_id, m)
+        if len(parts) < 2:
+            continue
+        s0 = src[u.key]
+        now = row_shape(parts)
+        inline = now["inline"]
+        gap_allowed = max(ROW_KEEP_GAP, ROW_KEEP_GROW * s0["gap"])
+        gap = clamp(1.0 - (now["gap"] - gap_allowed) / gap_allowed, 0.0, 1.0)
+        spread_allowed = max(ROW_KEEP_SPREAD, s0["spread"] + 0.05)
+        spread = clamp(1.0 - (now["spread"] - spread_allowed) / spread_allowed, 0.0, 1.0)
+        even = clamp(1.0 - max(0.0, now["cv"] - s0["cv"] - ROW_KEEP_CV) / 0.5, 0.0, 1.0) if len(parts) >= 3 else 1.0
+        nn_allowed = max(gap_allowed, ROW_KEEP_GROW * s0["nn"])
+        cluster = clamp(1.0 - (now["nn"] - nn_allowed) / nn_allowed, 0.0, 1.0)
+        w = max(u.importance, 0.05)
+        num += w * max(inline * gap * even, cluster) * spread
+        den += w
+    return num / den if den else 1.0
 
 
 def _scale_consistency(lives: list[Live]) -> float:

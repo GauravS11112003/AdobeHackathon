@@ -190,7 +190,7 @@ def test_judge_without_pixels_still_picks_a_clean_floor_plan(monkeypatch, fresh_
     source, target = load(INPUT / "chameleon_sample_level3_advanced.json")
     out = RZ.resize(source, target)
     best = RZ.LAST_JUDGED[0]
-    assert best.design == out and best.score.hard == [] and best.strategy == "floorplan"
+    assert best.design == out and best.score.hard == [] and best.strategy in ("floorplan", "structure")
     assert best.score.notes.get("pixels")
 
 

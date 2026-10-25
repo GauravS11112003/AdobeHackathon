@@ -459,3 +459,33 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
 - Finding: designer references lose to the engine on the regularity terms (even spacing, margins, line count,
   uniform scale, symmetry) and win on reading order, containment, contrast and presence; the fit moves the
   weight there. 71 of 600 tuning references trip a hard rule (mostly deliberate layering / bleed).
+
+## v8: the picker (2026-10-25, docs/EVAL_V8.md, tests/test_v8_picker.py)
+- Judge-only release: the candidate set holds a layout at designer agreement ≈ 0.70 while the judge returned
+  ≈ 0.60; the clean non-fallback ceiling is 0.663 / 0.652 (tuning / hold-out), the rest is the anchor fallback,
+  which the agreement metric likes and the eye does not (the fallback policy stays). Real runs: tuning
+  0.595 → 0.608, hold-out 0.603 → 0.610, best-vs-chosen gap 0.101 → 0.089 / 0.114 → 0.108, eval defects
+  unchanged (23 / 23 on 4 198 cases, 0 overflow / overlap / off canvas), runtime p50 unchanged (0.29 s on the
+  samples single-process, 0.34 s in the harness).
+- `score.py`: **`faith.rows`** (source-relative row integrity: a sibling row's parts stay one line or a compact
+  cluster: cross overlap ≥ `ROW_KEEP_OVERLAP`, gaps ≤ `ROW_KEEP_GAP` × the larger part or `ROW_KEEP_GROW` × the
+  source's ratio, spread ≤ `ROW_KEEP_SPREAD`, evenness within `ROW_KEEP_CV` of the source's; nearest-neighbour
+  gap for clusters; corner scatter scores 0) and the **structure prior**: `structure_survives(score)` = no hard
+  fail and `SURVIVAL_TERMS` (read.size, read.lines, read.presence) ≥ `STRUCTURE_READ_MIN` 0.8; when a structure
+  candidate survives a ratio change ≥ `ADAPT_RATIO`, templates and non-surviving structure variants pay
+  `STRUCTURE_PRIOR` 3 (`structure_prior`, applied in `resize.judge` before the sort, carried by `priors` into
+  "+opt" copies and the pixel re-judging). Hand weights re-balanced to keep the sum at 100.
+- `resize.refine`: a refined layout is dropped when it shrank a headline / CTA already within `SCARCE_FONT`
+  1.25 × of its floor (`_spent_scarce_font`).
+- **`engine/score_weights.json` is now shipped** (the v2 loader; `CHAMELEON_SCORE_WEIGHTS=0` → hand weights):
+  `eval/fit_judge.py` fits the pairwise logistic on the picker dump (reference > candidate, candidate pairs
+  ordered by agreement with margin 0.05, the human labels re-scored), readability block frozen
+  (`calibrate.fit_weights(freeze=...)`), L2 2.0, floor 1 %; faith.order 12 → 17.7, fill / margins to 2.3 / 1.0.
+  `eval/rank_judge.py`: linear-ext and gradient-boosted rankers over breakdown + energy + family do not beat
+  the 16 weights on the hold-out (gbt 0.600–0.602 < hand 0.605), so no model file.
+- Tools / data: `eval/picker_gap.py` (720-case diagnosis + candidate dump, `--report-only`), reports in
+  `docs/designer/compare/v8_picker{,_hand,_v7scorer}/`, renders `docs/sanity_v8/`. Goldens: four Level 3 files
+  regenerated deliberately (1080², 1080×1920, 1200×628, 160×600). Known: a multi-element unit's "primary" is
+  its first element in list order (`analyze._cluster`, read by `structure.py`), so a shuffled list can change a
+  structure candidate; `test_element_order_does_not_matter` is xfail (non-strict) until cluster ids are
+  canonicalised.

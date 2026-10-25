@@ -22,3 +22,6 @@ reference/
 
 # App-local config and skills
 .claude/
+
+# v8 picker dumps (47 MB each, regenerate with eval.picker_gap)
+docs/designer/compare/*/candidates.jsonl
