@@ -314,6 +314,13 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   source scale are *xfail* today (reasons in the file / docs/EVAL_SYNTH.md) with an aggregate pass-rate floor
   (`test_relation_pass_rate_does_not_regress`) so regressions still fail. ~25 s.
 
+## Labelling fairness filter (eval/labeling.py `source_quality`)
+- The /label sampler skips sources the Crello conversion broke: text overflowing its own box, missing
+  assets, an uncovered blank panel >= 55 % of the canvas, or a primary text with contrast < 1.6 in the
+  source. 293 of the 450 eval designs pass (151 have unreadable primary text in the source because a photo
+  became a flat stand-in). Text-box overlap is deliberately not a criterion. Round-1 labels
+  (docs/LABELS_V1.md) predate the filter.
+
 ## Learned role classifier (S4, dev + shipped; docs/ROLE_MODEL.md)
 - `engine/role_features.py` (123 id-free per-element features, ~2 ms), `engine/role_model.py`
   (`predict(source) -> {id: (role, confidence)}`, `predict_proba`, `text_hierarchy`; numpy-only traversal
