@@ -45,7 +45,8 @@ from pathlib import Path
 from typing import Any
 
 from engine.analyze import BACKGROUND, CTA, DECORATIVE, HEADLINE, Analysis, analyze
-from engine.candidates import SMALL_CHANGE_MAX, Candidate, generate_candidates
+from engine.candidates import SMALL_CHANGE_MAX, Candidate, generate_candidates, generate_repairs, placement_key
+from engine import critic
 from engine.geometry import Box
 from engine import render as judge_render
 from engine import optimize as opt
@@ -66,6 +67,7 @@ SCARCE_FONT = 1.25                 # v8: a refinement never shrinks a headline /
 DUMP_DIR = os.environ.get("CHAMELEON_DUMP_DIR") or None
 LAST_JUDGED: list["Judged"] = []     # every candidate of the most recent resize(), best first
 LAST_ANALYSIS: Analysis | None = None   # the analysis the most recent resize() laid out (roles after the vote)
+LAST_CRITIC: list[dict[str, Any]] = []  # v9: the critic rounds of the most recent resize() (diagnoses, repairs tried)
 _run_counter = 0
 
 
@@ -119,6 +121,7 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
     render = JUDGE_RENDER if render is None else render
     judged: list[Judged] = []
     priors: dict[str, float] = {}
+    cands_by_name: dict[str, Candidate] = {}
     # Stage 1: every candidate is judged on geometry and the JSON contrast
     # estimate (no pixels). Stage 2: the top few are re-judged with a render
     # without text, which refines contrast / busyness under each text.
@@ -133,6 +136,7 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
             continue
         judged.append(Judged(cand.name, cand.strategy, design, sc, time.time() - t0, cand.fallback, roles_info))
         priors[cand.name] = cand.prior
+        cands_by_name[cand.name] = cand
     if not judged:
         raise RuntimeError("no candidate could be realized")
     # v8: when the source's own composition survives the shape change (a
@@ -152,6 +156,13 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
     # ties. The anchor safety net on a big shape change carries the scorer's
     # adaptation penalty, so it only wins when every real layout has a defect.
     judged.sort(key=lambda j: -j.score.total)
+    # v9: the critic loop (engine/critic.py). When every candidate shares a
+    # failure, or the best clean one is weak on a term with a repair, the
+    # shared failure is diagnosed and repaired candidates are judged with the
+    # rest; runs before the optimiser so the refinements start from the
+    # repaired seeds. CHAMELEON_CRITIC=0 skips it: byte-identical output.
+    if critic.enabled():
+        judged = repair(judged, cands_by_name, analysis, source, target, priors, roles_info, change, clean_structure)
     # v7: the top seeds are walked down the design-principle energy
     # (engine/optimize.py); each refined layout competes as a candidate of
     # its own, so the judge still has the last word. CHAMELEON_OPTIMIZE=0
@@ -200,7 +211,14 @@ def refine(judged: list[Judged], analysis: Analysis, source: dict[str, Any], tar
     the seed (an aesthetic move is never worth a 7 px button on a banner)."""
     extra: list[Judged] = []
     met = Metrics.for_canvas(analysis.canvas, target, ratio_family(target))
-    for j in [x for x in judged if not x.fallback][:top_k]:
+    seeds = [x for x in judged if not x.fallback][:top_k]
+    # v9: a critic repair in the top K must not push the best plain seed out
+    # of the refinement (its refined copy was the winner in 1 of 8 cases
+    # before); one extra seed at most.
+    plain = next((x for x in judged if not x.fallback and "+fix:" not in x.name), None)
+    if plain is not None and plain not in seeds:
+        seeds.append(plain)
+    for j in seeds:
         t0 = time.time()
         try:
             res = opt.optimize(analysis, source, j.design["elements"], target)
@@ -229,6 +247,71 @@ def refine(judged: list[Judged], analysis: Analysis, source: dict[str, Any], tar
     if extra:
         judged = judged + extra
         judged.sort(key=lambda j: -j.score.total)
+    return judged
+
+
+def repair(judged: list[Judged], cands_by_name: dict[str, Candidate], analysis: Analysis,
+           source: dict[str, Any], target: Box, priors: dict[str, float], roles_info: dict[str, Any] | None,
+           change: float, clean_structure: bool) -> list[Judged]:
+    """v9 critic loop (engine/critic.py): up to `critic.settings()` rounds of
+    diagnose -> regenerate -> judge. Each round reads the shared failures of
+    the judged candidates, builds at most `candidates.MAX_REPAIRS` repair
+    candidates from the recipes (seeded from the best real candidates, and
+    from the previous round's repairs that removed what they were built for),
+    and judges them with the rest, priors included. Stops when the best
+    candidate is clean and reaches the target total, when nothing is
+    diagnosed, or when a round adds nothing new. The rounds are recorded in
+    LAST_CRITIC and in the winner's notes["critic_rounds"]; every repair's
+    notes["critic"] says which round, recipe and directives made it."""
+    global LAST_CRITIC
+    rounds, goal = critic.settings()
+    log: list[dict[str, Any]] = []
+    LAST_CRITIC = log
+    already: set[tuple] = {(placement_key(c.placement), critic._freeze(c.directives or {})) for c in cands_by_name.values()}
+    progress: list[Candidate] = []
+    for rnd in range(1, rounds + 1):
+        best = judged[0]
+        if not best.fallback and not best.score.hard and best.score.total >= goal:
+            break
+        diags = critic.diagnose(judged, analysis, source, target)
+        if not diags:
+            break
+        seeds = progress + [cands_by_name[j.name] for j in judged
+                            if not j.fallback and j.name in cands_by_name and cands_by_name[j.name] not in progress]
+        new = generate_repairs(analysis, source, target, diags, seeds[:4], already)
+        if not new:
+            break
+        diagnosed = {critic.hard_kind_of(d) for d in diags if d.hard}
+        progress = []
+        added: list[dict[str, Any]] = []
+        for cand in new:
+            t0 = time.time()
+            try:
+                design = realize(source, analysis, cand.placement, target, directives=cand.directives)
+                sc = score_design(analysis, source, design, target, render=False, strategy=cand.strategy)
+                _apply_prior(sc, cand)
+                sp = structure_prior(cand.strategy, change, clean_structure,
+                                     cand.strategy == "structure" and structure_survives(sc))
+                if sp:
+                    _apply_prior(sc, prior=sp, note="structure_prior")
+            except Exception:
+                logger.exception("repair %s failed; skipped", cand.name)
+                continue
+            sc.notes["critic"] = {"round": rnd, "fix": cand.fix, "directives": cand.directives or {}}
+            judged.append(Judged(cand.name, cand.strategy, design, sc, time.time() - t0, False, roles_info))
+            priors[cand.name] = cand.prior + sp
+            cands_by_name[cand.name] = cand
+            added.append({"name": cand.name, "total": round(sc.total, 2), "hard": len(sc.hard)})
+            if diagnosed and not (diagnosed & {critic._hard_kind(h) for h in sc.hard}):
+                progress.append(cand)
+        before = judged[0].name
+        judged.sort(key=lambda j: -j.score.total)
+        log.append({"round": rnd, "diagnoses": [d.summary() for d in diags], "tried": added,
+                    "best_before": before, "best_after": judged[0].name})
+        if not added:
+            break
+    if log:
+        judged[0].score.notes["critic_rounds"] = log
     return judged
 
 
@@ -298,13 +381,30 @@ def _apply_prior(sc: Score, cand: Candidate | None = None, prior: float | None =
         sc.notes[note] = round(v, 2)
 
 
-def realize(source: dict[str, Any], analysis: Analysis, placement: Placement, target: Box) -> dict[str, Any]:
+def realize(source: dict[str, Any], analysis: Analysis, placement: Placement, target: Box,
+            directives: dict[str, Any] | None = None) -> dict[str, Any]:
     """Turn a Placement into a finished design: fit the text, fix defects,
-    round and clamp."""
+    round and clamp. `directives` (v9, engine/critic.py) are applied to the
+    materialized elements before the rectifier: the critic's repairs."""
     elements = materialize(source, analysis, placement, target)
-    elements = rectify(analysis, elements, target)
+    applied: dict[str, Any] = {}
+    protect: set[str] = set()
+    if directives:
+        applied = critic.apply_directives(elements, analysis, target, directives)
+        # the texts a floor recipe names are protected whether or not they needed raising here
+        protect = set(applied.get("protect", ())) | {analysis.element_unit[e] for e in directives.get("floor") or ()
+                                                     if e in analysis.element_unit}
+    elements = rectify(analysis, elements, target, protect=protect)
+    if directives and directives.get("floor"):
+        # The rectifier may have scaled the text down again (a unit wider than
+        # the strip, a collision nothing could move away from) or the plan
+        # had it at the floor and the rectifier took it under: raise it once
+        # more and let a short rectify pass settle what that disturbed.
+        if critic.apply_directives(elements, analysis, target, {"floor": directives["floor"]}).get("floor"):
+            elements = rectify(analysis, elements, target, passes=2, protect=protect)
     grow_panels(analysis, elements, target)   # zones follow the content the rectifier moved
-    _keep_headline_largest(elements, source, analysis)
+    _keep_headline_largest(elements, source, analysis,
+                           floors=critic.cap_floors(analysis, target) if applied.get("cap_floor") else None)
     _finalize(elements, analysis, target)
     return {"canvas": {"width": int(target.w), "height": int(target.h)}, "elements": elements}
 
@@ -353,12 +453,15 @@ def _fit_text(new: dict[str, Any], src: dict[str, Any], scale: float,
     return size
 
 
-def _keep_headline_largest(elements: list[dict[str, Any]], source: dict[str, Any], analysis: Analysis) -> None:
+def _keep_headline_largest(elements: list[dict[str, Any]], source: dict[str, Any], analysis: Analysis,
+                           floors: dict[str, float] | None = None) -> None:
     """The headline stays the largest text in the output, as it was in the
     source: any text that was smaller than the headline there and comes out
     bigger here (a short label the fitter could grow, a badge number) is
     capped at the headline's size. Text the designer made bigger than the
-    headline (a date in a sticker) keeps that right."""
+    headline (a date in a sticker) keeps that right. With `floors` (v9: the
+    critic's cap_floor directive) the cap never pushes a text below its own
+    role's readable floor when the headline itself ended under it."""
     src = {el["id"]: el for el in source["elements"]}
     heads = [el for el in elements if analysis.roles.get(el["id"]) == HEADLINE and el["type"] == "text"]
     if not heads:
@@ -370,7 +473,9 @@ def _keep_headline_largest(elements: list[dict[str, Any]], source: dict[str, Any
         if el["type"] != "text" or el is head or el["id"] not in src:
             continue
         if float(src[el["id"]]["font_size"]) < h_src and float(el["font_size"]) > h_out:
-            apply_font_size(el, h_out)
+            cap = h_out if floors is None else max(h_out, float(floors.get(analysis.roles.get(el["id"], ""), 0.0)))
+            if float(el["font_size"]) > cap:
+                apply_font_size(el, cap)
 
 
 def _finalize(elements: list[dict[str, Any]], analysis: Analysis, target: Box) -> None:

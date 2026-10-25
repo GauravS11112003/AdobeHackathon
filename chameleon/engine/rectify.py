@@ -188,14 +188,17 @@ def parts_intersection(a: list[Box], b: list[Box]) -> float:
 
 
 def rectify(analysis: Analysis, elements: list[dict[str, Any]], target: Box,
-            measurer: TextMeasurer | None = None, passes: int = MAX_PASSES) -> list[dict[str, Any]]:
-    """Return a corrected copy of `elements` (same ids, same order)."""
+            measurer: TextMeasurer | None = None, passes: int = MAX_PASSES,
+            protect: Iterable[str] = ()) -> list[dict[str, Any]]:
+    """Return a corrected copy of `elements` (same ids, same order).
+    `protect` (v9, the critic's raised texts): unit keys that are never the
+    unit that shrinks to resolve an overlap when the other side is free."""
     m = measurer or default_measurer()
     elements = copy.deepcopy(elements)
     by_id = {el["id"]: el for el in elements}
     src_by_id = {eid: el for el in elements for eid in [el["id"]]}  # same dicts; fonts come from here
     lives = _lives(analysis, by_id)
-    r = _Rectifier(analysis, by_id, lives, target, m)
+    r = _Rectifier(analysis, by_id, lives, target, m, protect=set(protect))
     for _ in range(max(1, passes)):
         changed = r.run_pass()
         if not changed:
@@ -219,8 +222,9 @@ def _lives(analysis: Analysis, by_id: dict[str, dict[str, Any]]) -> list[Live]:
 
 class _Rectifier:
     def __init__(self, analysis: Analysis, by_id: dict[str, dict[str, Any]], lives: list[Live],
-                 target: Box, m: TextMeasurer):
+                 target: Box, m: TextMeasurer, protect: set[str] | None = None):
         self.analysis = analysis
+        self.protect = protect or set()
         self.by_id = by_id
         self.lives = sorted(lives, key=lambda l: l.unit.reading_index)
         self.target = target
@@ -525,6 +529,8 @@ class _Rectifier:
         victim, other = (b, a)
         if a.importance < b.importance - 1e-9:
             victim, other = (a, b)
+        if victim.unit.key in self.protect and other.unit.key not in self.protect:
+            victim, other = other, victim      # v9: a text the critic raised to its floor does not give way
         vv, vo = self.vis(victim), self.vis(other)
         options = []
         # vertical shrink: anchor at the far edge from `other`

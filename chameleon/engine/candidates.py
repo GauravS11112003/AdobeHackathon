@@ -16,7 +16,7 @@ Nothing here looks at element ids; roles come from the analyzer.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from engine.analyze import Analysis
@@ -31,8 +31,9 @@ from engine.floorplan import (
 )
 from engine.geometry import Box
 from engine.relayout import Placement, anchor_relayout, ratio_change, resolve_vertical_collisions
-from engine.structure import detect_structure, structure_relayout, structure_variants
+from engine.structure import StructureOptions, detect_structure, structure_relayout, structure_variants
 from engine.textfit import TextMeasurer, default_measurer
+from engine import critic
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,9 @@ class Candidate:
     fallback: bool = False              # safety net: pays the scorer's adaptation penalty, so it only
                                         # wins when every real candidate has a hard defect
     prior: float = 0.0                  # S1: soft penalty for a plan that fights the perceived archetype
+    structure: StructureOptions | None = None   # v6 preserve-structure variant
+    directives: dict[str, Any] | None = None    # v9: realize-time repairs (engine/critic.py)
+    fix: str | None = None                      # v9: "<rule>: <recipe label>" for the notes
 
 
 def generate_candidates(analysis: Analysis, source: dict[str, Any], target: Box,
@@ -106,7 +110,7 @@ def generate_candidates(analysis: Analysis, source: dict[str, Any], target: Box,
             if pl is None:
                 continue
             resolve_vertical_collisions(analysis, pl, target)
-            out.append(Candidate(f"{family} structure {sv.name}", "structure", pl))
+            out.append(Candidate(f"{family} structure {sv.name}", "structure", pl, structure=sv))
 
     if not small:
         # Safety candidate: proportions kept, everything slid toward its anchor.
@@ -115,6 +119,75 @@ def generate_candidates(analysis: Analysis, source: dict[str, Any], target: Box,
                              _anchor(analysis, target, s), scale=s, fallback=True))
 
     return dedupe(out)[:limit]
+
+
+MAX_REPAIRS = 6             # v9: new candidates per critic round
+
+
+def generate_repairs(analysis: Analysis, source: dict[str, Any], target: Box,
+                     diagnoses: list["critic.Diagnosis"], seeds: list[Candidate],
+                     already: set[tuple], measurer: TextMeasurer | None = None,
+                     limit: int = MAX_REPAIRS) -> list[Candidate]:
+    """v9: candidates built from the critic's repair recipes (engine/critic.py).
+
+    `seeds` are the judged candidates best first (no fallback). A recipe with
+    plan overrides re-runs the floor plan of up to two floor-plan seeds with
+    its PlanOptions changed (a structure recipe likewise for a structure
+    seed); a recipe with directives alone reuses the seed's placement and
+    hands the directives to `resize.realize`, which applies them before the
+    rectifier. Repairs carry the seed's strategy and prior and are named
+    "<seed> +fix:<recipe>"; `already` (placement key + directives) keeps the
+    rounds from retrying a layout the judge has seen."""
+    m = measurer or default_measurer()
+    by_id = {el["id"]: el for el in source["elements"]}
+    plan_seeds = [c for c in seeds if c.strategy == "floorplan" and c.options is not None][:2]
+    struct_seeds = [c for c in seeds if c.strategy == "structure" and c.structure is not None][:1]
+    direct_seeds = seeds[:critic.SEEDS]
+    structure = None
+    out: list[Candidate] = []
+    for d in diagnoses:
+        for r in d.recipes:
+            jobs: list[tuple[str, Candidate]] = []
+            if r.plan:
+                jobs += [("plan", s) for s in plan_seeds]
+            if r.structure:
+                jobs += [("structure", s) for s in struct_seeds]
+            if r.directives and (not jobs or not (r.plan or r.structure)):
+                jobs += [("same", s) for s in direct_seeds]
+            for mode, s in jobs:
+                if not d.applies_to(s.name):
+                    continue          # a hard diagnosis repairs the seeds that show the defect
+                opts, st_opts, pl = s.options, s.structure, s.placement
+                try:
+                    if mode == "plan":
+                        opts = replace(s.options, **r.plan)
+                        pl = floorplan_relayout(analysis, target, by_id, m, opts)
+                        resolve_vertical_collisions(analysis, pl, target)
+                    elif mode == "structure":
+                        if structure is None:
+                            structure = detect_structure(analysis, by_id)
+                        if structure is None:
+                            continue
+                        st_opts = replace(s.structure, **r.structure)
+                        pl = structure_relayout(analysis, target, by_id, m, st_opts, structure)
+                        if pl is None:
+                            continue
+                        resolve_vertical_collisions(analysis, pl, target)
+                except Exception:
+                    logger.exception("repair %s on %s failed; skipped", r.label, s.name)
+                    continue
+                directives = dict(s.directives or {})
+                directives.update(r.directives)
+                key = (placement_key(pl), critic._freeze(directives))
+                if key in already:
+                    continue
+                already.add(key)
+                out.append(Candidate(f"{s.name} +fix:{r.label}", s.strategy, pl, options=opts, scale=s.scale,
+                                     prior=s.prior, structure=st_opts, directives=directives or None,
+                                     fix=f"{d.rule}: {r.label}"))
+                if len(out) >= limit:
+                    return out
+    return out
 
 
 def anchor_scales(src: Box, target: Box) -> list[tuple[float, str]]:

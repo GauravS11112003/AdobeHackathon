@@ -284,6 +284,42 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
     not fit a linear reweighting (hand weights side with the designer in 31 %): the preference is compositional.
     `tests/fixtures/golden_v5` regenerated from this tree (flags off, optimiser off).
 
+## v9: critic loop, defect-driven regeneration (2026-10-25, docs/CRITIC_LOOP.md, tests/test_critic.py)
+- `engine/critic.py` — the judge's verdict feeds back into generation. `diagnose(judged, analysis, source,
+  target)` names the *shared* failures: when no real candidate is clean, every hard fail of the best one and
+  every kind ≥ `SHARE_MIN` (50 %) of the pool shows (`below_floor`, `contrast_drop`, `straddle`, `collision`,
+  `off_canvas`, `overflow`, parsed from the judge's hard-fail strings); when one is clean, a term the top
+  `TOP_SOFT` (3) clean candidates all score under `TYPICAL[term]` (p25 of the v8 winners) and that has a repair.
+  Each `Diagnosis` carries `Recipe`s: PlanOptions overrides (`rescue`, spacing, scale_bias, chips, fill) and / or
+  *directives* that `resize.realize(..., directives)` applies to the materialized elements before the rectifier
+  (`apply_directives`): `floor` (raise a headline / CTA to its floor, re-wrapped on ≤ 3 lines / 1 for a CTA;
+  tracking is given up before size; a vertical spine that cannot run along the canvas is levelled; a pill label
+  reshapes its pill; over-tall attached bars are trimmed; the unit is `protect`ed), `backing` (the plate / panel
+  whose fill the text read against in the source covers it again; an occluding card is slid off or cut back),
+  `onto` (the text goes back onto the picture it was layered on, fitted inside), `off`, `pin`, `shrink`, `widen`,
+  `refit`, `cap_floor` (the headline-largest cap never pushes a text under its own floor). Recipes are keyed on
+  roles / relations, never ids or sizes.
+- `candidates.generate_repairs(analysis, source, target, diagnoses, seeds, already)` → ≤ `MAX_REPAIRS` (6)
+  `Candidate`s named `<seed> +fix:<label>` (seed's strategy and prior, `Candidate.directives` / `.fix` /
+  `.structure`), plan recipes re-running the floor plan of ≤ 2 floor-plan seeds, directive recipes reusing the
+  seed's placement, deduped on (placement key, directives) against everything judged.
+- `resize.repair()` runs after the stage-1 sort and **before** the optimiser (one refinement pass, on repaired
+  seeds): up to `critic.settings()` rounds (`CHAMELEON_CRITIC_ROUNDS` 2) of diagnose → regenerate → judge (priors
+  included), stopping when the best is clean and ≥ `CHAMELEON_CRITIC_TARGET` (88, p60 of the v8 clean winners),
+  when nothing is diagnosed or a round adds nothing new; round 2 seeds from repairs that removed their defect.
+  `resize.LAST_CRITIC` and the winner's `notes["critic_rounds"]` record the rounds; each repair's
+  `notes["critic"]` names round, recipe and directives (the playground lists "+fix:" candidates).
+  `CHAMELEON_CRITIC=0` is byte-identical to the loop without it (test); `floorplan.PlanOptions.rescue` and
+  `rectify(..., protect=)` are the two knobs added for the recipes (default off, no effect otherwise).
+- Numbers (docs/CRITIC_LOOP.md): eval slice of 300 designs (4198 cases) judge-hard winners 42 → 24, fallback
+  wins 9 → 7, no new hard fails, judge mean 75.9 → 80.4, runtime p50 +0.015 s (p95 +0.15 s); designer
+  agreement 0.608 → 0.608 tuning, 0.610 → 0.614 hold-out; a "+fix" candidate wins 16 % of cases, mostly soft
+  recipes (pin / bolder / tighter). **Default on** (`critic.DEFAULT_ON`). Measurement tools:
+  `eval.compare_runs critic_off critic_on3`, `eval.compare_optimize --flag CHAMELEON_CRITIC` (the v7 tool
+  generalised to any switch), sanity sheets in `docs/sanity_critic/`. Two judgement calls inside the
+  recipes: a tracked display word gives up letter spacing before size, and a vertical / diagonal headline that
+  cannot fit a strip at the floor is set horizontal.
+
 ## Playground (dev tool, not shipped)
 - `chameleon/tools/playground.py` serves a local UI at http://localhost:8765: pick a sample, upload or paste a
   design, pick a preset or custom size; shows source / stretch-baseline / output renders (fit or 1:1, optional

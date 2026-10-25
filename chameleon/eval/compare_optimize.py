@@ -9,7 +9,10 @@ by that score, the design energy of both, and the runtime. Hold-out designs
 (docs/designer2/holdout_ids.json) are reported in their own table and never
 looked at while tuning.
 
-    .venv/bin/python -m eval.compare_optimize [--names a,b] [--batch designer|designer2] [--out DIR]
+    .venv/bin/python -m eval.compare_optimize [--names a,b] [--batch designer|designer2] [--out DIR] [--flag CHAMELEON_CRITIC]
+
+`--flag` names another on/off switch to compare instead of the optimiser
+(v9: CHAMELEON_CRITIC); the two modes are the flag at 0 and at 1.
 
 Writes <out>/results.jsonl and <out>/SUMMARY.md (default
 docs/designer/compare/v7_optimizer/).
@@ -39,6 +42,7 @@ from eval.metrics import designer_agreement  # noqa: E402
 from eval.perturb_designer import BATCHES, Ref, references  # noqa: E402
 
 OUT_DIR = ROOT.parent / "docs" / "designer" / "compare" / "v7_optimizer"
+FLAG = "CHAMELEON_OPTIMIZE"       # the switch the two modes toggle (--flag)
 
 
 def run_case(ref: Ref) -> dict[str, Any]:
@@ -53,7 +57,7 @@ def run_case(ref: Ref) -> dict[str, Any]:
                            "ref_score": round(s_ref.total, 2), "ref_hard": list(s_ref.hard),
                            "ref_energy": round(e_ref.total, 3), "ref_energy_hard": list(e_ref.hard)}
     for mode in ("off", "on"):
-        os.environ["CHAMELEON_OPTIMIZE"] = "0" if mode == "off" else "1"
+        os.environ[FLAG] = "0" if mode == "off" else "1"
         t0 = time.time()
         design, judged = resize_with_candidates(ref.source, tdict)
         dt = time.time() - t0
@@ -66,7 +70,7 @@ def run_case(ref: Ref) -> dict[str, Any]:
                      "order_tau": da.get("da_order_tau"), "energy": round(e.total, 3), "energy_hard": list(e.hard),
                      "seconds": round(dt, 3), "designer_wins": bool(s_ref.total > sc.total),
                      "opt_won": bool(judged and judged[0].name.endswith("+opt"))}
-    os.environ.pop("CHAMELEON_OPTIMIZE", None)
+    os.environ.pop(FLAG, None)
     return row
 
 
@@ -136,12 +140,15 @@ def summary(rows: list[dict[str, Any]]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    global FLAG
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--names", default="")
     ap.add_argument("--batch", default="", help="designer | designer2 (default both)")
     ap.add_argument("--out", type=Path, default=OUT_DIR)
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--flag", default=FLAG, help="environment switch compared at 0 vs 1 (default CHAMELEON_OPTIMIZE)")
     args = ap.parse_args(argv)
+    FLAG = args.flag
     names = {n for n in args.names.split(",") if n} or None
     batches = [b for b in BATCHES if not args.batch or b.name == args.batch]
     refs = references(batches, names)

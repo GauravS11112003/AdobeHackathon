@@ -158,6 +158,10 @@ class PlanOptions:
     chips: str = "row"
     text_flow: str = "stacked"
     fill: bool = False
+    rescue: bool = False        # v9 (critic recipe): secondary copy yields first; the secondary and minor
+                                # floors start lowered by the first two RESCUE_STEPS, so the k search hands
+                                # the room to the headline / logo / CTA on a canvas where not everything can
+                                # be readable at once (a 160 px strip holding five paragraphs)
 
     @property
     def name(self) -> str:
@@ -169,6 +173,8 @@ class PlanOptions:
                 parts.append(f"{f.replace('_side', '').replace('_flow', '').replace('_bias', '')}={v:g}" if isinstance(v, float) else f"{f.replace('_side', '').replace('_flow', '')}={v}")
         if self.fill:
             parts.append("fill")
+        if self.rescue:
+            parts.append("rescue")
         return ", ".join(parts) or "default"
 
 
@@ -1116,7 +1122,7 @@ def _collect(analysis: Analysis, elements: dict[str, dict[str, Any]]) -> _Slots:
 
 class _Builder:
     def __init__(self, analysis: Analysis, elements: dict[str, dict[str, Any]],
-                 met: Metrics, m: TextMeasurer, family: str, uniform: bool = False):
+                 met: Metrics, m: TextMeasurer, family: str, uniform: bool = False, rescue: bool = False):
         self.analysis = analysis
         self.elements = elements
         self.met = met
@@ -1125,6 +1131,7 @@ class _Builder:
         self.slots = _collect(analysis, elements)
         self.target = met.target
         self.uniform = uniform      # PlanOptions.fill: one shrink speed for everything
+        self.rescue = rescue        # PlanOptions.rescue: secondary / minor floors pre-lowered (v9)
 
     def prio(self, p: float) -> float:
         return PRIO_PRIMARY if self.uniform else p
@@ -1134,9 +1141,12 @@ class _Builder:
     def text(self, unit: Unit, prio: float, natural_width: bool = False) -> _TextItem:
         el = self.elements[unit.primary or unit.ids[0]]
         cap = float(el["font_size"]) * self.met.cap_scale
-        return _TextItem(unit, el, self.m, cap, self.met.min_font(unit.role), self.prio(prio), natural_width,
-                         hard_w=self.target.w,   # a line may run into the margins before it goes under the floor
-                         tier=tier_of(prio))
+        it = _TextItem(unit, el, self.m, cap, self.met.min_font(unit.role), self.prio(prio), natural_width,
+                       hard_w=self.target.w,   # a line may run into the margins before it goes under the floor
+                       tier=tier_of(prio))
+        if self.rescue:
+            _pre_relax(it)
+        return it
 
     def text_items(self) -> list[_TextItem]:
         items = []
@@ -1182,6 +1192,8 @@ class _Builder:
         it = _Scaled(unit, self.elements, ideal_s, floor_s, self.prio(prio), w_frac, self.m, label_floor,
                      tier=tier_of(prio))
         it.cap_s = self.met.cap_scale * cap_mult
+        if self.rescue:
+            _pre_relax(it)
         return it
 
     def logo(self, ideal_h: float, floor_h: float, w_frac: float) -> _Scaled | None:
@@ -1233,6 +1245,13 @@ class _Builder:
 
 # ---------------------------------------------------------------------------
 # column plans (tall, square, and the text side of wide)
+
+
+def _pre_relax(item: _Item) -> None:
+    """Rescue first (PlanOptions.rescue, v9): the item's floor is lowered the
+    way the first two RESCUE_STEPS would lower it, before the k search runs."""
+    for tier, factor in RESCUE_STEPS[:2]:
+        item.relax(factor, tier)
 
 
 def _column_fits(items: list[_Item], gaps: list[float], aw: float, ah: float) -> Callable[[float], bool]:
@@ -1632,7 +1651,7 @@ def floorplan_relayout(analysis: Analysis, target: Box, elements: dict[str, dict
             for eid in unit.ids:
                 out.font_scale[eid] = s
 
-    b = _Builder(analysis, elements, met, m, family, uniform=opts.fill)
+    b = _Builder(analysis, elements, met, m, family, uniform=opts.fill, rescue=opts.rescue)
     plan = family
     if family == SQUARE and opts.hero_side in ("left", "right") and b.slots.hero is not None:
         plan = WIDE          # hero on one side, column on the other, on a square
