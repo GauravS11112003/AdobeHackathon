@@ -1,0 +1,63 @@
+{
+ "source": "docs/designer2/src_09_592fbd6095a7a863ddcdb859.json",
+ "target": [
+  1240,
+  1754
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Poster: full-height dark-red band centred on the gradient; serif quote centred in it, rule, author; the two dark squares flank the first and last line.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 223.2,
+   "y": 0.0,
+   "w": 793.6,
+   "h": 1754.0
+  },
+  {
+   "id": "el_06",
+   "x": 302.6,
+   "y": 567.2,
+   "w": 634.9,
+   "font": 92,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 588.7,
+   "y": 1059.5,
+   "w": 62.6,
+   "h": 6.9
+  },
+  {
+   "id": "el_05",
+   "x": 302.6,
+   "y": 1107.8,
+   "w": 634.9,
+   "font": 55,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "x": 257.4,
+   "y": 551.1,
+   "w": 88.3,
+   "h": 69.0
+  },
+  {
+   "id": "el_03",
+   "x": 904.7,
+   "y": 919.1,
+   "w": 88.3,
+   "h": 69.0
+  }
+ ]
+}

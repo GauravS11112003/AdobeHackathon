@@ -1,0 +1,51 @@
+{
+ "source": "docs/designer2/src_11_593011fc95a7a863ddcdbf9a.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "16:9: cluster left, the quote centred in the right column.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_02",
+   "x": 202.5,
+   "y": 45.0,
+   "h": 778.6
+  },
+  {
+   "id": "el_03",
+   "x": 259.7,
+   "y": 66.0,
+   "h": 614.6
+  },
+  {
+   "id": "el_05",
+   "x": 168.2,
+   "y": 46.0,
+   "h": 503.2
+  },
+  {
+   "id": "el_04",
+   "x": 112.0,
+   "y": 439.5,
+   "h": 415.5
+  },
+  {
+   "id": "el_01",
+   "x": 1041.1,
+   "y": 343.6,
+   "w": 462.9,
+   "font": 62,
+   "align": "center"
+  }
+ ]
+}

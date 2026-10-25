@@ -1,0 +1,99 @@
+{
+ "source": "docs/designer2/src_07_591429a395a7a863ddcd7e39.json",
+ "target": [
+  1000,
+  1500
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "White double-bordered card with the stacked serif lockup (mark, JOIN US AT A, BBQ, PARTY, icon) as the focal point; the black + yellow info strip beside it on wide canvases, under it on tall ones.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 175.16,
+   "y": 247.5,
+   "w": 649.67,
+   "h": 750.0
+  },
+  {
+   "id": "el_02",
+   "x": 194.74,
+   "y": 269.52,
+   "w": 611.75,
+   "h": 705.95
+  },
+  {
+   "id": "el_06",
+   "x": 447.39,
+   "y": 327.03,
+   "w": 105.22,
+   "h": 91.76
+  },
+  {
+   "id": "el_11",
+   "x": 302.97,
+   "y": 431.02,
+   "w": 394.07,
+   "font": 58,
+   "align": "center"
+  },
+  {
+   "id": "el_10",
+   "x": 293.24,
+   "y": 501.46,
+   "w": 413.52,
+   "font": 190,
+   "align": "center"
+  },
+  {
+   "id": "el_09",
+   "x": 300.86,
+   "y": 693.46,
+   "w": 398.27,
+   "font": 118,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "x": 442.5,
+   "y": 810.31,
+   "w": 115.01,
+   "h": 113.78
+  },
+  {
+   "id": "el_03",
+   "x": 70.0,
+   "y": 1087.5,
+   "w": 430.0,
+   "h": 165.0
+  },
+  {
+   "id": "el_07",
+   "in": "el_03",
+   "inset": 16.5,
+   "font": 46,
+   "fit": false
+  },
+  {
+   "id": "el_04",
+   "x": 500.0,
+   "y": 1087.5,
+   "w": 430.0,
+   "h": 165.0
+  },
+  {
+   "id": "el_08",
+   "in": "el_04",
+   "inset": 16.5,
+   "font": 37,
+   "fit": false
+  }
+ ]
+}

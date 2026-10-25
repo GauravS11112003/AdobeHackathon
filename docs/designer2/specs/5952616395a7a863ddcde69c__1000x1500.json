@@ -1,0 +1,67 @@
+{
+ "source": "docs/designer2/src_15_5952616395a7a863ddcde69c.json",
+ "target": [
+  1000,
+  1500
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Poster: the typographic stack centred - orange serif headline, dashed rule, subhead, dashed rule, teal line, body with open leading.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_06",
+   "x": 80.0,
+   "y": 309.1,
+   "w": 840.0,
+   "font": 75,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "x": 80.0,
+   "y": 524.1,
+   "w": 840.0,
+   "font": 45,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "x": 80.0,
+   "y": 625.7,
+   "w": 840.0,
+   "font": 54,
+   "align": "center"
+  },
+  {
+   "id": "el_03",
+   "x": 80.0,
+   "y": 813.3,
+   "w": 840.0,
+   "font": 45,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 80.0,
+   "y": 914.9,
+   "w": 840.0,
+   "font": 45,
+   "align": "center"
+  },
+  {
+   "id": "el_01",
+   "x": 80.0,
+   "y": 1016.5,
+   "w": 840.0,
+   "font": 37,
+   "align": "center"
+  }
+ ]
+}

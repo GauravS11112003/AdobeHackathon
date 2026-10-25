@@ -1,0 +1,116 @@
+{
+ "source": "docs/designer2/src_32_5d5ec02dcf657b21effed4f3.json",
+ "target": [
+  1280,
+  720
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Dusk photo field on the left carrying the chat lockup, the rating headline and the thank-you; the screen cluster (panel, dark sidebar, floating chat bubbles) sits on the right edge with the light-blue sky showing above and below it.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 0.0,
+   "y": 0.0,
+   "w": 0.69,
+   "h": 1.0
+  },
+  {
+   "id": "el_09",
+   "x": 0.68,
+   "y": 0.14,
+   "w": 0.32,
+   "h": 0.74
+  },
+  {
+   "id": "el_08",
+   "x": 0.68,
+   "y": 0.11029,
+   "w": 0.32,
+   "h": 0.42438
+  },
+  {
+   "id": "el_10",
+   "x": 0.68,
+   "y": 0.39308,
+   "w": 0.05781,
+   "h": 0.48692
+  },
+  {
+   "id": "el_11",
+   "x": 0.64206,
+   "y": 0.40134,
+   "w": 0.09084,
+   "h": 0.31198
+  },
+  {
+   "id": "el_12",
+   "x": 0.64258,
+   "y": 0.41831,
+   "w": 0.09084,
+   "h": 0.28904
+  },
+  {
+   "id": "el_13",
+   "x": 0.56748,
+   "y": 0.46511,
+   "w": 0.10839,
+   "h": 0.25005
+  },
+  {
+   "id": "el_05",
+   "x": 0.07,
+   "y": 0.1,
+   "w": 0.03759,
+   "h": 0.09
+  },
+  {
+   "id": "el_03",
+   "x": 0.12125,
+   "y": 0.1297,
+   "w": 0.06723,
+   "font": 15,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 0.12125,
+   "y": 0.15261,
+   "w": 0.06723,
+   "font": 31,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 0.07,
+   "y": 0.29,
+   "w": 0.47748,
+   "font": 72,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 0.07,
+   "below": "el_02",
+   "gap": 0.03,
+   "w": 0.28037,
+   "font": 32,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "x": 0.058,
+   "anchor_y": "bottom",
+   "margin_y": 0.1,
+   "w": 0.15,
+   "h": 0.0625
+  }
+ ]
+}

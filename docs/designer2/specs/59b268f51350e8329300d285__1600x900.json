@@ -1,0 +1,92 @@
+{
+ "source": "docs/designer2/src_24_59b268f51350e8329300d285.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Red panel with a generous inset; headline centred mid-panel with the tracked attribution and its yellow underline below; yellow pin squares with hairlines on opposite panel edges, red bars entering from the top-right and bottom-left.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 81.0,
+   "y": 81.0,
+   "w": 1438.0,
+   "h": 738.0
+  },
+  {
+   "id": "el_03",
+   "x": 27.0,
+   "y": 135.0,
+   "w": 108.0,
+   "h": 108.0
+  },
+  {
+   "id": "el_02",
+   "x": 1465.0,
+   "y": 639.0,
+   "w": 108.0,
+   "h": 108.0
+  },
+  {
+   "id": "el_07",
+   "x": 11.88,
+   "y": 207.36,
+   "w": 60.48,
+   "h": 3.02
+  },
+  {
+   "id": "el_06",
+   "x": 1526.56,
+   "y": 709.2,
+   "w": 60.48,
+   "h": 3.02
+  },
+  {
+   "id": "el_04",
+   "x": 1456.0,
+   "y": 95.85,
+   "w": 144.0,
+   "h": 24.3
+  },
+  {
+   "id": "el_05",
+   "x": 0.0,
+   "y": 757.35,
+   "w": 144.0,
+   "h": 24.3
+  },
+  {
+   "id": "el_10",
+   "x": 320.0,
+   "y": 132.2,
+   "w": 960.0,
+   "font": 100,
+   "align": "center",
+   "line_height": 1.2
+  },
+  {
+   "id": "el_09",
+   "x": 608.48,
+   "y": 694.2,
+   "w": 383.04,
+   "font": 40,
+   "align": "center"
+  },
+  {
+   "id": "el_08",
+   "x": 646.78,
+   "y": 760.2,
+   "w": 306.43,
+   "h": 7.6
+  }
+ ]
+}

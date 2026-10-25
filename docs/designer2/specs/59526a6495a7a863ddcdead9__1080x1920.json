@@ -1,0 +1,86 @@
+{
+ "source": "docs/designer2/src_16_59526a6495a7a863ddcdead9.json",
+ "target": [
+  1080,
+  1920
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Poster: photo panel on top, headline and subhead under it left-aligned; dots mark the left margin and the top line.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_09",
+   "x": 81.0,
+   "y": 337.6,
+   "w": 918.0,
+   "h": 768.0,
+   "crop": true
+  },
+  {
+   "id": "el_08",
+   "x": 81.0,
+   "y": 1192.0,
+   "w": 918.0,
+   "font": 94,
+   "align": "left",
+   "line_height": 0.92
+  },
+  {
+   "id": "el_07",
+   "x": 81.0,
+   "y": 1469.7,
+   "w": 918.0,
+   "font": 41,
+   "align": "left"
+  },
+  {
+   "id": "el_01",
+   "x": 34.0,
+   "y": 331.1,
+   "w": 13.0,
+   "h": 13.0
+  },
+  {
+   "id": "el_03",
+   "x": 34.0,
+   "y": 953.5,
+   "w": 13.0,
+   "h": 13.0
+  },
+  {
+   "id": "el_02",
+   "x": 34.0,
+   "y": 1575.9,
+   "w": 13.0,
+   "h": 13.0
+  },
+  {
+   "id": "el_04",
+   "x": 87.5,
+   "y": 273.5,
+   "w": 13.0,
+   "h": 13.0
+  },
+  {
+   "id": "el_05",
+   "x": 533.5,
+   "y": 273.5,
+   "w": 13.0,
+   "h": 13.0
+  },
+  {
+   "id": "el_06",
+   "x": 979.6,
+   "y": 273.5,
+   "w": 13.0,
+   "h": 13.0
+  }
+ ]
+}

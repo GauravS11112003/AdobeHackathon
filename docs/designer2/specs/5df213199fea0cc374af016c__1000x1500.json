@@ -1,0 +1,137 @@
+{
+ "source": "docs/designer2/src_14_5df213199fea0cc374af016c.json",
+ "target": [
+  1000,
+  1500
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Match card column as the source: gameday tab hanging from the top, home crest + name + city, VS between two rules, away crest + name + city, ticket square + URL; the column sits left of centre, leaving the photo side free.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 207.2,
+   "y": 0.0,
+   "w": 225.6,
+   "h": 311.2
+  },
+  {
+   "id": "el_13",
+   "x": 303.9,
+   "y": 40.5,
+   "w": 32.3,
+   "h": 32.3
+  },
+  {
+   "id": "el_04",
+   "x": 207.2,
+   "y": 96.2,
+   "w": 225.6,
+   "font": 33,
+   "align": "center"
+  },
+  {
+   "id": "el_14",
+   "x": 303.9,
+   "y": 199.2,
+   "w": 32.3,
+   "h": 32.3
+  },
+  {
+   "id": "el_03",
+   "x": 199.6,
+   "y": 352.3,
+   "h": 155.6
+  },
+  {
+   "id": "el_07",
+   "x": 189.4,
+   "y": 525.6,
+   "w": 261.1,
+   "font": 49,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "x": 253.0,
+   "y": 593.2,
+   "w": 134.1,
+   "font": 20,
+   "align": "center"
+  },
+  {
+   "id": "el_11",
+   "x": 208.4,
+   "y": 652.6,
+   "w": 223.1,
+   "h": 5.9
+  },
+  {
+   "id": "el_10",
+   "x": 255.1,
+   "y": 682.0,
+   "w": 129.7,
+   "font": 91,
+   "align": "center"
+  },
+  {
+   "id": "el_12",
+   "x": 208.4,
+   "y": 834.9,
+   "w": 223.1,
+   "h": 5.9
+  },
+  {
+   "id": "el_02",
+   "x": 253.9,
+   "y": 887.7,
+   "h": 167.4
+  },
+  {
+   "id": "el_09",
+   "x": 202.8,
+   "y": 1072.7,
+   "w": 234.4,
+   "font": 49,
+   "align": "center"
+  },
+  {
+   "id": "el_06",
+   "x": 257.6,
+   "y": 1140.3,
+   "w": 124.7,
+   "font": 20,
+   "align": "center"
+  },
+  {
+   "id": "el_15",
+   "x": 303.9,
+   "y": 1211.5,
+   "w": 32.3,
+   "h": 32.3
+  },
+  {
+   "id": "el_08",
+   "x": 248.8,
+   "y": 1284.9,
+   "w": 142.3,
+   "font": 20,
+   "align": "center"
+  },
+  {
+   "id": "el_16",
+   "x": 237.5,
+   "y": 1315.9,
+   "w": 165.0,
+   "font": 26,
+   "align": "center"
+  }
+ ]
+}

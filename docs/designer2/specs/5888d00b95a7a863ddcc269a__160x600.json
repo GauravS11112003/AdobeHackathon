@@ -1,0 +1,91 @@
+{
+ "source": "docs/designer2/src_22_5888d00b95a7a863ddcc269a.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Photo hero framed by navy bars (date in the top bar, time on a yellow tag at the right edge), serif headline with a yellow highlight behind its first line on the light-blue panel, support text beside or below it.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 0.0,
+   "y": 0.0,
+   "w": 152.0,
+   "h": 600.0
+  },
+  {
+   "id": "el_01",
+   "x": 0.0,
+   "y": 0.0,
+   "w": 160.0,
+   "h": 14.0
+  },
+  {
+   "id": "el_03",
+   "x": 152.0,
+   "y": 0.0,
+   "w": 8.0,
+   "h": 600.0
+  },
+  {
+   "id": "el_02",
+   "x": 8.0,
+   "y": 14.0,
+   "w": 144.0,
+   "h": 334.0
+  },
+  {
+   "id": "el_07",
+   "x": 8.0,
+   "y": 431.45,
+   "w": 132.0,
+   "font": 18,
+   "align": "left",
+   "line_height": 1.19
+  },
+  {
+   "id": "el_04",
+   "x": 0.0,
+   "y": 435.3,
+   "w": 136.61,
+   "h": 18.0
+  },
+  {
+   "id": "el_06",
+   "x": 8.0,
+   "y": 485.11,
+   "w": 132.0,
+   "font": 8,
+   "align": "left",
+   "line_height": 1.2
+  },
+  {
+   "id": "el_05",
+   "x": 73.37,
+   "y": 21.2,
+   "w": 86.63,
+   "h": 10.4
+  },
+  {
+   "id": "el_08",
+   "x": 75.77,
+   "y": 20.28,
+   "w": 73.83,
+   "font": 8,
+   "align": "right"
+  },
+  {
+   "id": "el_09",
+   "x": 58.83,
+   "y": 0.0,
+   "w": 90.77,
+   "font": 10,
+   "align": "right"
+  }
+ ]
+}

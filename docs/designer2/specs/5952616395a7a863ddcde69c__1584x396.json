@@ -1,0 +1,69 @@
+{
+ "source": "docs/designer2/src_15_5952616395a7a863ddcde69c.json",
+ "target": [
+  1584,
+  396
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Banner: three columns - headline | subhead | teal line + body - separated by the two dashed rules turned vertical.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_06",
+   "x": 63.4,
+   "y": 87.1,
+   "w": 443.5,
+   "font": 67,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 586.1,
+   "y": 88.6,
+   "w": 411.8,
+   "font": 40,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 1077.1,
+   "y": 73.3,
+   "w": 443.5,
+   "font": 30,
+   "align": "left"
+  },
+  {
+   "id": "el_01",
+   "x": 1077.1,
+   "y": 155.6,
+   "w": 443.5,
+   "font": 26,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "cx": 546.5,
+   "cy": 198.0,
+   "w": 147.1,
+   "font": 17,
+   "align": "center",
+   "rotation": 90
+  },
+  {
+   "id": "el_03",
+   "cx": 1037.5,
+   "cy": 198.0,
+   "w": 147.1,
+   "font": 17,
+   "align": "center",
+   "rotation": 90
+  }
+ ]
+}

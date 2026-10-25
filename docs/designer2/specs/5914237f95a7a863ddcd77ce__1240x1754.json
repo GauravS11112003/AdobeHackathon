@@ -1,0 +1,70 @@
+{
+ "source": "docs/designer2/src_21_5914237f95a7a863ddcd77ce.json",
+ "target": [
+  1240,
+  1754
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Centred poster column: headline, lede, dates, blue tick, 'Worship & Bible Study'; photo anchored at the bottom (or on the left for wide formats, where the details form their own column).",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_06",
+   "x": 99.2,
+   "y": 105.24,
+   "w": 1041.6,
+   "font": 117,
+   "align": "center",
+   "line_height": 1.2
+  },
+  {
+   "id": "el_03",
+   "x": 99.2,
+   "y": 604.49,
+   "w": 1041.6,
+   "font": 49,
+   "align": "center",
+   "line_height": 1.22
+  },
+  {
+   "id": "el_04",
+   "x": 99.2,
+   "y": 829.75,
+   "w": 1041.6,
+   "font": 40,
+   "align": "center",
+   "line_height": 1.0
+  },
+  {
+   "id": "el_02",
+   "x": 599.52,
+   "y": 922.85,
+   "w": 40.95,
+   "h": 51.48
+  },
+  {
+   "id": "el_05",
+   "x": 99.2,
+   "y": 1009.43,
+   "w": 1041.6,
+   "font": 49,
+   "align": "center",
+   "line_height": 1.0
+  },
+  {
+   "id": "el_01",
+   "x": 62.0,
+   "y": 1150.19,
+   "w": 1116.0,
+   "h": 542.42,
+   "fit_box": true
+  }
+ ]
+}

@@ -1,0 +1,102 @@
+{
+ "canvas": {
+  "width": 820,
+  "height": 312
+ },
+ "elements": [
+  {
+   "id": "el_00",
+   "type": "shape",
+   "x": 0,
+   "y": 0,
+   "width": 820.0,
+   "height": 312.0,
+   "rotation": 0.0,
+   "opacity": 1.0,
+   "z_index": 0,
+   "group_id": null,
+   "shape_type": "rectangle",
+   "fill_color": "rgba(254,236,237,1)",
+   "stroke_color": null,
+   "stroke_width": 0,
+   "corner_radius": 0
+  },
+  {
+   "id": "el_01",
+   "type": "text",
+   "x": 382.9,
+   "y": 71.7,
+   "width": 387.9,
+   "height": 168.6,
+   "rotation": 0.0,
+   "opacity": 1.0,
+   "z_index": 1,
+   "group_id": null,
+   "content": "Life\u2019s too short to wear boring clothes.",
+   "font_family": "Solstice Sans",
+   "font_size": 49.0,
+   "font_weight": "regular",
+   "font_style": "normal",
+   "color": "rgba(88,89,91,1)",
+   "text_align": "center",
+   "line_height": 1.0,
+   "letter_spacing": 0.7959714100064977
+  },
+  {
+   "id": "el_02",
+   "type": "image",
+   "x": 73.1,
+   "y": 12.5,
+   "width": 238.42,
+   "height": 275.9,
+   "rotation": 0.0,
+   "opacity": 1.0,
+   "z_index": 2,
+   "group_id": null,
+   "asset_id": "solstice_bottle.png",
+   "fit": "contain"
+  },
+  {
+   "id": "el_03",
+   "type": "image",
+   "x": 93.3,
+   "y": 19.9,
+   "width": 194.16,
+   "height": 217.8,
+   "rotation": 0.0,
+   "opacity": 1.0,
+   "z_index": 3,
+   "group_id": null,
+   "asset_id": "solstice_bottle.png",
+   "fit": "contain"
+  },
+  {
+   "id": "el_04",
+   "type": "image",
+   "x": 41.0,
+   "y": 152.3,
+   "width": 300.81,
+   "height": 147.2,
+   "rotation": 0.0,
+   "opacity": 1.0,
+   "z_index": 4,
+   "group_id": null,
+   "asset_id": "solstice_logo_lockup.png",
+   "fit": "contain"
+  },
+  {
+   "id": "el_05",
+   "type": "image",
+   "x": 60.9,
+   "y": 12.8,
+   "width": 267.45,
+   "height": 178.3,
+   "rotation": 0.0,
+   "opacity": 1.0,
+   "z_index": 5,
+   "group_id": null,
+   "asset_id": "solstice_bottle.png",
+   "fit": "contain"
+  }
+ ]
+}

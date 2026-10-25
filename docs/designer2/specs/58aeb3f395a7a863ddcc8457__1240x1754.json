@@ -1,0 +1,72 @@
+{
+ "source": "docs/designer2/src_37_58aeb3f395a7a863ddcc8457.json",
+ "target": [
+  1240,
+  1754
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Hero panel lower-right, 01/APRIL lockup on its corner, vertical expo title along its edge, badge + fine print top-right.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 173.6,
+   "y": 420.96,
+   "w": 919.78,
+   "h": 1210.26,
+   "crop": true
+  },
+  {
+   "id": "el_04",
+   "x": 93.0,
+   "y": 201.45,
+   "w": 358.72,
+   "font": 347,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "cx": 494.62,
+   "cy": 387.45,
+   "w": 219.23,
+   "font": 78,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "cx": 1129.49,
+   "cy": 1317.09,
+   "w": 698.42,
+   "font": 45,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 887.84,
+   "y": 117.52,
+   "w": 186.0,
+   "h": 128.34
+  },
+  {
+   "id": "el_06",
+   "in": "el_02",
+   "font": 38,
+   "inset": 12.83
+  },
+  {
+   "id": "el_07",
+   "x": 533.2,
+   "y": 149.6,
+   "w": 331.48,
+   "font": 28,
+   "align": "right"
+  }
+ ]
+}

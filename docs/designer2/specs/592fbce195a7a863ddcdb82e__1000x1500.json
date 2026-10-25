@@ -1,0 +1,63 @@
+{
+ "source": "docs/designer2/src_01_592fbce195a7a863ddcdb82e.json",
+ "target": [
+  1000,
+  1500
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Deep-red vertical band holds the centred quote; two translucent squares accent its top-left and lower-right (one straddling the band edge); rule + author beneath.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 120.0,
+   "y": 0,
+   "w": 455.4,
+   "h": 1500.0
+  },
+  {
+   "id": "el_06",
+   "x": 153.0,
+   "y": 484.97,
+   "w": 389.4,
+   "font": 55,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 332.03,
+   "y": 882.98,
+   "w": 31.35,
+   "h": 3.3
+  },
+  {
+   "id": "el_05",
+   "x": 120.0,
+   "y": 911.03,
+   "w": 455.4,
+   "font": 30,
+   "align": "center"
+  },
+  {
+   "id": "el_03",
+   "x": 498.4,
+   "y": 751.72,
+   "w": 96.25,
+   "h": 73.15
+  },
+  {
+   "id": "el_04",
+   "x": 144.06,
+   "y": 416.22,
+   "w": 96.25,
+   "h": 73.15
+  }
+ ]
+}

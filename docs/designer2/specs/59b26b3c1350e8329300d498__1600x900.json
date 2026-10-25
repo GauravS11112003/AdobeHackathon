@@ -1,0 +1,117 @@
+{
+ "source": "docs/designer2/src_19_59b26b3c1350e8329300d498.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Coral poster block carrying the centred headline stack (brand, white bar, SPARKLING NIGHT, address) inside a maroon frame; the three purple info pills stacked or in a row on the free side.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "cover": true
+  },
+  {
+   "id": "el_02",
+   "x": 45.0,
+   "y": 45.0,
+   "w": 1510.0,
+   "h": 810.0
+  },
+  {
+   "id": "el_03",
+   "x": 96.0,
+   "y": 63.0,
+   "w": 774.0,
+   "h": 774.0
+  },
+  {
+   "id": "el_04",
+   "x": 127.73,
+   "y": 94.73,
+   "w": 710.53,
+   "h": 710.53
+  },
+  {
+   "id": "el_14",
+   "x": 157.92,
+   "y": 192.72,
+   "w": 650.16,
+   "font": 43,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "x": 337.59,
+   "y": 265.42,
+   "w": 290.83,
+   "h": 52.5
+  },
+  {
+   "id": "el_13",
+   "x": 158.86,
+   "y": 354.67,
+   "w": 648.29,
+   "font": 105,
+   "align": "right"
+  },
+  {
+   "id": "el_12",
+   "x": 157.92,
+   "y": 650.68,
+   "w": 650.16,
+   "font": 39,
+   "align": "center"
+  },
+  {
+   "id": "el_06",
+   "x": 1041.89,
+   "y": 350.71,
+   "w": 341.21,
+   "h": 54.86
+  },
+  {
+   "id": "el_11",
+   "in": "el_06",
+   "font": 27,
+   "inset": 6.58,
+   "align": "center"
+  },
+  {
+   "id": "el_07",
+   "x": 924.5,
+   "y": 413.79,
+   "w": 576.0,
+   "h": 72.41
+  },
+  {
+   "id": "el_10",
+   "in": "el_07",
+   "font": 27,
+   "inset": 8.69,
+   "align": "center"
+  },
+  {
+   "id": "el_08",
+   "x": 1041.35,
+   "y": 494.43,
+   "w": 342.31,
+   "h": 54.86
+  },
+  {
+   "id": "el_09",
+   "in": "el_08",
+   "font": 27,
+   "inset": 6.58,
+   "align": "center"
+  }
+ ]
+}

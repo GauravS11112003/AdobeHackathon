@@ -1,0 +1,142 @@
+{
+ "source": "docs/designer2/src_10_5f34ddbfa637ee11e32f6bf0.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Landscape letter: yellow tabs flush with the sheet's left edge mark salutation and sign-off, body between; letterhead block (title, subtitle, FROM, TO, date/signature lines) as the right column.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 54.0,
+   "y": 54.0,
+   "w": 1492.0,
+   "h": 792.0
+  },
+  {
+   "id": "el_12",
+   "x": 52.5,
+   "y": 212.2,
+   "w": 80.5,
+   "h": 56.4
+  },
+  {
+   "id": "el_14",
+   "x": 158.4,
+   "y": 225.5,
+   "w": 835.5,
+   "font": 20,
+   "align": "left"
+  },
+  {
+   "id": "el_10",
+   "x": 158.4,
+   "y": 301.1,
+   "w": 835.5,
+   "font": 20,
+   "align": "left"
+  },
+  {
+   "id": "el_13",
+   "x": 52.5,
+   "y": 628.8,
+   "w": 80.5,
+   "h": 56.4
+  },
+  {
+   "id": "el_07",
+   "x": 158.4,
+   "y": 628.8,
+   "w": 835.5,
+   "font": 20,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 1053.6,
+   "y": 168.4,
+   "w": 402.8,
+   "font": 69,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 1055.6,
+   "y": 272.6,
+   "w": 402.8,
+   "font": 16,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 1053.6,
+   "y": 365.0,
+   "w": 50.1,
+   "font": 13,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "x": 1111.8,
+   "y": 361.7,
+   "w": 344.7,
+   "font": 17,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 1053.6,
+   "y": 494.5,
+   "w": 27.7,
+   "font": 13,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 1089.4,
+   "y": 491.3,
+   "w": 367.0,
+   "font": 17,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "x": 1053.6,
+   "y": 653.3,
+   "w": 51.1,
+   "font": 15,
+   "align": "left"
+  },
+  {
+   "id": "el_15",
+   "x": 1114.5,
+   "y": 670.5,
+   "w": 261.5,
+   "h": 1.5
+  },
+  {
+   "id": "el_11",
+   "x": 1053.6,
+   "y": 708.6,
+   "w": 103.8,
+   "font": 15,
+   "align": "left"
+  },
+  {
+   "id": "el_16",
+   "x": 1167.1,
+   "y": 725.9,
+   "w": 208.8,
+   "h": 1.5
+  }
+ ]
+}

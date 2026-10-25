@@ -1,0 +1,147 @@
+{
+ "source": "docs/designer2/src_06_5888d6c095a7a863ddcc2826.json",
+ "target": [
+  728,
+  90
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Photo above, charcoal panel below carrying the left-aligned message (CORPORATE / CHARITY DAY, hairline, tracked tagline, proceeds line, url); red date badge pinned to the photo's top-right; red pixel confetti straddles the panel edges.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 6.0,
+   "y": 6.0,
+   "w": 146.88,
+   "h": 78.0
+  },
+  {
+   "id": "el_01",
+   "x": 163.8,
+   "y": 13.16,
+   "w": 558.2,
+   "h": 70.84
+  },
+  {
+   "id": "el_02",
+   "x": 93.18,
+   "y": 8.7,
+   "w": 50.96,
+   "h": 62.17
+  },
+  {
+   "id": "el_17",
+   "x": 102.36,
+   "y": 26.59,
+   "w": 41.79,
+   "font": 9,
+   "align": "left"
+  },
+  {
+   "id": "el_16",
+   "x": 102.36,
+   "y": 41.19,
+   "w": 41.79,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_15",
+   "x": 177.8,
+   "y": 26.58,
+   "w": 222.68,
+   "font": 15,
+   "align": "left"
+  },
+  {
+   "id": "el_11",
+   "x": 177.8,
+   "y": 69.68,
+   "w": 140.63,
+   "h": 1.5
+  },
+  {
+   "id": "el_14",
+   "x": 422.32,
+   "y": 23.75,
+   "w": 285.68,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_13",
+   "x": 422.32,
+   "y": 37.8,
+   "w": 285.68,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_10",
+   "x": 422.32,
+   "y": 54.1,
+   "w": 10.5,
+   "h": 2.7
+  },
+  {
+   "id": "el_12",
+   "x": 422.32,
+   "y": 61.6,
+   "w": 285.68,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 179.54,
+   "y": 12.44,
+   "w": 13.6,
+   "h": 10.73
+  },
+  {
+   "id": "el_08",
+   "x": 177.4,
+   "y": 8.15,
+   "w": 7.16,
+   "h": 5.01
+  },
+  {
+   "id": "el_09",
+   "x": 165.95,
+   "y": 10.29,
+   "w": 10.02,
+   "h": 7.87
+  },
+  {
+   "id": "el_04",
+   "x": 686.22,
+   "y": 4.57,
+   "w": 23.61,
+   "h": 17.89
+  },
+  {
+   "id": "el_05",
+   "x": 679.78,
+   "y": 2.0,
+   "w": 12.88,
+   "h": 10.02
+  },
+  {
+   "id": "el_06",
+   "x": 661.89,
+   "y": 3.14,
+   "w": 12.16,
+   "h": 9.3
+  },
+  {
+   "id": "el_03",
+   "x": 699.1,
+   "y": 5.28,
+   "w": 5.72,
+   "h": 4.29
+  }
+ ]
+}

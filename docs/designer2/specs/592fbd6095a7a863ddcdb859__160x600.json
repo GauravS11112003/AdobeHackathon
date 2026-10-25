@@ -1,0 +1,63 @@
+{
+ "source": "docs/designer2/src_09_592fbd6095a7a863ddcdb859.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Skyscraper: the band becomes a horizontal belt across the middle; quote in 4 lines, rule, author.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 0.0,
+   "y": 144.0,
+   "w": 160.0,
+   "h": 312.0
+  },
+  {
+   "id": "el_06",
+   "x": 11.2,
+   "y": 231.0,
+   "w": 137.6,
+   "font": 20,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 73.2,
+   "y": 339.6,
+   "w": 13.6,
+   "h": 1.5
+  },
+  {
+   "id": "el_05",
+   "x": 11.2,
+   "y": 350.1,
+   "w": 137.6,
+   "font": 12,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "x": 4.8,
+   "y": 227.5,
+   "w": 19.2,
+   "h": 15.0
+  },
+  {
+   "id": "el_03",
+   "x": 136.0,
+   "y": 307.5,
+   "w": 19.2,
+   "h": 15.0
+  }
+ ]
+}

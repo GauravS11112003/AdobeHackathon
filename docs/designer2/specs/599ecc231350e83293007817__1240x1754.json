@@ -1,0 +1,119 @@
+{
+ "source": "docs/designer2/src_05_599ecc231350e83293007817.json",
+ "target": [
+  1240,
+  1754
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Black square mark over the tracked YOUTH CAMP, then the hairline table: church name running down the left, three vertical session dates in cells, worship line and the eight-line invitation; banners unroll the table into one row.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 474.16,
+   "y": 125.46,
+   "w": 291.67,
+   "h": 268.25
+  },
+  {
+   "id": "el_14",
+   "x": 209.38,
+   "y": 421.39,
+   "w": 825.24,
+   "font": 56,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 161.2,
+   "y": 507.85,
+   "w": 917.6,
+   "h": 2.0
+  },
+  {
+   "id": "el_12",
+   "cx": 484.45,
+   "cy": 709.9,
+   "w": 263.6,
+   "font": 42
+  },
+  {
+   "id": "el_11",
+   "cx": 722.19,
+   "cy": 709.9,
+   "w": 252.48,
+   "font": 42
+  },
+  {
+   "id": "el_10",
+   "cx": 959.93,
+   "cy": 709.9,
+   "w": 363.12,
+   "font": 42
+  },
+  {
+   "id": "el_05",
+   "x": 603.32,
+   "y": 546.17,
+   "w": 2.0,
+   "h": 327.47
+  },
+  {
+   "id": "el_04",
+   "x": 841.06,
+   "y": 546.17,
+   "w": 2.0,
+   "h": 327.47
+  },
+  {
+   "id": "el_03",
+   "x": 406.04,
+   "y": 903.45,
+   "w": 672.76,
+   "h": 2.0
+  },
+  {
+   "id": "el_09",
+   "cx": 484.45,
+   "cy": 1260.15,
+   "w": 685.28,
+   "font": 32
+  },
+  {
+   "id": "el_02",
+   "x": 603.32,
+   "y": 937.51,
+   "w": 2.0,
+   "h": 645.28
+  },
+  {
+   "id": "el_08",
+   "x": 667.19,
+   "y": 937.51,
+   "w": 382.7,
+   "font": 34,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "x": 365.58,
+   "y": 546.17,
+   "w": 2.0,
+   "h": 1036.62
+  },
+  {
+   "id": "el_13",
+   "cx": 247.04,
+   "cy": 1064.48,
+   "w": 1022.99,
+   "font": 42
+  }
+ ]
+}

@@ -1,0 +1,53 @@
+{
+ "source": "docs/designer2/src_20_5ea97608499b85dcc7d2ec78.json",
+ "target": [
+  1080,
+  1350
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Photo panel plus white panel; the three-word lockup SHOES / mega / SALE scaled as one unit and centred in the white (a row on the leaderboard).",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 0.0,
+   "y": 0.0,
+   "w": 1080.0,
+   "h": 796.5
+  },
+  {
+   "id": "el_01",
+   "x": 0.0,
+   "y": 729.0,
+   "w": 1080.0,
+   "h": 621.0
+  },
+  {
+   "id": "el_02",
+   "x": 267.74,
+   "y": 796.5,
+   "w": 553.78,
+   "font": 165,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 333.79,
+   "y": 872.46,
+   "w": 455.99,
+   "font": 180,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 261.13,
+   "y": 961.63,
+   "w": 534.0,
+   "font": 229,
+   "align": "left"
+  }
+ ]
+}

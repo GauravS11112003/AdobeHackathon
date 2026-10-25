@@ -1,0 +1,59 @@
+{
+ "source": "docs/designer2/src_31_5909cf8595a7a863ddcd37aa.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Editorial frame on grey: tracked title top centre, tracked date bottom centre, the photo as a centred plate with the two rotated information lines running up its flanks. Banners lay the lines flat beside the plate; the skyscraper stacks them under it.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_04",
+   "cx": 0.5,
+   "y": 0.08,
+   "w": 1.0,
+   "font": 40,
+   "align": "center"
+  },
+  {
+   "id": "el_03",
+   "cx": 0.5,
+   "anchor_y": "bottom",
+   "margin_y": 0.075,
+   "w": 1.0,
+   "font": 36,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "cx": 0.5,
+   "cy": 0.51,
+   "w": 0.46,
+   "h": 0.58
+  },
+  {
+   "id": "el_01",
+   "cx": 0.865,
+   "cy": 0.51,
+   "w": 0.30932,
+   "font": 27,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "cx": 0.135,
+   "cy": 0.51,
+   "w": 0.30932,
+   "font": 27,
+   "align": "center"
+  }
+ ]
+}

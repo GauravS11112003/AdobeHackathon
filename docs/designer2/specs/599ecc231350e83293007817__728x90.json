@@ -1,0 +1,133 @@
+{
+ "source": "docs/designer2/src_05_599ecc231350e83293007817.json",
+ "target": [
+  728,
+  90
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Black square mark over the tracked YOUTH CAMP, then the hairline table: church name running down the left, three vertical session dates in cells, worship line and the eight-line invitation; banners unroll the table into one row.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 8.0,
+   "y": 26.5,
+   "w": 37.0,
+   "h": 37.0
+  },
+  {
+   "id": "el_14",
+   "x": 66.84,
+   "y": 16.84,
+   "w": 143.94,
+   "font": 14,
+   "align": "left",
+   "tracking": 0.4
+  },
+  {
+   "id": "el_07",
+   "x": 66.84,
+   "y": 40.96,
+   "w": 147.25,
+   "h": 2.0
+  },
+  {
+   "id": "el_13",
+   "x": 66.84,
+   "y": 47.16,
+   "w": 147.25,
+   "font": 8,
+   "align": "left",
+   "tracking": 0.5,
+   "rotation": 0
+  },
+  {
+   "id": "el_09",
+   "x": 66.84,
+   "y": 62.2,
+   "w": 135.61,
+   "font": 7,
+   "align": "left",
+   "tracking": 0.7,
+   "rotation": 0
+  },
+  {
+   "id": "el_06",
+   "x": 252.72,
+   "y": 8.0,
+   "w": 2.0,
+   "h": 74.0
+  },
+  {
+   "id": "el_12",
+   "x": 293.35,
+   "y": 35.14,
+   "w": 59.63,
+   "font": 9,
+   "align": "left",
+   "rotation": 0
+  },
+  {
+   "id": "el_05",
+   "x": 368.98,
+   "y": 31.64,
+   "w": 2.0,
+   "h": 20.52
+  },
+  {
+   "id": "el_11",
+   "x": 386.98,
+   "y": 35.14,
+   "w": 57.25,
+   "font": 9,
+   "align": "left",
+   "rotation": 0
+  },
+  {
+   "id": "el_04",
+   "x": 460.23,
+   "y": 31.64,
+   "w": 2.0,
+   "h": 20.52
+  },
+  {
+   "id": "el_10",
+   "x": 478.23,
+   "y": 35.14,
+   "w": 80.95,
+   "font": 9,
+   "align": "left",
+   "rotation": 0
+  },
+  {
+   "id": "el_03",
+   "x": 293.35,
+   "y": 56.36,
+   "w": 265.83,
+   "h": 2.0
+  },
+  {
+   "id": "el_02",
+   "x": 597.81,
+   "y": 8.0,
+   "w": 2.0,
+   "h": 74.0
+  },
+  {
+   "id": "el_08",
+   "x": 638.44,
+   "y": 8.9,
+   "w": 81.56,
+   "font": 7,
+   "align": "left",
+   "line_height": 1.25
+  }
+ ]
+}

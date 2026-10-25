@@ -1,0 +1,86 @@
+{
+ "source": "docs/designer2/src_16_59526a6495a7a863ddcdead9.json",
+ "target": [
+  1280,
+  720
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "16:9: photo left (cropped to the designer's panel proportion), headline + subhead right, vertically centred; the six grey dots mark the left margin and the text column.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_09",
+   "x": 96.0,
+   "y": 61.2,
+   "w": 576.0,
+   "h": 597.6,
+   "crop": true
+  },
+  {
+   "id": "el_08",
+   "x": 729.6,
+   "y": 239.7,
+   "w": 486.4,
+   "font": 50,
+   "align": "left",
+   "line_height": 0.92
+  },
+  {
+   "id": "el_07",
+   "x": 729.6,
+   "y": 418.9,
+   "w": 486.4,
+   "font": 22,
+   "align": "left"
+  },
+  {
+   "id": "el_01",
+   "x": 48.0,
+   "y": 56.9,
+   "w": 8.6,
+   "h": 8.6
+  },
+  {
+   "id": "el_03",
+   "x": 48.0,
+   "y": 355.7,
+   "w": 8.6,
+   "h": 8.6
+  },
+  {
+   "id": "el_02",
+   "x": 48.0,
+   "y": 654.5,
+   "w": 8.6,
+   "h": 8.6
+  },
+  {
+   "id": "el_04",
+   "x": 690.7,
+   "y": 56.9,
+   "w": 8.6,
+   "h": 8.6
+  },
+  {
+   "id": "el_05",
+   "x": 968.5,
+   "y": 56.9,
+   "w": 8.6,
+   "h": 8.6
+  },
+  {
+   "id": "el_06",
+   "x": 1203.0,
+   "y": 56.9,
+   "w": 8.6,
+   "h": 8.6
+  }
+ ]
+}

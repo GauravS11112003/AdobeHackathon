@@ -1,0 +1,142 @@
+{
+ "source": "docs/designer2/src_10_5f34ddbfa637ee11e32f6bf0.json",
+ "target": [
+  1584,
+  396
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Banner sheet: letter body left with its tabs, letterhead (title, subtitle, FROM, TO) in the middle column, date/signature lines at the right.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 23.8,
+   "y": 23.8,
+   "w": 1536.5,
+   "h": 348.5
+  },
+  {
+   "id": "el_12",
+   "x": 22.3,
+   "y": 54.9,
+   "w": 51.3,
+   "h": 36.0
+  },
+  {
+   "id": "el_14",
+   "x": 131.3,
+   "y": 62.8,
+   "w": 706.8,
+   "font": 13,
+   "align": "left"
+  },
+  {
+   "id": "el_10",
+   "x": 131.3,
+   "y": 111.5,
+   "w": 706.8,
+   "font": 13,
+   "align": "left"
+  },
+  {
+   "id": "el_13",
+   "x": 22.3,
+   "y": 302.1,
+   "w": 51.3,
+   "h": 36.0
+  },
+  {
+   "id": "el_07",
+   "x": 131.3,
+   "y": 302.1,
+   "w": 706.8,
+   "font": 13,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 899.6,
+   "y": 64.2,
+   "w": 368.8,
+   "font": 56,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 901.6,
+   "y": 146.7,
+   "w": 368.8,
+   "font": 10,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 899.6,
+   "y": 200.1,
+   "w": 32.3,
+   "font": 8,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "x": 939.3,
+   "y": 198.1,
+   "w": 329.0,
+   "font": 10,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 899.6,
+   "y": 275.8,
+   "w": 18.6,
+   "font": 8,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 925.5,
+   "y": 273.8,
+   "w": 342.8,
+   "font": 10,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "x": 1329.8,
+   "y": 174.6,
+   "w": 32.3,
+   "font": 9,
+   "align": "left"
+  },
+  {
+   "id": "el_15",
+   "x": 1367.1,
+   "y": 185.5,
+   "w": 131.7,
+   "h": 1.5
+  },
+  {
+   "id": "el_11",
+   "x": 1329.8,
+   "y": 206.8,
+   "w": 63.9,
+   "font": 9,
+   "align": "left"
+  },
+  {
+   "id": "el_16",
+   "x": 1398.7,
+   "y": 217.8,
+   "w": 100.1,
+   "h": 1.5
+  }
+ ]
+}

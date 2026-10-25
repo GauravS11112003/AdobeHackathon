@@ -1,0 +1,63 @@
+{
+ "source": "docs/designer2/src_09_592fbd6095a7a863ddcdb859.json",
+ "target": [
+  820,
+  312
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Banner as the source: band at the right with the quote; gradient left and a sliver right.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 524.8,
+   "y": 0.0,
+   "w": 237.8,
+   "h": 312.0
+  },
+  {
+   "id": "el_06",
+   "x": 548.6,
+   "y": 105.0,
+   "w": 190.2,
+   "font": 18,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 637.6,
+   "y": 181.4,
+   "w": 12.2,
+   "h": 1.5
+  },
+  {
+   "id": "el_05",
+   "x": 548.6,
+   "y": 191.0,
+   "w": 190.2,
+   "font": 10,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "x": 572.7,
+   "y": 101.9,
+   "w": 17.3,
+   "h": 13.5
+  },
+  {
+   "id": "el_03",
+   "x": 702.1,
+   "y": 152.3,
+   "w": 17.3,
+   "h": 13.5
+  }
+ ]
+}

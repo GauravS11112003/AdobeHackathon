@@ -1,0 +1,93 @@
+{
+ "source": "docs/designer2/src_23_59158aee95a7a863ddcd861e.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "White double-bordered card with the centred text stack floating across the pink/photo boundary; the photo dominates the rest.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 805.31,
+   "y": 0.0,
+   "w": 794.69,
+   "h": 900.0
+  },
+  {
+   "id": "el_01",
+   "x": 0.0,
+   "y": 0.0,
+   "w": 853.31,
+   "h": 900.0
+  },
+  {
+   "id": "el_02",
+   "x": 128.0,
+   "y": 225.19,
+   "w": 738.31,
+   "h": 449.62
+  },
+  {
+   "id": "el_03",
+   "x": 137.6,
+   "y": 234.79,
+   "w": 719.12,
+   "h": 430.42
+  },
+  {
+   "id": "el_09",
+   "x": 191.0,
+   "y": 253.19,
+   "w": 612.31,
+   "font": 70,
+   "align": "center",
+   "line_height": 0.96
+  },
+  {
+   "id": "el_08",
+   "x": 191.0,
+   "y": 422.49,
+   "w": 612.31,
+   "font": 28,
+   "align": "center",
+   "line_height": 1.57
+  },
+  {
+   "id": "el_07",
+   "x": 191.0,
+   "y": 514.65,
+   "w": 612.31,
+   "font": 23,
+   "align": "center",
+   "line_height": 1.92
+  },
+  {
+   "id": "el_06",
+   "x": 191.0,
+   "y": 614.01,
+   "w": 612.31,
+   "font": 22,
+   "align": "center",
+   "line_height": 1.0
+  },
+  {
+   "id": "el_04",
+   "x": 849.71,
+   "y": 837.0,
+   "w": 3.6,
+   "h": 63.0
+  },
+  {
+   "id": "el_05",
+   "x": 201.83,
+   "y": 0.0,
+   "w": 3.6,
+   "h": 45.0
+  }
+ ]
+}

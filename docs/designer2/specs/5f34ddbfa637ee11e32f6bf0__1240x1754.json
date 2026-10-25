@@ -1,0 +1,142 @@
+{
+ "source": "docs/designer2/src_10_5f34ddbfa637ee11e32f6bf0.json",
+ "target": [
+  1240,
+  1754
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Letter on a sheet: title + tracked subtitle centred, FROM/TO blocks, yellow tabs flush with the sheet edge at the salutation and sign-off, body, date/signature line at the foot.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 111.6,
+   "y": 96.5,
+   "w": 1016.8,
+   "h": 1561.1
+  },
+  {
+   "id": "el_02",
+   "x": 111.6,
+   "y": 227.6,
+   "w": 1016.8,
+   "font": 97,
+   "align": "center"
+  },
+  {
+   "id": "el_03",
+   "x": 111.6,
+   "y": 369.6,
+   "w": 1016.8,
+   "font": 18,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "x": 213.3,
+   "y": 518.9,
+   "w": 53.6,
+   "font": 14,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "x": 276.0,
+   "y": 515.4,
+   "w": 394.8,
+   "font": 18,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 711.5,
+   "y": 518.9,
+   "w": 29.6,
+   "font": 14,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 748.8,
+   "y": 515.4,
+   "w": 349.1,
+   "font": 18,
+   "align": "left"
+  },
+  {
+   "id": "el_12",
+   "x": 110.1,
+   "y": 750.1,
+   "w": 88.5,
+   "h": 62.0
+  },
+  {
+   "id": "el_14",
+   "x": 213.3,
+   "y": 764.7,
+   "w": 701.6,
+   "font": 22,
+   "align": "left"
+  },
+  {
+   "id": "el_10",
+   "x": 315.0,
+   "y": 871.4,
+   "w": 701.6,
+   "font": 22,
+   "align": "left"
+  },
+  {
+   "id": "el_13",
+   "x": 110.1,
+   "y": 1327.3,
+   "w": 88.5,
+   "h": 62.0
+  },
+  {
+   "id": "el_07",
+   "x": 213.3,
+   "y": 1327.3,
+   "w": 701.6,
+   "font": 22,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "x": 213.3,
+   "y": 1523.9,
+   "w": 54.3,
+   "font": 16,
+   "align": "left"
+  },
+  {
+   "id": "el_15",
+   "x": 277.9,
+   "y": 1542.2,
+   "w": 281.1,
+   "h": 1.5
+  },
+  {
+   "id": "el_11",
+   "x": 620.0,
+   "y": 1523.9,
+   "w": 110.4,
+   "font": 16,
+   "align": "left"
+  },
+  {
+   "id": "el_16",
+   "x": 742.0,
+   "y": 1542.2,
+   "w": 264.4,
+   "h": 1.5
+  }
+ ]
+}

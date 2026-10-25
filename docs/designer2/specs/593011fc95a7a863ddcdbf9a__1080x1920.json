@@ -1,0 +1,51 @@
+{
+ "source": "docs/designer2/src_11_593011fc95a7a863ddcdbf9a.json",
+ "target": [
+  1080,
+  1920
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Poster: the koala-in-flowers cluster (layers kept in register) on top, the quote centred beneath in two lines.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_02",
+   "x": 191.6,
+   "y": 325.4,
+   "h": 812.0
+  },
+  {
+   "id": "el_03",
+   "x": 251.3,
+   "y": 347.2,
+   "h": 641.1
+  },
+  {
+   "id": "el_05",
+   "x": 155.8,
+   "y": 326.4,
+   "h": 524.8
+  },
+  {
+   "id": "el_04",
+   "x": 97.2,
+   "y": 736.9,
+   "h": 433.4
+  },
+  {
+   "id": "el_01",
+   "x": 86.4,
+   "y": 1266.2,
+   "w": 907.2,
+   "font": 96,
+   "align": "center"
+  }
+ ]
+}

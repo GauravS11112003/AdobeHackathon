@@ -1,0 +1,67 @@
+{
+ "source": "docs/designer2/src_15_5952616395a7a863ddcde69c.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Skyscraper: centred stack with wrapped lines.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_06",
+   "x": 11.2,
+   "y": 151.2,
+   "w": 137.6,
+   "font": 20,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "x": 11.2,
+   "y": 232.0,
+   "w": 137.6,
+   "font": 10,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "x": 11.2,
+   "y": 260.0,
+   "w": 137.6,
+   "font": 12,
+   "align": "center"
+  },
+  {
+   "id": "el_03",
+   "x": 11.2,
+   "y": 323.7,
+   "w": 137.6,
+   "font": 10,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 11.2,
+   "y": 351.7,
+   "w": 137.6,
+   "font": 10,
+   "align": "center"
+  },
+  {
+   "id": "el_01",
+   "x": 11.2,
+   "y": 389.7,
+   "w": 137.6,
+   "font": 9,
+   "align": "center"
+  }
+ ]
+}

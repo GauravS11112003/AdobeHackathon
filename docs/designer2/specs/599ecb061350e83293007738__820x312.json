@@ -1,0 +1,65 @@
+{
+ "source": "docs/designer2/src_18_599ecb061350e83293007738.json",
+ "target": [
+  820,
+  312
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Quiet typographic diptych: two centred couplets separated by a vertical rule on white, the photo filling the other half.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 606.8,
+   "y": 0.0,
+   "w": 213.2,
+   "h": 312.0
+  },
+  {
+   "id": "el_06",
+   "x": 32.8,
+   "y": 124.76,
+   "w": 246.0,
+   "font": 23,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "x": 32.8,
+   "y": 159.64,
+   "w": 246.0,
+   "font": 20,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "x": 328.0,
+   "y": 125.4,
+   "w": 246.0,
+   "font": 21,
+   "align": "center"
+  },
+  {
+   "id": "el_03",
+   "x": 328.0,
+   "y": 157.72,
+   "w": 246.0,
+   "font": 21,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 302.4,
+   "y": 78.0,
+   "w": 2.0,
+   "h": 156.0
+  }
+ ]
+}

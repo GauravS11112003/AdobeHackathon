@@ -1,0 +1,84 @@
+{
+ "source": "docs/designer2/src_39_59b26adc1350e8329300d435.json",
+ "target": [
+  1080,
+  1080
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Framed photo; centred stack LIVE / PERFORMANCE / bar / band name in the upper half; address at the photo foot.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 0,
+   "y": 0,
+   "w": 1080.0,
+   "h": 1080.0
+  },
+  {
+   "id": "el_01",
+   "x": 74.52,
+   "y": 74.52,
+   "w": 930.96,
+   "h": 930.96
+  },
+  {
+   "id": "el_02",
+   "x": 119.88,
+   "y": 119.88,
+   "w": 840.24,
+   "h": 840.24,
+   "crop": true
+  },
+  {
+   "id": "el_08",
+   "x": 367.3,
+   "y": 161.89,
+   "w": 345.4,
+   "font": 168,
+   "align": "center",
+   "tracking": 1.0
+  },
+  {
+   "id": "el_07",
+   "x": 244.59,
+   "y": 324.85,
+   "w": 590.82,
+   "font": 77,
+   "align": "center",
+   "tracking": 1.0
+  },
+  {
+   "id": "el_03",
+   "x": 396.5,
+   "y": 411.86,
+   "w": 287.0,
+   "h": 54.6
+  },
+  {
+   "id": "el_06",
+   "in": "el_03",
+   "font": 35,
+   "inset": 8.19
+  },
+  {
+   "id": "el_05",
+   "x": 187.1,
+   "y": 481.86,
+   "w": 705.8,
+   "font": 63,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "x": 161.89,
+   "y": 872.71,
+   "w": 756.22,
+   "font": 31,
+   "align": "center"
+  }
+ ]
+}

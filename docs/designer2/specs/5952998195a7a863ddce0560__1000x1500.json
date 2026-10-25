@@ -1,0 +1,128 @@
+{
+ "source": "docs/designer2/src_04_5952998195a7a863ddce0560.json",
+ "target": [
+  1000,
+  1500
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Three editorial blocks on the quiet grey: date + FRIDAY with its rule, LIVE / PERFORMANCE / DON'T MISS IT as the focal stack, venue + band right-aligned; four little icons scattered in the air between.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "cover": true
+  },
+  {
+   "id": "el_13",
+   "x": 80.0,
+   "y": 139.65,
+   "w": 405.1,
+   "font": 66,
+   "align": "left"
+  },
+  {
+   "id": "el_15",
+   "x": 175.15,
+   "y": 166.05,
+   "w": 15.84,
+   "h": 15.84
+  },
+  {
+   "id": "el_14",
+   "x": 305.62,
+   "y": 166.05,
+   "w": 15.84,
+   "h": 15.84
+  },
+  {
+   "id": "el_12",
+   "x": 80.0,
+   "y": 236.53,
+   "w": 425.75,
+   "font": 104,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 80.0,
+   "y": 384.13,
+   "w": 83.2,
+   "h": 12.48
+  },
+  {
+   "id": "el_11",
+   "x": 80.0,
+   "y": 516.61,
+   "w": 465.49,
+   "font": 190,
+   "align": "left"
+  },
+  {
+   "id": "el_10",
+   "x": 80.0,
+   "y": 752.31,
+   "w": 742.46,
+   "font": 93,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 80.0,
+   "y": 882.85,
+   "w": 407.41,
+   "font": 50,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "x": 321.1,
+   "y": 1068.85,
+   "w": 598.9,
+   "font": 53,
+   "align": "right"
+  },
+  {
+   "id": "el_07",
+   "x": 321.1,
+   "y": 1235.68,
+   "w": 598.9,
+   "font": 47,
+   "align": "right"
+  },
+  {
+   "id": "el_06",
+   "x": 552.18,
+   "y": 490.11,
+   "w": 106.62,
+   "h": 110.0
+  },
+  {
+   "id": "el_05",
+   "x": 815.03,
+   "y": 571.65,
+   "w": 60.92,
+   "h": 60.92
+  },
+  {
+   "id": "el_04",
+   "x": 833.54,
+   "y": 823.89,
+   "w": 77.85,
+   "h": 60.92
+  },
+  {
+   "id": "el_03",
+   "x": 725.85,
+   "y": 599.69,
+   "w": 108.31,
+   "h": 99.85
+  }
+ ]
+}

@@ -1,0 +1,107 @@
+{
+ "source": "docs/designer2/src_38_5888ce7495a7a863ddcc2449.json",
+ "target": [
+  1240,
+  1754
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Navy header with photo/date/time; headline on a yellow band; donation sticker + white charity panel; navy corner block.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 0,
+   "y": 0,
+   "w": 1240.0,
+   "h": 948.14
+  },
+  {
+   "id": "el_02",
+   "x": 91.76,
+   "y": 89.21,
+   "w": 1148.24,
+   "h": 867.7,
+   "crop": true
+  },
+  {
+   "id": "el_12",
+   "x": 640.97,
+   "y": 8.55,
+   "w": 496.59,
+   "font": 57,
+   "align": "right"
+  },
+  {
+   "id": "el_06",
+   "x": 608.47,
+   "y": 107.73,
+   "w": 631.53,
+   "h": 74.1
+  },
+  {
+   "id": "el_11",
+   "in": "el_06",
+   "font": 57,
+   "inset": 11.12,
+   "align": "right"
+  },
+  {
+   "id": "el_10",
+   "x": 74.4,
+   "y": 928.85,
+   "w": 1066.4,
+   "font": 138,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 0,
+   "y": 946.79,
+   "w": 1124.68,
+   "h": 91.08
+  },
+  {
+   "id": "el_03",
+   "x": 553.04,
+   "y": 1299.49,
+   "w": 686.96,
+   "h": 454.51
+  },
+  {
+   "id": "el_08",
+   "x": 482.36,
+   "y": 1355.62,
+   "w": 540.64,
+   "font": 53,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 75.64,
+   "y": 1376.67,
+   "w": 297.6,
+   "h": 290.76
+  },
+  {
+   "id": "el_09",
+   "in": "el_04",
+   "font": 34,
+   "inset": 23.81,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 1054.0,
+   "y": 1582.88,
+   "w": 186.0,
+   "h": 171.12
+  }
+ ]
+}

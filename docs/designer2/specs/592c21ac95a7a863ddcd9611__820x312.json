@@ -1,0 +1,104 @@
+{
+ "source": "docs/designer2/src_29_592c21ac95a7a863ddcd9611.json",
+ "target": [
+  820,
+  312
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "A white card floats on the photo; the message reads as one row SEWING DAY | note | red date tile | studio | address, separated by thin red ticks. Square cards fold it into two rows, tall ones into a column with the ticks laid flat as short rules.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 0.055,
+   "y": 0.25202,
+   "w": 0.89,
+   "h": 0.49596
+  },
+  {
+   "id": "el_09",
+   "cx": 0.16827,
+   "y": 0.36682,
+   "w": 0.16654,
+   "font": 33,
+   "align": "center"
+  },
+  {
+   "id": "el_08",
+   "cx": 0.16827,
+   "y": 0.4861,
+   "w": 0.16654,
+   "font": 38,
+   "align": "center"
+  },
+  {
+   "id": "el_11",
+   "x": 0.27718,
+   "cy": 0.5,
+   "w": 0.00328,
+   "h": 0.09858
+  },
+  {
+   "id": "el_07",
+   "cx": 0.37606,
+   "cy": 0.5,
+   "w": 0.1416,
+   "font": 13,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 0.4725,
+   "y": 0.33057,
+   "w": 0.12893,
+   "h": 0.33885
+  },
+  {
+   "id": "el_06",
+   "x": 0.49829,
+   "y": 0.42545,
+   "w": 0.09799,
+   "font": 29,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 0.49829,
+   "below": "el_06",
+   "gap": 0.00678,
+   "w": 0.09799,
+   "font": 10,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "cx": 0.67745,
+   "cy": 0.5,
+   "w": 0.10076,
+   "font": 20,
+   "align": "center"
+  },
+  {
+   "id": "el_10",
+   "x": 0.75347,
+   "cy": 0.5,
+   "w": 0.00328,
+   "h": 0.09858
+  },
+  {
+   "id": "el_03",
+   "cx": 0.84827,
+   "cy": 0.5,
+   "w": 0.13345,
+   "font": 13,
+   "align": "center"
+  }
+ ]
+}

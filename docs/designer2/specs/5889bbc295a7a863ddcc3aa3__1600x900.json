@@ -1,0 +1,127 @@
+{
+ "source": "docs/designer2/src_13_5889bbc295a7a863ddcc3aa3.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "16:9 / banner as the source: grey sheet, typographic stack left (sizes 1 : 0.8 : 0.41), red square with the bottle hero right, the two bars run off the edges at the foot, author above them.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 32.0,
+   "y": 32.0,
+   "w": 1536.0,
+   "h": 836.0
+  },
+  {
+   "id": "el_03",
+   "x": 0.0,
+   "y": 788.0,
+   "w": 832.0,
+   "h": 48.0
+  },
+  {
+   "id": "el_02",
+   "x": 1328.0,
+   "y": 788.0,
+   "w": 272.0,
+   "h": 48.0
+  },
+  {
+   "id": "el_14",
+   "x": 72.0,
+   "y": 257.9,
+   "w": 723.8,
+   "font": 82,
+   "align": "left"
+  },
+  {
+   "id": "el_13",
+   "x": 72.0,
+   "y": 376.4,
+   "w": 723.8,
+   "font": 65,
+   "align": "left"
+  },
+  {
+   "id": "el_12",
+   "x": 72.0,
+   "y": 474.3,
+   "w": 723.8,
+   "font": 33,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 1005.7,
+   "y": 238.8,
+   "w": 354.2,
+   "h": 354.2
+  },
+  {
+   "id": "el_01",
+   "x": 1111.7,
+   "y": 68.0,
+   "h": 498.6
+  },
+  {
+   "id": "el_04",
+   "x": 843.8,
+   "y": 352.0,
+   "h": 328.0
+  },
+  {
+   "id": "el_06",
+   "x": 968.4,
+   "y": 492.7,
+   "w": 162.0,
+   "h": 162.0
+  },
+  {
+   "id": "el_10",
+   "x": 64.0,
+   "y": 64.0,
+   "w": 30.3,
+   "h": 8.8
+  },
+  {
+   "id": "el_09",
+   "x": 94.3,
+   "y": 64.0,
+   "w": 8.8,
+   "h": 8.8
+  },
+  {
+   "id": "el_07",
+   "line_of": "el_12",
+   "line": 2,
+   "line_pos": 0.44,
+   "x_after_line": 20.5,
+   "w": 8.8,
+   "h": 8.8,
+   "y": 0
+  },
+  {
+   "id": "el_08",
+   "right_of": "el_07",
+   "gap": 0,
+   "cy_at": "el_07",
+   "w": 30.3,
+   "h": 8.8,
+   "y": 0
+  },
+  {
+   "id": "el_11",
+   "x": 1270.9,
+   "y": 744.4,
+   "w": 169.1,
+   "font": 22,
+   "align": "left"
+  }
+ ]
+}

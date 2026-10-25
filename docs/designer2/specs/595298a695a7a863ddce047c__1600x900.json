@@ -1,0 +1,88 @@
+{
+ "source": "docs/designer2/src_30_595298a695a7a863ddce047c.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Centred logo above a left-aligned type column: headline, blue bar line, red live-music line with its leading rule, address with its trailing rule, reservation note centred at the foot. Wide canvases put the logo left and the column right; banners read logo | headline | details | note.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "cx": 0.27,
+   "cy": 0.5,
+   "w": 0.42,
+   "h": 0.32719
+  },
+  {
+   "id": "el_08",
+   "x": 0.5,
+   "y": 0.14273,
+   "w": 0.46,
+   "font": 66,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 0.5,
+   "below": "el_08",
+   "gap": 0.01056,
+   "w": 0.46,
+   "font": 68,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "x": 0.61028,
+   "below": "el_07",
+   "gap": 0.0088,
+   "w": 0.34972,
+   "font": 50,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 0.5,
+   "line_of": "el_06",
+   "line": 1,
+   "line_pos": 0.6,
+   "w": 0.09453,
+   "h": 0.01128
+  },
+  {
+   "id": "el_05",
+   "x": 0.5,
+   "below": "el_06",
+   "gap": 0.0132,
+   "w": 0.46,
+   "font": 52,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 0.74101,
+   "line_of": "el_05",
+   "line": 1,
+   "line_pos": 0.6,
+   "w": 0.13753,
+   "h": 0.01128
+  },
+  {
+   "id": "el_04",
+   "x": 0.5,
+   "below": "el_05",
+   "gap": 0.1056,
+   "w": 0.46,
+   "font": 35,
+   "align": "center"
+  }
+ ]
+}

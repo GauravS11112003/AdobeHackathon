@@ -1,0 +1,51 @@
+{
+ "source": "docs/designer2/src_11_593011fc95a7a863ddcdbf9a.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Skyscraper: cluster on top, quote in several centred lines below.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_02",
+   "x": 23.4,
+   "y": 189.4,
+   "h": 132.0
+  },
+  {
+   "id": "el_03",
+   "x": 33.1,
+   "y": 193.0,
+   "h": 104.2
+  },
+  {
+   "id": "el_05",
+   "x": 17.5,
+   "y": 189.6,
+   "h": 85.3
+  },
+  {
+   "id": "el_04",
+   "x": 8.0,
+   "y": 256.3,
+   "h": 70.5
+  },
+  {
+   "id": "el_01",
+   "x": 9.6,
+   "y": 350.8,
+   "w": 140.8,
+   "font": 17,
+   "align": "center"
+  }
+ ]
+}

@@ -1,0 +1,74 @@
+{
+ "source": "docs/designer2/src_40_5e8596d64b3890eb078227f9.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Yellow hashtag band; 6 SYMPTOMS headline; bottle bottom-left, symptom list + advice in the right column.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 0,
+   "y": 0,
+   "w": 1600.0,
+   "h": 900.0
+  },
+  {
+   "id": "el_03",
+   "x": 0,
+   "y": 0,
+   "w": 1600.0,
+   "h": 99.0
+  },
+  {
+   "id": "el_07",
+   "in": "el_03",
+   "font": 36,
+   "inset": 19.8,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 96.0,
+   "y": 144.0,
+   "w": 593.07,
+   "font": 94,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 896.0,
+   "y": 313.6,
+   "w": 480.0,
+   "font": 40,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "x": 896.0,
+   "y": 696.8,
+   "w": 480.0,
+   "font": 34,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 720.0,
+   "y": 497.6,
+   "w": 40.0,
+   "h": 52.0
+  },
+  {
+   "id": "el_01",
+   "x": 64.0,
+   "y": 295.6,
+   "w": 724.27,
+   "h": 604.4
+  }
+ ]
+}

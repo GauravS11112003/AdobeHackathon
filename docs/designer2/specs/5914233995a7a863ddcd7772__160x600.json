@@ -1,0 +1,149 @@
+{
+ "source": "docs/designer2/src_25_5914233995a7a863ddcd7772.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Photo band with the yellow address square; KENNER sits yellow on the band's foot, BAPTIST CHURCH under it; contact block top-right with its rule, invitation bottom-left with its rule; grey photo tiles as corner counterweights.",
+ "place": [
+  {
+   "id": "el_01",
+   "x": 0.05,
+   "y": 0.01333,
+   "w": 0.325,
+   "h": 0.07422
+  },
+  {
+   "id": "el_17",
+   "x": 0.4375,
+   "y": 0.01667,
+   "w": 0.30379,
+   "font": 9,
+   "align": "left"
+  },
+  {
+   "id": "el_16",
+   "x": 0.4375,
+   "y": 0.04146,
+   "w": 0.30379,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_15",
+   "x": 0.4375,
+   "y": 0.06148,
+   "w": 0.30379,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_14",
+   "x": 0.4375,
+   "y": 0.08154,
+   "w": 0.30379,
+   "font": 5,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 0.9375,
+   "y": 0.01833,
+   "w": 0.0125,
+   "h": 0.0735
+  },
+  {
+   "id": "el_03",
+   "x": 0.0,
+   "y": 0.11683,
+   "w": 1.0,
+   "h": 0.43667
+  },
+  {
+   "id": "el_06",
+   "x": 0.05,
+   "y": 0.14016,
+   "w": 0.3125,
+   "h": 0.08333
+  },
+  {
+   "id": "el_13",
+   "in": "el_06",
+   "inset": 0.025,
+   "font": 6,
+   "fit": true
+  },
+  {
+   "id": "el_04",
+   "x": 0.80312,
+   "y": 0.41333,
+   "w": 0.14688,
+   "h": 0.0375
+  },
+  {
+   "id": "el_05",
+   "x": 0.38438,
+   "y": 0.41333,
+   "w": 0.4125,
+   "h": 0.0375
+  },
+  {
+   "id": "el_10",
+   "in": "el_05",
+   "font": 7,
+   "inset": 0.01687
+  },
+  {
+   "id": "el_09",
+   "in": "el_04",
+   "font": 7,
+   "inset": 0.01687
+  },
+  {
+   "id": "el_12",
+   "x": 0.05,
+   "y": 0.46416,
+   "w": 0.86119,
+   "font": 34,
+   "align": "left"
+  },
+  {
+   "id": "el_11",
+   "x": 0.05,
+   "below": "el_03",
+   "gap": 0.00667,
+   "w": 0.9,
+   "font": 22,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "x": 0.1375,
+   "anchor_y": "bottom",
+   "margin_y": 0.02333,
+   "w": 0.525,
+   "font": 9,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 0.05,
+   "top_at": "el_08",
+   "dy": 0.00688,
+   "w": 0.0125,
+   "h": 0.09133
+  },
+  {
+   "id": "el_00",
+   "x": 0.725,
+   "bottom_at": "el_08",
+   "w": 0.225,
+   "h": 0.08411
+  }
+ ]
+}

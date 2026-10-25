@@ -1,0 +1,88 @@
+{
+ "source": "docs/designer2/src_34_5ea00c67499b85dcc778413e.json",
+ "target": [
+  1240,
+  1754
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Type column (hanging date tile, COLD PROCESS, SOAP/Making lockup, workshop line) beside a two-photo collage.",
+ "place": [
+  {
+   "id": "el_05",
+   "x": 152.84,
+   "y": -50.42,
+   "w": 235.6,
+   "h": 235.6
+  },
+  {
+   "id": "el_07",
+   "x": 235.2,
+   "y": 68.56,
+   "w": 70.88,
+   "font": 68,
+   "align": "center"
+  },
+  {
+   "id": "el_06",
+   "x": 238.24,
+   "y": 133.35,
+   "w": 64.8,
+   "font": 27,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 99.2,
+   "y": 290.42,
+   "w": 774.71,
+   "font": 298,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 152.84,
+   "y": 230.66,
+   "w": 316.35,
+   "font": 37,
+   "align": "left"
+  },
+  {
+   "id": "el_01",
+   "x": 105.16,
+   "y": 573.52,
+   "w": 565.55,
+   "font": 157,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 108.14,
+   "y": 752.5,
+   "w": 415.18,
+   "font": 37,
+   "align": "left"
+  },
+  {
+   "id": "el_00",
+   "x": 173.6,
+   "y": 894.0,
+   "w": 1066.4,
+   "h": 860.0,
+   "crop": true,
+   "rotation": 0
+  },
+  {
+   "id": "el_08",
+   "x": 66.96,
+   "y": 980.0,
+   "w": 1002.42,
+   "h": 774.0,
+   "crop": true,
+   "rotation": 0
+  }
+ ]
+}

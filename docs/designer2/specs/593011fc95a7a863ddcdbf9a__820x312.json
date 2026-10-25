@@ -1,0 +1,51 @@
+{
+ "source": "docs/designer2/src_11_593011fc95a7a863ddcdbf9a.json",
+ "target": [
+  820,
+  312
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Banner: cluster at the left, quote in 2-3 centred lines on the right.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_02",
+   "x": 73.1,
+   "y": 12.5,
+   "h": 275.9
+  },
+  {
+   "id": "el_03",
+   "x": 93.3,
+   "y": 19.9,
+   "h": 217.8
+  },
+  {
+   "id": "el_05",
+   "x": 60.9,
+   "y": 12.8,
+   "h": 178.3
+  },
+  {
+   "id": "el_04",
+   "x": 41.0,
+   "y": 152.3,
+   "h": 147.2
+  },
+  {
+   "id": "el_01",
+   "x": 382.9,
+   "y": 71.7,
+   "w": 387.9,
+   "font": 49,
+   "align": "center"
+  }
+ ]
+}

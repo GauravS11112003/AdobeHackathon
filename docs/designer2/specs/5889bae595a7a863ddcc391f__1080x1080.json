@@ -1,0 +1,91 @@
+{
+ "source": "docs/designer2/src_12_5889bae595a7a863ddcc391f.json",
+ "target": [
+  1080,
+  1080
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Red card inset on the gradient; bold quote centred in four lines, author + underline below; yellow squares pinned on the card's left and right edges, red rules reaching in from the canvas edges.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 100.4,
+   "y": 99.4,
+   "w": 879.1,
+   "h": 881.3
+  },
+  {
+   "id": "el_10",
+   "x": 223.5,
+   "y": 307.1,
+   "w": 633.0,
+   "font": 78,
+   "align": "center"
+  },
+  {
+   "id": "el_09",
+   "x": 397.6,
+   "y": 717.1,
+   "w": 284.9,
+   "font": 34,
+   "align": "center"
+  },
+  {
+   "id": "el_08",
+   "x": 410.8,
+   "y": 765.7,
+   "w": 258.4,
+   "h": 6.2
+  },
+  {
+   "id": "el_02",
+   "x": 53.4,
+   "y": 175.7,
+   "w": 94.1,
+   "h": 94.1
+  },
+  {
+   "id": "el_03",
+   "x": 932.5,
+   "y": 783.8,
+   "w": 94.1,
+   "h": 94.1
+  },
+  {
+   "id": "el_06",
+   "x": 45.9,
+   "y": 220.9,
+   "w": 54.6,
+   "h": 3.8
+  },
+  {
+   "id": "el_07",
+   "x": 979.6,
+   "y": 828.9,
+   "w": 54.6,
+   "h": 3.8
+  },
+  {
+   "id": "el_05",
+   "x": 0.0,
+   "y": 550.8,
+   "w": 188.4,
+   "h": 13.0
+  },
+  {
+   "id": "el_04",
+   "x": 891.6,
+   "y": 516.2,
+   "w": 188.4,
+   "h": 13.0
+  }
+ ]
+}

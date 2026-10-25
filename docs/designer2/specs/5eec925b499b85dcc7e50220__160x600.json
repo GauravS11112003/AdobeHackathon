@@ -1,0 +1,60 @@
+{
+ "source": "docs/designer2/src_03_5eec925b499b85dcc7e50220.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Rust panel (right third on wide, bottom band on tall) carries the serif wordmark with the italic tagline on two lines, flanked by hairlines; the photo keeps the rest.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 0,
+   "y": 360.0,
+   "w": 160.0,
+   "h": 240.0
+  },
+  {
+   "id": "el_04",
+   "x": 21.35,
+   "y": 449.36,
+   "w": 119.3,
+   "font": 23,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 54.38,
+   "y": 483.56,
+   "w": 51.25,
+   "font": 11,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 24.87,
+   "w": 8.21,
+   "h": 1.5,
+   "line_of": "el_05",
+   "line": 1,
+   "line_pos": 0.62
+  },
+  {
+   "id": "el_03",
+   "x": 126.92,
+   "w": 8.21,
+   "h": 1.5,
+   "line_of": "el_05",
+   "line": 1,
+   "line_pos": 0.62
+  }
+ ]
+}

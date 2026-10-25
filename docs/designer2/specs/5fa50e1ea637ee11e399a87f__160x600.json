@@ -1,0 +1,70 @@
+{
+ "source": "docs/designer2/src_26_5fa50e1ea637ee11e399a87f.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Dark field, the bottle as the stage: SALE / BLACK FRIDAY / 50% locked over it as one centred type stack; the swipe-up chip and label sit at the foot (beside the stack on wide canvases).",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_05",
+   "cx": 0.5,
+   "y": 0.05667,
+   "w": 0.9,
+   "font": 56,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "cx": 0.5,
+   "below": "el_05",
+   "gap": 0.01333,
+   "w": 0.9,
+   "font": 24,
+   "align": "center"
+  },
+  {
+   "id": "el_06",
+   "cx": 0.5,
+   "below": "el_04",
+   "gap": 0.01667,
+   "w": 0.9,
+   "font": 60,
+   "align": "center"
+  },
+  {
+   "id": "el_01",
+   "cx": 0.5,
+   "below": "el_06",
+   "gap": 0.01,
+   "w": 0.9,
+   "h": 0.25052
+  },
+  {
+   "id": "el_03",
+   "cx": 0.5,
+   "anchor_y": "bottom",
+   "margin_y": 0.03667,
+   "w": 0.9,
+   "font": 9,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "cx": 0.5,
+   "above": "el_03",
+   "gap": 0.01,
+   "w": 0.08812,
+   "h": 0.0135
+  }
+ ]
+}

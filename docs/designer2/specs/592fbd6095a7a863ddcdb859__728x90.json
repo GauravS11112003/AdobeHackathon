@@ -1,0 +1,63 @@
+{
+ "source": "docs/designer2/src_09_592fbd6095a7a863ddcdb859.json",
+ "target": [
+  728,
+  90
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Leaderboard: gradient left, dark-red band right carrying the quote (3 lines) with the author beside it; corner squares as in the source.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 291.2,
+   "y": 0.0,
+   "w": 407.7,
+   "h": 90.0
+  },
+  {
+   "id": "el_06",
+   "x": 305.2,
+   "y": 9.8,
+   "w": 137.0,
+   "font": 14,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 460.2,
+   "y": 33.7,
+   "w": 52.5,
+   "font": 9,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 460.2,
+   "y": 50.3,
+   "w": 9.5,
+   "h": 1.5
+  },
+  {
+   "id": "el_04",
+   "x": 299.2,
+   "y": 7.0,
+   "w": 12.6,
+   "h": 9.8
+  },
+  {
+   "id": "el_03",
+   "x": 678.3,
+   "y": 73.2,
+   "w": 12.6,
+   "h": 9.8
+  }
+ ]
+}

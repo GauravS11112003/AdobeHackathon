@@ -1,0 +1,112 @@
+{
+ "source": "docs/designer2/src_27_5d4ab742cf657b21ef933c97.json",
+ "target": [
+  728,
+  90
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "A navy ribbon with a translucent orange halo runs top to bottom through the photo; the whole message is one centred column on it: mark, JACINDA, Accessories, SALE, 'Special on' between its ticks, the month, the URL. On the leaderboard the ribbon lies flat and the column becomes a row.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 0.43819,
+   "y": -319.0,
+   "w": 0.12363,
+   "h": 728
+  },
+  {
+   "id": "el_01",
+   "cx": 0.5,
+   "y": 0.0,
+   "w": 0.8,
+   "h": 1.0
+  },
+  {
+   "id": "el_02",
+   "cx": 0.5,
+   "y": 0.0,
+   "w": 0.72,
+   "h": 1.0
+  },
+  {
+   "id": "el_09",
+   "cx": 0.26476,
+   "y": 0.30667,
+   "w": 0.01923,
+   "h": 0.21111
+  },
+  {
+   "id": "el_07",
+   "cx": 0.26476,
+   "below": "el_09",
+   "gap": 0.04444,
+   "w": 0.04961,
+   "font": 7,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "cx": 0.39048,
+   "y": 0.09689,
+   "w": 0.1304,
+   "font": 14,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "cx": 0.39048,
+   "below": "el_05",
+   "gap": 0.0,
+   "w": 0.1304,
+   "font": 38,
+   "align": "center"
+  },
+  {
+   "id": "el_08",
+   "cx": 0.55382,
+   "y": 0.28167,
+   "w": 0.12484,
+   "font": 7,
+   "align": "center"
+  },
+  {
+   "id": "el_11",
+   "x": 0.50358,
+   "line_of": "el_08",
+   "line": 1,
+   "line_pos": 0.56,
+   "w": 0.01648,
+   "h": 0.01333
+  },
+  {
+   "id": "el_10",
+   "x": 0.58757,
+   "line_of": "el_08",
+   "line": 1,
+   "line_pos": 0.56,
+   "w": 0.01648,
+   "h": 0.01333
+  },
+  {
+   "id": "el_03",
+   "cx": 0.55382,
+   "below": "el_08",
+   "gap": 0.03333,
+   "w": 0.12484,
+   "font": 9,
+   "align": "center"
+  },
+  {
+   "id": "el_06",
+   "cx": 0.706,
+   "cy": 0.5,
+   "w": 0.10809,
+   "font": 9,
+   "align": "center"
+  }
+ ]
+}

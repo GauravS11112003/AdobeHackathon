@@ -1,0 +1,144 @@
+{
+ "source": "docs/designer2/src_10_5f34ddbfa637ee11e32f6bf0.json",
+ "target": [
+  728,
+  90
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Leaderboard: tabs flush left with salutation, body (tight leading) and sign-off; letterhead at right: title + date/signature lines, FROM/TO blocks under.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 3.0,
+   "y": 3.0,
+   "w": 722.0,
+   "h": 84.0
+  },
+  {
+   "id": "el_12",
+   "x": 1.5,
+   "y": 6.4,
+   "w": 14.0,
+   "h": 9.0
+  },
+  {
+   "id": "el_14",
+   "x": 23.0,
+   "y": 5.0,
+   "w": 447.6,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_10",
+   "x": 23.0,
+   "y": 17.8,
+   "w": 447.6,
+   "font": 6,
+   "align": "left",
+   "line_height": 1.1
+  },
+  {
+   "id": "el_13",
+   "x": 1.5,
+   "y": 68.8,
+   "w": 14.0,
+   "h": 9.0
+  },
+  {
+   "id": "el_07",
+   "x": 23.0,
+   "y": 68.8,
+   "w": 447.6,
+   "font": 6,
+   "align": "left",
+   "line_height": 1.0
+  },
+  {
+   "id": "el_02",
+   "x": 482.6,
+   "y": 6.0,
+   "w": 108.3,
+   "font": 18,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 484.6,
+   "y": 28.0,
+   "w": 108.3,
+   "font": 6,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "x": 602.9,
+   "y": 8.0,
+   "w": 22.9,
+   "font": 6,
+   "align": "left"
+  },
+  {
+   "id": "el_15",
+   "x": 629.2,
+   "y": 15.8,
+   "w": 89.8,
+   "h": 1.5
+  },
+  {
+   "id": "el_11",
+   "x": 602.9,
+   "y": 21.4,
+   "w": 43.9,
+   "font": 6,
+   "align": "left"
+  },
+  {
+   "id": "el_16",
+   "x": 650.3,
+   "y": 29.2,
+   "w": 68.7,
+   "h": 1.5
+  },
+  {
+   "id": "el_05",
+   "x": 482.6,
+   "y": 41.9,
+   "w": 25.3,
+   "font": 6,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "x": 510.3,
+   "y": 40.4,
+   "w": 90.6,
+   "font": 6,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 605.5,
+   "y": 41.9,
+   "w": 15.0,
+   "font": 6,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 622.8,
+   "y": 40.4,
+   "w": 96.2,
+   "font": 6,
+   "align": "left"
+  }
+ ]
+}

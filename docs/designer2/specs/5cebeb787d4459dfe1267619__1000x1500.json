@@ -1,0 +1,99 @@
+{
+ "source": "docs/designer2/src_08_5cebeb787d4459dfe1267619.json",
+ "target": [
+  1000,
+  1500
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Red / blue / yellow bands; portrait hero with bottles straddling its sides; two-line headline sits across the hero's top (yellow on blue, white on the photo) under its small subline; CTA with icon on yellow; brand lockups as furniture top-left and bottom-right.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 0,
+   "y": 195.0,
+   "w": 1000.0,
+   "h": 1305.0
+  },
+  {
+   "id": "el_02",
+   "x": 0,
+   "y": 941.1,
+   "w": 1000.0,
+   "h": 558.9
+  },
+  {
+   "id": "el_03",
+   "x": 0,
+   "y": 35.31,
+   "w": 750.0,
+   "h": 124.38
+  },
+  {
+   "id": "el_04",
+   "x": 224.35,
+   "y": 495.4,
+   "w": 551.3,
+   "h": 685.7
+  },
+  {
+   "id": "el_05",
+   "x": 430.0,
+   "y": 1299.5,
+   "w": 550.0,
+   "h": 170.5
+  },
+  {
+   "id": "el_06",
+   "x": 161.35,
+   "y": 573.34,
+   "w": 140.0,
+   "h": 599.13
+  },
+  {
+   "id": "el_07",
+   "x": 684.65,
+   "y": 594.9,
+   "w": 182.0,
+   "h": 598.0
+  },
+  {
+   "id": "el_08",
+   "x": 467.5,
+   "y": 1148.6,
+   "w": 65.0,
+   "h": 65.0
+  },
+  {
+   "id": "el_11",
+   "x": 409.1,
+   "y": 1231.6,
+   "w": 181.8,
+   "font": 31,
+   "align": "center"
+  },
+  {
+   "id": "el_09",
+   "x": 187.89,
+   "y": 232.5,
+   "w": 624.22,
+   "font": 36,
+   "align": "center"
+  },
+  {
+   "id": "el_10",
+   "x": 148.5,
+   "y": 314.9,
+   "w": 703.0,
+   "font": 190,
+   "align": "center"
+  }
+ ]
+}

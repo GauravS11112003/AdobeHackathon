@@ -1,0 +1,81 @@
+{
+ "source": "docs/designer2/src_02_59525fbb95a7a863ddcde543.json",
+ "target": [
+  728,
+  90
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "White card on the gradient; centred editorial stack (foundation, headline, address, grey divider, date, subhead, venue); two columns when the card is wide.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 6.0,
+   "y": 6.0,
+   "w": 716.0,
+   "h": 78.0
+  },
+  {
+   "id": "el_08",
+   "x": 20.32,
+   "y": 21.3,
+   "w": 143.2,
+   "font": 7,
+   "align": "center"
+  },
+  {
+   "id": "el_06",
+   "x": 20.32,
+   "y": 39.1,
+   "w": 143.2,
+   "font": 7,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "x": 20.32,
+   "y": 56.9,
+   "w": 143.2,
+   "font": 7,
+   "align": "center"
+  },
+  {
+   "id": "el_07",
+   "x": 177.84,
+   "y": 9.63,
+   "w": 186.16,
+   "font": 14,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "x": 378.32,
+   "y": 20.05,
+   "w": 186.16,
+   "font": 10,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 621.76,
+   "y": 32.1,
+   "w": 57.28,
+   "h": 6.0
+  },
+  {
+   "id": "el_03",
+   "x": 578.8,
+   "y": 46.1,
+   "w": 143.2,
+   "font": 7,
+   "align": "center"
+  }
+ ]
+}
