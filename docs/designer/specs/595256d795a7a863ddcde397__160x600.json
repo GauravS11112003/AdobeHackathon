@@ -1,0 +1,111 @@
+{
+ "source": "docs/designer/src_19_595256d795a7a863ddcde397.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "White editorial poster; teal enters from the edges (tab beside the headline, bar beside the footer). Focal block: a 2x2 checkerboard of photo tiles and teal quote panels (hidden photos stay under their panels), the brand lockup under it, website at the foot. Wide: headline column left, checkerboard right; 4:1 banners: a strip of four tiles; square: header across, grid left, lockup right.",
+ "place": [
+  {
+   "id": "el_05",
+   "x": 0,
+   "y": 52.44,
+   "w": 40,
+   "h": 10
+  },
+  {
+   "id": "el_10",
+   "x": 8.0,
+   "y": 70.44,
+   "w": 144.0,
+   "font": 13,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 8.0,
+   "y": 120.54,
+   "w": 144.0,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_12",
+   "x": 8.0,
+   "y": 210.09,
+   "w": 68.0,
+   "h": 68.0,
+   "fit_box": true
+  },
+  {
+   "id": "el_03",
+   "x": 84.0,
+   "y": 210.09,
+   "w": 68.0,
+   "h": 68.0
+  },
+  {
+   "id": "el_02",
+   "in": "el_03"
+  },
+  {
+   "id": "el_08",
+   "in": "el_03",
+   "font": 7,
+   "inset": 4.76,
+   "align": "center"
+  },
+  {
+   "id": "el_01",
+   "x": 8.0,
+   "y": 286.09,
+   "w": 68.0,
+   "h": 68.0
+  },
+  {
+   "id": "el_00",
+   "in": "el_01"
+  },
+  {
+   "id": "el_07",
+   "in": "el_01",
+   "font": 7,
+   "inset": 4.76,
+   "align": "center"
+  },
+  {
+   "id": "el_11",
+   "x": 84.0,
+   "y": 286.09,
+   "w": 68.0,
+   "h": 68.0,
+   "fit_box": true
+  },
+  {
+   "id": "el_13",
+   "x": 28.16,
+   "y": 424.83,
+   "w": 103.68
+  },
+  {
+   "id": "el_06",
+   "x": 8.0,
+   "y": 546.3,
+   "w": 99.7,
+   "font": 6,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 120.0,
+   "y": 565.7,
+   "w": 40.0,
+   "h": 4.8
+  }
+ ],
+ "target": [
+  160,
+  600
+ ]
+}

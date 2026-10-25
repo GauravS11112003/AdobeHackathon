@@ -1,0 +1,65 @@
+{
+ "source": "docs/designer/src_20_59b27ce91350e8329300d847.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Dark stage: the hero bottle on the left on the centre line, a left-aligned message column on the right (headline, pink question, bold answer, details, link) sized by the column width; tall formats stack the hero above the column; banners centre the hero + column group; the leaderboard runs the texts as three small columns after the hero.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 77.0,
+   "y": 201.6,
+   "h": 316.8
+  },
+  {
+   "id": "el_06",
+   "x": 473.3,
+   "y": 108.02,
+   "w": 751.07,
+   "font": 69,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 473.3,
+   "y": 295.63,
+   "w": 755.7,
+   "font": 31,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 473.3,
+   "y": 429.23,
+   "w": 755.7,
+   "font": 35,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 473.3,
+   "y": 504.38,
+   "w": 755.7,
+   "font": 20,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 473.3,
+   "y": 580.58,
+   "w": 755.7,
+   "font": 21,
+   "align": "left"
+  }
+ ],
+ "target": [
+  1280,
+  720
+ ]
+}

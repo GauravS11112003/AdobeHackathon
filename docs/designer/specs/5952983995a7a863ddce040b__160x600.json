@@ -1,0 +1,96 @@
+{
+ "source": "docs/designer/src_18_5952983995a7a863ddce040b.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "A green spine carries the whole message over the photo: kicker above a white rule, BBQ / PARTY as the focal pair, the address running vertically down the spine, a second rule, 3PM / SATURDAY at the foot. The spine hugs the left edge and scales with the canvas height (full width on the skyscraper); on 4:1 banners it turns into a horizontal band whose rules become dividers and the address reads horizontally.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 0.0,
+   "y": 36.0,
+   "w": 160.0,
+   "h": 528.0
+  },
+  {
+   "id": "el_03",
+   "x": 0.0,
+   "y": 84.05,
+   "w": 160.0,
+   "h": 9
+  },
+  {
+   "id": "el_10",
+   "x": 16.0,
+   "y": 53.68,
+   "w": 128.0,
+   "font": 18,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 16.0,
+   "y": 110.45,
+   "w": 128.0,
+   "font": 67,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "x": 16.0,
+   "y": 206.92,
+   "w": 128.0,
+   "font": 40,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 32.0,
+   "y": 468.24,
+   "w": 128.0,
+   "font": 41,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 32.0,
+   "y": 527.64,
+   "w": 128.0,
+   "font": 17,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 0.0,
+   "y": 440.76,
+   "w": 160.0,
+   "h": 9
+  },
+  {
+   "id": "el_07",
+   "cx": 92.0,
+   "cy": 352.84,
+   "w": 130.62,
+   "font": 10,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "cx": 68.0,
+   "cy": 352.84,
+   "w": 135.68,
+   "font": 10,
+   "align": "left"
+  }
+ ],
+ "target": [
+  160,
+  600
+ ]
+}

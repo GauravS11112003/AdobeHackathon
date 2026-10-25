@@ -1,0 +1,98 @@
+{
+ "source": "docs/designer/src_02_level2_core.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.06,
+  "gutter": 0.02
+ },
+ "concept": "Product poster: the bottle is the focal point above a centred stack headline / subhead / CTA pill; badge pinned top-left, logo top-centre, the two circles keep their corners. 16:9 splits into bottle-left and a left-aligned text column; 4:1 banners run logo | bottle | chip-over-headline | CTA.",
+ "place": [
+  {
+   "id": "bg",
+   "cover": true
+  },
+  {
+   "id": "deco_circle_1",
+   "corner": "top-left"
+  },
+  {
+   "id": "deco_circle_2",
+   "corner": "bottom-right"
+  },
+  {
+   "id": "logo",
+   "col": [
+    1,
+    1
+   ],
+   "cy": 0.5,
+   "w": 0.1
+  },
+  {
+   "id": "product",
+   "col": [
+    2,
+    3
+   ],
+   "y": 0.1,
+   "h": 0.8,
+   "fit_box": true
+  },
+  {
+   "id": "badge_bg",
+   "col": [
+    4,
+    4
+   ],
+   "w": 0.1,
+   "y": 0.26,
+   "h": 0.1
+  },
+  {
+   "id": "badge_label",
+   "in": "badge_bg",
+   "font": 15,
+   "inset": 0.01
+  },
+  {
+   "id": "headline",
+   "col": [
+    4,
+    9
+   ],
+   "below": "badge_bg",
+   "gap": 0.04,
+   "font": 52,
+   "align": "left"
+  },
+  {
+   "id": "subhead",
+   "col": [
+    4,
+    9
+   ],
+   "below": "headline",
+   "gap": 0.025,
+   "font": 21,
+   "align": "left"
+  },
+  {
+   "id": "cta_bg",
+   "col": [
+    10,
+    12
+   ],
+   "cy": 0.5,
+   "h": 0.2
+  },
+  {
+   "id": "cta_label",
+   "in": "cta_bg",
+   "font": 20
+  }
+ ],
+ "target": [
+  1584,
+  396
+ ]
+}

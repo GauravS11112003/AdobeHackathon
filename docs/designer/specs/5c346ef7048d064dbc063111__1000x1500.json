@@ -1,0 +1,60 @@
+{
+ "source": "docs/designer/src_06_5c346ef7048d064dbc063111.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.06
+ },
+ "concept": "Red field with the dark photo set as a panel to the right; eyebrow + two-line serif headline on the left, the headline straddling the photo's edge on square/tall canvases; two white blocks punctuate opposite corners (top-right over the photo corner, bottom-left). Banners keep the text clear of the photo and move the lower block onto the photo's bottom-left corner.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "cover": true
+  },
+  {
+   "id": "el_02",
+   "x": 367.0,
+   "y": 120.0,
+   "w": 590.0,
+   "h": 1305.0
+  },
+  {
+   "id": "el_03",
+   "font": 32.0,
+   "x": 130.0,
+   "y": 517.48,
+   "w": 198.08,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "font": 109.0,
+   "x": 130.0,
+   "below": "el_03",
+   "gap": 10.9,
+   "w": 409.52,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 71.0,
+   "y": 1175.53,
+   "w": 158.0,
+   "h": 249.47
+  },
+  {
+   "id": "el_06",
+   "x": 750.0,
+   "y": 17.08,
+   "w": 250.0,
+   "h": 158.33
+  }
+ ],
+ "target": [
+  1000,
+  1500
+ ]
+}

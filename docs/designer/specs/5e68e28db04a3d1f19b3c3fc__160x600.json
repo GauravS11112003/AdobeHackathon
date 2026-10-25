@@ -1,0 +1,90 @@
+{
+ "source": "docs/designer/src_09_5e68e28db04a3d1f19b3c3fc.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Split: cyan panel with a navy inset carries the type stack (SEO / ЛАЙФХАКИ / URL + rule); a navy bar bridges panel and photo and carries the tagline; the photo fills the rest. Wide: panel left, photo right. Tall: panel top, photo bottom, the bar crosses the seam.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 0,
+   "y": 0,
+   "w": 160.0,
+   "h": 348.0
+  },
+  {
+   "id": "el_03",
+   "x": 0,
+   "y": 20.0,
+   "w": 132.0,
+   "h": 268.0
+  },
+  {
+   "id": "el_09",
+   "x": 14,
+   "y": 83.68,
+   "w": 113.96,
+   "font": 53,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 14,
+   "below": "el_09",
+   "gap": 4,
+   "w": 80.0,
+   "font": 19,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 14,
+   "below": "el_03",
+   "gap": 10,
+   "w": 130.25,
+   "font": 9,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "x": 14,
+   "below": "el_07",
+   "gap": 6,
+   "w": 44,
+   "h": 2
+  },
+  {
+   "id": "el_04",
+   "x": 0,
+   "y": 586.0,
+   "w": 70,
+   "h": 14
+  },
+  {
+   "id": "el_02",
+   "x": 12,
+   "y": 340.0,
+   "w": 144,
+   "h": 57.36
+  },
+  {
+   "id": "el_06",
+   "x": 22.0,
+   "w": 122.0,
+   "cy_at": "el_02",
+   "font": 8,
+   "tracking": 0.6,
+   "align": "left"
+  }
+ ]
+}

@@ -1,0 +1,110 @@
+{
+ "source": "docs/designer/src_05_593112f495a7a863ddcdc5a7.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.06
+ },
+ "concept": "Centred typographic lockup (NATURAL / -skin care- / [] 30% [] / OFF) layered over the hero bottle on the dark field inside a thin white frame, URL as footer; wide canvases put the bottle beside the lockup, the leaderboard flattens it to one row, the skyscraper stacks bottle / lockup / URL.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 12.0,
+   "w": 80.53,
+   "h": 84.6,
+   "fit_box": true,
+   "cy": 45.0
+  },
+  {
+   "id": "el_12",
+   "font": 32.0,
+   "x": 104.53,
+   "y": 2.45,
+   "w": 171.71,
+   "align": "left"
+  },
+  {
+   "id": "el_11",
+   "shadow_of": "el_12",
+   "dx": 2.5,
+   "dy": 2.2
+  },
+  {
+   "id": "el_10",
+   "font": 27.52,
+   "cx_at": "el_12",
+   "y": 49.46,
+   "w": 126.9,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "w": 14,
+   "h": 2,
+   "left_of": "el_10",
+   "gap": 6,
+   "cy_at": "el_10"
+  },
+  {
+   "id": "el_05",
+   "w": 14,
+   "h": 2,
+   "right_of": "el_10",
+   "gap": 6,
+   "cy_at": "el_10"
+  },
+  {
+   "id": "el_03",
+   "x": 300.24,
+   "w": 12,
+   "h": 15,
+   "cy": 49.0
+  },
+  {
+   "id": "el_09",
+   "font": 56.0,
+   "x": 318.24,
+   "y": 7.48,
+   "w": 72.15,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "font": 15.12,
+   "x": 392.39,
+   "y": 30.84,
+   "w": 16.15,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "font": 21.28,
+   "x": 416.54,
+   "y": 44.63,
+   "w": 66.73,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "x": 489.28,
+   "w": 12,
+   "h": 15,
+   "cy": 49.0
+  },
+  {
+   "id": "el_06",
+   "font": 10,
+   "x": 574.97,
+   "y": 38.0,
+   "w": 141.03,
+   "align": "right"
+  }
+ ],
+ "target": [
+  728,
+  90
+ ]
+}

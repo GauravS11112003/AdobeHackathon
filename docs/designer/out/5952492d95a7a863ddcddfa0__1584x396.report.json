@@ -1,0 +1,5 @@
+{
+ "spec": "../docs/designer/specs/5952492d95a7a863ddcddfa0__1584x396.json",
+ "problems": [],
+ "concept": "Typographic quote over a photo: the four fixed lines set the block, the photo sits behind it, white rules run from the text's left edge to the canvas's right edge after lines 1 and 3, accent rules fill the space beside the short lines 2 and 4. Portrait keeps the source's leading and square photo; wide / banner formats tighten the leading and let the photo become a band behind the block."
+}

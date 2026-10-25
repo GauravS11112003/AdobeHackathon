@@ -1,0 +1,60 @@
+{
+ "canvas": {
+  "width": 1600,
+  "height": 900
+ },
+ "elements": [
+  {
+   "id": "bg",
+   "type": "image",
+   "x": 0,
+   "y": 0,
+   "width": 1600.0,
+   "height": 900.0,
+   "z_index": 0,
+   "asset_id": "solstice_bg_gradient.png",
+   "fit": "cover"
+  },
+  {
+   "id": "logo",
+   "type": "image",
+   "x": 624.0,
+   "y": 63.0,
+   "width": 352.0,
+   "height": 110.0,
+   "z_index": 2,
+   "asset_id": "solstice_logo_lockup.png",
+   "fit": "contain"
+  },
+  {
+   "id": "headline",
+   "type": "text",
+   "x": 305.67,
+   "y": 373.4,
+   "width": 988.67,
+   "height": 117.2,
+   "z_index": 2,
+   "content": "Chase the Light",
+   "font_family": "Solstice Serif",
+   "font_size": 90.0,
+   "font_weight": "bold",
+   "color": "rgba(255,255,255,1)",
+   "text_align": "center"
+  },
+  {
+   "id": "cta",
+   "type": "text",
+   "x": 305.67,
+   "y": 522.1,
+   "width": 988.67,
+   "height": 60.8,
+   "z_index": 2,
+   "content": "Shop the Summer Line",
+   "font_family": "Solstice Sans",
+   "font_size": 42.0,
+   "font_weight": "bold",
+   "color": "rgba(232,106,58,1)",
+   "text_align": "center"
+  }
+ ]
+}

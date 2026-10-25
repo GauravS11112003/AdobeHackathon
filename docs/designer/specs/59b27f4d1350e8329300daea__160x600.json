@@ -1,0 +1,71 @@
+{
+ "source": "docs/designer/src_10_59b27f4d1350e8329300daea.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "White mat, gradient card; tracked 'premiere' heads the card, the date sits mid-card, the headline closes it; the grey details rest on the mat under the card. Tall: the card becomes a portrait, the headline wraps to two lines; leaderboard: one row premiere | headline | date inside the card.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_03",
+   "x": 8.0,
+   "y": 8.0,
+   "w": 144.0,
+   "h": 533.6
+  },
+  {
+   "id": "el_06",
+   "cx": 80.0,
+   "y": 28.0,
+   "w": 128.18,
+   "font": 9,
+   "tracking": 0.3,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "cx": 80.0,
+   "cy": 274.8,
+   "w": 57.44,
+   "font": 10,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "cx": 80.0,
+   "y": 480.8,
+   "w": 128.0,
+   "font": 17,
+   "tracking": 0.5,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "cx": 80.0,
+   "y": 553.6,
+   "w": 128.0,
+   "font": 8,
+   "tracking": 0.5,
+   "align": "center"
+  },
+  {
+   "id": "el_01",
+   "cx": 80.0,
+   "below": "el_02",
+   "gap": 4,
+   "w": 108.0,
+   "font": 8,
+   "tracking": 0.5,
+   "align": "center"
+  }
+ ]
+}

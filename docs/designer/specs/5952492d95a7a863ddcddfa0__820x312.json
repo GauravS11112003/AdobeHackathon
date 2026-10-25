@@ -1,0 +1,71 @@
+{
+ "source": "docs/designer/src_04_5952492d95a7a863ddcddfa0.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.06,
+  "gutter": 0.02
+ },
+ "concept": "Typographic quote over a photo: the four fixed lines set the block, the photo sits behind it, white rules run from the text's left edge to the canvas's right edge after lines 1 and 3, accent rules fill the space beside the short lines 2 and 4. Portrait keeps the source's leading and square photo; wide / banner formats tighten the leading and let the photo become a band behind the block.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 41.0,
+   "y": 21.8,
+   "w": 311.6,
+   "h": 268.3
+  },
+  {
+   "id": "el_02",
+   "x": 65.6,
+   "y": 24.4,
+   "w": 754.4,
+   "font": 47,
+   "line_height": 1.4,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "line_of": "el_02",
+   "line": 1,
+   "line_pos": 0.941,
+   "x": 65.6,
+   "to_right_edge": true,
+   "h": 4
+  },
+  {
+   "id": "el_06",
+   "line_of": "el_02",
+   "line": 2,
+   "line_pos": 0.514,
+   "x_after_line": 28,
+   "to_right_edge": true,
+   "h": 4
+  },
+  {
+   "id": "el_04",
+   "line_of": "el_02",
+   "line": 3,
+   "line_pos": 0.941,
+   "x": 65.6,
+   "to_right_edge": true,
+   "h": 4
+  },
+  {
+   "id": "el_03",
+   "line_of": "el_02",
+   "line": 4,
+   "line_pos": 0.514,
+   "x_after_line": 28,
+   "to_right_edge": true,
+   "h": 4
+  }
+ ],
+ "target": [
+  820,
+  312
+ ]
+}

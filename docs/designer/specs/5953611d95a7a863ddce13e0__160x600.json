@@ -1,0 +1,77 @@
+{
+ "source": "docs/designer/src_15_5953611d95a7a863ddce13e0.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Skyscraper: the white card fills the width, text stack centred inside; hairlines become short ticks to the edges.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 12.0,
+   "y": 100.0,
+   "w": 136.0,
+   "h": 400.0
+  },
+  {
+   "id": "el_02",
+   "in": "el_01",
+   "inset": 0.006
+  },
+  {
+   "id": "el_03",
+   "x": 0,
+   "y": 472.0,
+   "w": 14.0,
+   "h": 2
+  },
+  {
+   "id": "el_04",
+   "x": 146.0,
+   "y": 122.4,
+   "w": 14.0,
+   "h": 2
+  },
+  {
+   "id": "el_08",
+   "y": 193.7,
+   "w": 116.0,
+   "font": 14,
+   "align": "center",
+   "cx": 80.0
+  },
+  {
+   "id": "el_07",
+   "y": 267.9,
+   "w": 116.0,
+   "font": 9,
+   "align": "center",
+   "cx": 80.0
+  },
+  {
+   "id": "el_06",
+   "y": 355.8,
+   "w": 116.0,
+   "font": 8,
+   "align": "center",
+   "cx": 80.0
+  },
+  {
+   "id": "el_05",
+   "y": 393.1,
+   "w": 116.0,
+   "font": 8,
+   "align": "center",
+   "cx": 80.0
+  }
+ ]
+}

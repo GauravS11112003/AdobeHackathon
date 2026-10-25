@@ -1,0 +1,77 @@
+{
+ "source": "docs/designer/src_08_58a4091695a7a863ddcc6c53.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.06
+ },
+ "concept": "Typographic stack on one left axis: AWESOME / TEAM / rule-at-rule / WORK, TEAM largest; the Shh! sticker sits above the stack (tall), beside it (landscape/banners); banners fold the stack to two lines and the leaderboard to one line.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_07",
+   "x": 179.44,
+   "y": 96.0,
+   "w": 239.13,
+   "h": 208.0
+  },
+  {
+   "id": "el_08",
+   "in": "el_07",
+   "font": 62.4,
+   "inset": 16.64
+  },
+  {
+   "id": "el_01",
+   "font": 100.0,
+   "x": 498.57,
+   "y": 73.2,
+   "w": 523.0,
+   "align": "left"
+  },
+  {
+   "id": "el_02",
+   "font": 112.0,
+   "x": 498.57,
+   "y": 179.96,
+   "w": 316.14,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "x": 840.71,
+   "w": 80.0,
+   "h": 22.0,
+   "y": 278.57
+  },
+  {
+   "id": "el_04",
+   "font": 31.0,
+   "x": 940.71,
+   "y": 266.63,
+   "w": 40.73,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "x": 997.45,
+   "w": 80.0,
+   "h": 22.0,
+   "y": 278.57
+  },
+  {
+   "id": "el_03",
+   "font": 90.0,
+   "x": 1107.45,
+   "y": 203.5,
+   "w": 317.11,
+   "align": "left"
+  }
+ ],
+ "target": [
+  1600,
+  400
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "source": "docs/designer/src_01_level1_warmup.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.06,
+  "gutter": 0.02
+ },
+ "concept": "Centred typographic lockup: logo at the top, headline just above the optical centre, CTA one headline-gap below; 4:1 banners and the leaderboard become a row logo | headline | CTA; the skyscraper stacks the headline word by word.",
+ "place": [
+  {
+   "id": "bg",
+   "cover": true
+  },
+  {
+   "id": "logo",
+   "w": 0.22,
+   "align_x": "center",
+   "y": 0.07
+  },
+  {
+   "id": "headline",
+   "col": [
+    3,
+    10
+   ],
+   "cy": 0.48,
+   "font": 72,
+   "align": "center"
+  },
+  {
+   "id": "cta",
+   "col": [
+    3,
+    10
+   ],
+   "below": "headline",
+   "gap": 0.035,
+   "font": 34,
+   "align": "center"
+  }
+ ],
+ "target": [
+  1280,
+  720
+ ]
+}

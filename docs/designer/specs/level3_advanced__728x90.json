@@ -1,0 +1,117 @@
+{
+ "source": "docs/designer/src_03_level3_advanced.json",
+ "grid": {
+  "cols": 24,
+  "margin": 0.0,
+  "gutter": 0.0
+ },
+ "concept": "Dense product poster: bottle focal above a centred text block (long headline, subhead), the three badges as one row, CTA pill under them; ribbon pinned top-right; legal along the bottom edge with the watermark in the bottom-right corner. 16:9: bottle left, text column right. 4:1: one row logo | bottle | text column with badge row | CTA.",
+ "place": [
+  {
+   "id": "bg",
+   "cover": true
+  },
+  {
+   "id": "logo",
+   "x": 0.012,
+   "cy": 0.5,
+   "w": 0.08
+  },
+  {
+   "id": "product",
+   "x": 0.095,
+   "w": 0.1,
+   "cy": 0.5,
+   "h": 0.8,
+   "fit_box": true
+  },
+  {
+   "id": "headline",
+   "x": 0.205,
+   "w": 0.475,
+   "y": 0.03,
+   "font": 14,
+   "align": "left"
+  },
+  {
+   "id": "subhead",
+   "x": 0.205,
+   "w": 0.475,
+   "below": "headline",
+   "gap": 0.01,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "legal_text",
+   "x": 0.205,
+   "w": 0.5,
+   "anchor_y": "bottom",
+   "margin_y": 0.012,
+   "font": 6,
+   "align": "left"
+  },
+  {
+   "id": "holiday_watermark",
+   "x": 0.7,
+   "y": 0.05,
+   "w": 0.045
+  },
+  {
+   "id": "ribbon_bg",
+   "x": 0.895,
+   "y": 0.09,
+   "w": 0.085
+  },
+  {
+   "id": "ribbon_label",
+   "in": "ribbon_bg",
+   "font": 7
+  },
+  {
+   "id": "cta_bg",
+   "x": 0.7,
+   "w": 0.285,
+   "y": 0.3,
+   "h": 0.3
+  },
+  {
+   "id": "cta_label",
+   "in": "cta_bg",
+   "font": 12
+  }
+ ],
+ "rows": {
+  "badges": {
+   "x": 0.7,
+   "w": 0.285,
+   "col": [
+    1,
+    24
+   ],
+   "below": "cta_bg",
+   "gap": 0.05,
+   "item_gap": 0.004,
+   "h": 0.17,
+   "align": "left",
+   "items": [
+    [
+     "badge1_bg",
+     "badge1_label"
+    ],
+    [
+     "badge2_bg",
+     "badge2_label"
+    ],
+    [
+     "badge3_bg",
+     "badge3_label"
+    ]
+   ]
+  }
+ },
+ "target": [
+  728,
+  90
+ ]
+}

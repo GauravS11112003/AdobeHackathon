@@ -1,0 +1,100 @@
+{
+ "source": "docs/designer/src_14_5888cec295a7a863ddcc24c9.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Wide: photo bleeds the right 40 %; left column keeps the poster order \u2014 badge | headline + lede, red venue panel, contact footer.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 960.0,
+   "y": 0,
+   "w": 640.0,
+   "h": 900
+  },
+  {
+   "id": "el_02",
+   "x": 80.0,
+   "y": 63.0,
+   "w": 188.4,
+   "h": 144.0
+  },
+  {
+   "id": "el_10",
+   "cx": 102.6,
+   "cy": 146.5,
+   "w": 70.8,
+   "font": 19
+  },
+  {
+   "id": "el_06",
+   "x": 144.0,
+   "y": 91.8,
+   "w": 116.8,
+   "font": 16
+  },
+  {
+   "id": "el_05",
+   "x": 144.0,
+   "y": 158.0,
+   "w": 116.8,
+   "font": 17
+  },
+  {
+   "id": "el_08",
+   "x": 316.4,
+   "y": 63.0,
+   "w": 517.1,
+   "font": 65,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 316.4,
+   "below": "el_08",
+   "gap": 0.015,
+   "w": 579.6,
+   "font": 25,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 80.0,
+   "anchor_y": "bottom",
+   "margin_y": 0.05,
+   "w": 784.0,
+   "font": 21,
+   "align": "left"
+  },
+  {
+   "id": "el_01",
+   "x": 0,
+   "y": 383.4,
+   "w": 960.0,
+   "h": 364.5
+  },
+  {
+   "id": "el_04",
+   "x": 134.4,
+   "y": 492.8,
+   "w": 242.5,
+   "font": 36,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 134.4,
+   "below": "el_04",
+   "gap": 0,
+   "w": 242.5,
+   "font": 36,
+   "align": "left"
+  }
+ ]
+}

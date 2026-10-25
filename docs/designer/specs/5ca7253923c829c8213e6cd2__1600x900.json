@@ -1,0 +1,97 @@
+{
+ "source": "docs/designer/src_17_5ca7253923c829c8213e6cd2.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Split poster: a white typographic half (MAY 12 yellow tab bleeding top-left, headline on a pale panel underlined by the yellow bar, pink square locked to the panel's corner, address + contact at the foot) and the photo on the other half with pink / yellow squares pinned to its outer corners. Wide and square: photo right; tall: photo as the bottom band; banners: one-line headline, contact row at the bottom.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 896,
+   "y": 0,
+   "w": 704,
+   "h": 900,
+   "crop": true
+  },
+  {
+   "id": "el_06",
+   "x": -52.0,
+   "y": -68.0,
+   "w": 388.0,
+   "h": 306.0
+  },
+  {
+   "id": "el_10",
+   "x": 54.0,
+   "y": 88.0,
+   "w": 109.79,
+   "font": 40,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "x": 54.0,
+   "y": 246.75,
+   "w": 815.0,
+   "font": 125,
+   "align": "left"
+  },
+  {
+   "id": "el_04",
+   "x": 616.5,
+   "y": 552.5,
+   "w": 148.75,
+   "h": 148.75
+  },
+  {
+   "id": "el_05",
+   "x": 54.0,
+   "y": 567.5,
+   "w": 593.75,
+   "h": 62.5
+  },
+  {
+   "id": "el_03",
+   "x": 154.0,
+   "y": 171.75,
+   "w": 529.5,
+   "h": 529.5
+  },
+  {
+   "id": "el_09",
+   "x": 54.0,
+   "y": 757.5,
+   "w": 359.01,
+   "font": 26,
+   "align": "left"
+  },
+  {
+   "id": "el_01",
+   "x": 554.0,
+   "y": 757.5,
+   "w": 233.87,
+   "font": 23,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 1462.72,
+   "y": 8.45,
+   "w": 116.16,
+   "h": 116.16
+  },
+  {
+   "id": "el_02",
+   "x": 1458.49,
+   "y": 761.31,
+   "w": 138.69,
+   "h": 138.69
+  }
+ ],
+ "target": [
+  1600,
+  900
+ ]
+}

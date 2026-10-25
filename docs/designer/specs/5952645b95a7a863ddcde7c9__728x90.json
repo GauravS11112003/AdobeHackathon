@@ -1,0 +1,76 @@
+{
+ "source": "docs/designer/src_16_5952645b95a7a863ddcde7c9.json",
+ "target": [
+  728,
+  90
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Leaderboard: '01 APRIL' over the photo's left edge, grey badge, then event name and info flush right.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 319.0,
+   "y": -319.0,
+   "w": 90.0,
+   "h": 728.0,
+   "rotation": 90
+  },
+  {
+   "id": "el_01",
+   "x": 35.8,
+   "y": 0,
+   "w": 150,
+   "h": 90
+  },
+  {
+   "id": "el_04",
+   "x": 12.0,
+   "y": 6.2,
+   "w": 59.5,
+   "font": 54,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "cx": 89.6,
+   "cy": 45.0,
+   "w": 42.0,
+   "font": 14
+  },
+  {
+   "id": "el_03",
+   "x": 457.0,
+   "y": 17.3,
+   "w": 259.0,
+   "font": 15,
+   "align": "right",
+   "rotation": 0
+  },
+  {
+   "id": "el_07",
+   "x": 616.9,
+   "y": 44.3,
+   "w": 99.1,
+   "font": 7,
+   "align": "right"
+  },
+  {
+   "id": "el_02",
+   "x": 201.8,
+   "y": 31.0,
+   "w": 40.0,
+   "h": 28.0
+  },
+  {
+   "id": "el_06",
+   "x": 215.4,
+   "y": 39.4,
+   "w": 24.8,
+   "font": 7
+  }
+ ]
+}

@@ -1,0 +1,72 @@
+{
+ "source": "docs/designer/src_13_5e8d96cb4b3890eb071c683d.json",
+ "target": [
+  1280,
+  720
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Wide: centred text column (kicker, headline, hashtags) on the left half, figures on the bench between two pink walls on the right.",
+ "place": [
+  {
+   "id": "el_04",
+   "cx": 358.4,
+   "y": 146.6,
+   "w": 291.6,
+   "font": 24,
+   "align": "center"
+  },
+  {
+   "id": "el_03",
+   "cx": 358.4,
+   "y": 248.2,
+   "w": 561.5,
+   "font": 87,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "cx": 358.4,
+   "y": 496.4,
+   "w": 275.9,
+   "font": 25,
+   "align": "center"
+  },
+  {
+   "id": "el_07",
+   "x": 691.2,
+   "y": 342.8,
+   "h": 326.8
+  },
+  {
+   "id": "el_06",
+   "x": 989.8,
+   "y": 342.8,
+   "h": 326.8
+  },
+  {
+   "id": "el_05",
+   "cx": 972.8,
+   "y": 489.9,
+   "w": 298.5,
+   "h": 125.5
+  },
+  {
+   "id": "el_00",
+   "x": 652.8,
+   "y": 284.0,
+   "w": 172.8,
+   "h": 436.0
+  },
+  {
+   "id": "el_01",
+   "x": 1122.1,
+   "y": 310.1,
+   "w": 157.9,
+   "h": 409.9
+  }
+ ]
+}

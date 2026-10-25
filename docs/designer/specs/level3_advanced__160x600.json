@@ -1,0 +1,132 @@
+{
+ "source": "docs/designer/src_03_level3_advanced.json",
+ "grid": {
+  "cols": 4,
+  "margin": 0.1,
+  "gutter": 0.03
+ },
+ "concept": "Dense product poster: bottle focal above a centred text block (long headline, subhead), the three badges as one row, CTA pill under them; ribbon pinned top-right; legal along the bottom edge with the watermark in the bottom-right corner. 16:9: bottle left, text column right. 4:1: one row logo | bottle | text column with badge row | CTA.",
+ "place": [
+  {
+   "id": "bg",
+   "cover": true
+  },
+  {
+   "id": "ribbon_bg",
+   "w": 0.62,
+   "align_x": "center",
+   "y": 0.025
+  },
+  {
+   "id": "ribbon_label",
+   "in": "ribbon_bg",
+   "font": 10
+  },
+  {
+   "id": "logo",
+   "w": 0.62,
+   "align_x": "center",
+   "y": 0.075
+  },
+  {
+   "id": "product",
+   "w": 0.66,
+   "align_x": "center",
+   "y": 0.125
+  },
+  {
+   "id": "headline",
+   "x": 0.04,
+   "w": 0.92,
+   "below": "product",
+   "gap": 0.012,
+   "font": 14,
+   "align": "center"
+  },
+  {
+   "id": "subhead",
+   "x": 0.06,
+   "w": 0.88,
+   "below": "headline",
+   "gap": 0.01,
+   "font": 9,
+   "align": "center"
+  },
+  {
+   "id": "badge1_bg",
+   "w": 0.62,
+   "align_x": "center",
+   "below": "subhead",
+   "gap": 0.012,
+   "h": 0.028
+  },
+  {
+   "id": "badge1_label",
+   "in": "badge1_bg",
+   "font": 9,
+   "inset": 0.01
+  },
+  {
+   "id": "badge2_bg",
+   "w": 0.72,
+   "align_x": "center",
+   "below": "badge1_bg",
+   "gap": 0.007,
+   "h": 0.028
+  },
+  {
+   "id": "badge2_label",
+   "in": "badge2_bg",
+   "font": 9,
+   "inset": 0.01
+  },
+  {
+   "id": "badge3_bg",
+   "w": 0.56,
+   "align_x": "center",
+   "below": "badge2_bg",
+   "gap": 0.007,
+   "h": 0.028
+  },
+  {
+   "id": "badge3_label",
+   "in": "badge3_bg",
+   "font": 9,
+   "inset": 0.01
+  },
+  {
+   "id": "cta_bg",
+   "w": 0.88,
+   "align_x": "center",
+   "below": "badge3_bg",
+   "gap": 0.015,
+   "h": 0.05
+  },
+  {
+   "id": "cta_label",
+   "in": "cta_bg",
+   "font": 12,
+   "inset": 0.01
+  },
+  {
+   "id": "holiday_watermark",
+   "align_x": "right",
+   "anchor_y": "bottom",
+   "margin_y": 0.05,
+   "w": 0.22
+  },
+  {
+   "id": "legal_text",
+   "x": 0.06,
+   "w": 0.66,
+   "anchor_y": "bottom",
+   "margin_y": 0.012,
+   "font": 6,
+   "align": "left"
+  }
+ ],
+ "target": [
+  160,
+  600
+ ]
+}

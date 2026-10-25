@@ -1,0 +1,100 @@
+{
+ "source": "docs/designer/src_14_5888cec295a7a863ddcc24c9.json",
+ "target": [
+  1600,
+  400
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Wide banner: badge | headline + lede with the contact line as a footer | red venue panel | photo bleeding to the right edge.",
+ "place": [
+  {
+   "id": "el_02",
+   "x": 32.0,
+   "y": 116.0,
+   "w": 219.8,
+   "h": 168.0
+  },
+  {
+   "id": "el_10",
+   "cx": 58.4,
+   "cy": 213.4,
+   "w": 81.4,
+   "font": 22
+  },
+  {
+   "id": "el_06",
+   "x": 106.7,
+   "y": 149.6,
+   "w": 136.3,
+   "font": 18
+  },
+  {
+   "id": "el_05",
+   "x": 106.7,
+   "y": 226.9,
+   "w": 136.3,
+   "font": 20
+  },
+  {
+   "id": "el_08",
+   "x": 291.8,
+   "y": 48.0,
+   "w": 446.3,
+   "font": 56,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 291.8,
+   "below": "el_08",
+   "gap": 0.025,
+   "w": 446.3,
+   "font": 21,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 291.8,
+   "anchor_y": "bottom",
+   "margin_y": 0.07,
+   "w": 446.3,
+   "font": 12,
+   "align": "left"
+  },
+  {
+   "id": "el_01",
+   "x": 786.1,
+   "y": 0,
+   "w": 208.0,
+   "h": 400
+  },
+  {
+   "id": "el_04",
+   "x": 815.2,
+   "y": 152.0,
+   "w": 123.2,
+   "font": 18,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 815.2,
+   "below": "el_04",
+   "gap": 0,
+   "w": 123.2,
+   "font": 18,
+   "align": "left"
+  },
+  {
+   "id": "el_00",
+   "x": 994.1,
+   "y": 0,
+   "w": 605.9,
+   "h": 400
+  }
+ ]
+}

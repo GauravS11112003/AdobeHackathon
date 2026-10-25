@@ -1,0 +1,77 @@
+{
+ "source": "docs/designer/src_15_5953611d95a7a863ddce13e0.json",
+ "target": [
+  820,
+  312
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Wide banner: a wide card, headline in the left half, details + address + email stacked in the right half; hairlines to both edges.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 41.0,
+   "y": 31.2,
+   "w": 639.6,
+   "h": 249.6
+  },
+  {
+   "id": "el_02",
+   "in": "el_01",
+   "inset": 0.006
+  },
+  {
+   "id": "el_03",
+   "x": 0,
+   "y": 263.3,
+   "w": 43.0,
+   "h": 2
+  },
+  {
+   "id": "el_04",
+   "x": 678.6,
+   "y": 45.2,
+   "w": 141.4,
+   "h": 2
+  },
+  {
+   "id": "el_08",
+   "y": 122.0,
+   "w": 255.8,
+   "font": 28,
+   "align": "center",
+   "cx": 207.3
+  },
+  {
+   "id": "el_07",
+   "y": 87.6,
+   "w": 275.0,
+   "font": 11,
+   "align": "center",
+   "cx": 511.1
+  },
+  {
+   "id": "el_06",
+   "y": 160.9,
+   "w": 275.0,
+   "font": 11,
+   "align": "center",
+   "cx": 511.1
+  },
+  {
+   "id": "el_05",
+   "y": 207.0,
+   "w": 275.0,
+   "font": 11,
+   "align": "center",
+   "cx": 511.1
+  }
+ ]
+}

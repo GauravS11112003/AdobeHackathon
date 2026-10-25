@@ -1,0 +1,121 @@
+{
+ "source": "docs/designer/src_05_593112f495a7a863ddcdc5a7.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.06
+ },
+ "concept": "Centred typographic lockup (NATURAL / -skin care- / [] 30% [] / OFF) layered over the hero bottle on the dark field inside a thin white frame, URL as footer; wide canvases put the bottle beside the lockup, the leaderboard flattens it to one row, the skyscraper stacks bottle / lockup / URL.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 6.4,
+   "y": 6.4,
+   "w": 1587.2,
+   "h": 387.2
+  },
+  {
+   "id": "el_01",
+   "x": 398.58,
+   "w": 335.05,
+   "h": 352.0,
+   "fit_box": true,
+   "cy": 200.0
+  },
+  {
+   "id": "el_12",
+   "font": 57.69,
+   "x": 846.36,
+   "y": 32.43,
+   "w": 306.33,
+   "align": "left"
+  },
+  {
+   "id": "el_11",
+   "shadow_of": "el_12",
+   "dx": 4.27,
+   "dy": 3.75
+  },
+  {
+   "id": "el_10",
+   "font": 49.61,
+   "x": 886.75,
+   "y": 115.36,
+   "w": 225.55,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "w": 77.87,
+   "h": 2.31,
+   "left_of": "el_10",
+   "gap": 12.69,
+   "cy_at": "el_10",
+   "dy": -1.01
+  },
+  {
+   "id": "el_05",
+   "w": 77.87,
+   "h": 2.31,
+   "right_of": "el_10",
+   "gap": 12.69,
+   "cy_at": "el_10",
+   "dy": -1.01
+  },
+  {
+   "id": "el_09",
+   "font": 147.1,
+   "x": 888.77,
+   "y": 146.04,
+   "w": 183.02,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "font": 34.03,
+   "right_of": "el_09",
+   "gap": 5.88,
+   "w": 32.61,
+   "top_at": "el_09",
+   "dy": 65.83,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "w": 73.84,
+   "h": 91.47,
+   "left_of": "el_09",
+   "gap": 17.31,
+   "cy_at": "el_09",
+   "dy": 10.3
+  },
+  {
+   "id": "el_02",
+   "w": 73.84,
+   "h": 91.47,
+   "right_of": "el_08",
+   "gap": 17.31,
+   "cy_at": "el_09",
+   "dy": 10.3
+  },
+  {
+   "id": "el_07",
+   "font": 46.15,
+   "cx_at": "el_09",
+   "y": 302.51,
+   "w": 140.04,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "font": 16.8,
+   "x": 1317.79,
+   "y": 348.48,
+   "w": 234.21,
+   "align": "right"
+  }
+ ],
+ "target": [
+  1600,
+  400
+ ]
+}

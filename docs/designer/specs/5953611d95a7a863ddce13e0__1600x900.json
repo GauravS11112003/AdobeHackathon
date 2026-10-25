@@ -1,0 +1,77 @@
+{
+ "source": "docs/designer/src_15_5953611d95a7a863ddce13e0.json",
+ "target": [
+  1600,
+  900
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Wide: the card sits left on the gradient exactly as in the source, text stack centred inside; hairlines tie it to both edges.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 80.0,
+   "y": 90.0,
+   "w": 672.0,
+   "h": 720.0
+  },
+  {
+   "id": "el_02",
+   "in": "el_01",
+   "inset": 0.006
+  },
+  {
+   "id": "el_03",
+   "x": 0,
+   "y": 759.6,
+   "w": 82.0,
+   "h": 2
+  },
+  {
+   "id": "el_04",
+   "x": 750.0,
+   "y": 130.3,
+   "w": 850.0,
+   "h": 2
+  },
+  {
+   "id": "el_08",
+   "y": 140.2,
+   "w": 591.4,
+   "font": 69,
+   "align": "center",
+   "cx": 416.0
+  },
+  {
+   "id": "el_07",
+   "y": 422.7,
+   "w": 591.4,
+   "font": 25,
+   "align": "center",
+   "cx": 416.0
+  },
+  {
+   "id": "el_06",
+   "y": 626.7,
+   "w": 591.4,
+   "font": 22,
+   "align": "center",
+   "cx": 416.0
+  },
+  {
+   "id": "el_05",
+   "y": 727.0,
+   "w": 591.4,
+   "font": 22,
+   "align": "center",
+   "cx": 416.0
+  }
+ ]
+}

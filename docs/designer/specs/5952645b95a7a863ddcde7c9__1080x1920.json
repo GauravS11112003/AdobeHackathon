@@ -1,0 +1,74 @@
+{
+ "source": "docs/designer/src_16_5952645b95a7a863ddcde7c9.json",
+ "target": [
+  1080,
+  1920
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Poster: info line top-right, grey badge, giant red '01 APRIL' straddling the photo's top-left corner, event name vertical up the right edge.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": -420.0,
+   "y": 420.0,
+   "w": 1920.0,
+   "h": 1080.0,
+   "rotation": 90
+  },
+  {
+   "id": "el_07",
+   "x": 329.0,
+   "y": 53.8,
+   "w": 697.0,
+   "font": 51,
+   "align": "right"
+  },
+  {
+   "id": "el_01",
+   "x": 84.2,
+   "y": 773.8,
+   "w": 830.5,
+   "h": 1069.4
+  },
+  {
+   "id": "el_04",
+   "x": 10.8,
+   "y": 523.2,
+   "w": 337.1,
+   "font": 324,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "cx": 410.8,
+   "cy": 897.5,
+   "w": 206.3,
+   "font": 73
+  },
+  {
+   "id": "el_03",
+   "cx": 993.6,
+   "cy": 1308.5,
+   "w": 887.0,
+   "font": 52
+  },
+  {
+   "id": "el_02",
+   "x": 655.6,
+   "y": 382.6,
+   "w": 370.4,
+   "h": 257.2
+  },
+  {
+   "id": "el_06",
+   "x": 781.5,
+   "y": 459.7,
+   "w": 229.7,
+   "font": 50
+  }
+ ]
+}

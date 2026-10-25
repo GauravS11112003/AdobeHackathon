@@ -1,0 +1,122 @@
+{
+ "source": "docs/designer/src_03_level3_advanced.json",
+ "grid": {
+  "cols": 8,
+  "margin": 0.06,
+  "gutter": 0.02
+ },
+ "concept": "Dense product poster: bottle focal above a centred text block (long headline, subhead), the three badges as one row, CTA pill under them; ribbon pinned top-right; legal along the bottom edge with the watermark in the bottom-right corner. 16:9: bottle left, text column right. 4:1: one row logo | bottle | text column with badge row | CTA.",
+ "place": [
+  {
+   "id": "bg",
+   "cover": true
+  },
+  {
+   "id": "logo",
+   "w": 0.3,
+   "align_x": "center",
+   "y": 0.035
+  },
+  {
+   "id": "ribbon_bg",
+   "x": 0.705,
+   "y": 0.03,
+   "w": 0.26
+  },
+  {
+   "id": "ribbon_label",
+   "in": "ribbon_bg",
+   "font": 20
+  },
+  {
+   "id": "product",
+   "w": 0.37,
+   "align_x": "center",
+   "y": 0.12
+  },
+  {
+   "id": "headline",
+   "col": [
+    1,
+    8
+   ],
+   "below": "product",
+   "gap": 0.028,
+   "font": 46,
+   "align": "center"
+  },
+  {
+   "id": "subhead",
+   "col": [
+    2,
+    7
+   ],
+   "below": "headline",
+   "gap": 0.02,
+   "font": 25,
+   "align": "center"
+  },
+  {
+   "id": "cta_bg",
+   "w": 0.39,
+   "align_x": "center",
+   "below": "subhead",
+   "gap": 0.085,
+   "h": 0.066
+  },
+  {
+   "id": "cta_label",
+   "in": "cta_bg",
+   "font": 22
+  },
+  {
+   "id": "holiday_watermark",
+   "align_x": "right",
+   "anchor_y": "bottom",
+   "margin_y": 0.05,
+   "w": 0.16
+  },
+  {
+   "id": "legal_text",
+   "col": [
+    1,
+    8
+   ],
+   "anchor_y": "bottom",
+   "margin_y": 0.02,
+   "font": 13,
+   "align": "center"
+  }
+ ],
+ "rows": {
+  "badges": {
+   "col": [
+    1,
+    8
+   ],
+   "below": "subhead",
+   "gap": 0.03,
+   "item_gap": 0.015,
+   "h": 0.038,
+   "align": "center",
+   "items": [
+    [
+     "badge1_bg",
+     "badge1_label"
+    ],
+    [
+     "badge2_bg",
+     "badge2_label"
+    ],
+    [
+     "badge3_bg",
+     "badge3_label"
+    ]
+   ]
+  }
+ },
+ "target": [
+  1240,
+  1754
+ ]
+}

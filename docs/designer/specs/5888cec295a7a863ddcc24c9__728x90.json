@@ -1,0 +1,98 @@
+{
+ "source": "docs/designer/src_14_5888cec295a7a863ddcc24c9.json",
+ "target": [
+  728,
+  90
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Leaderboard: badge | CHARITY NIGHT | lede over contact line | red panel with venue | photo bleeding right.",
+ "place": [
+  {
+   "id": "el_02",
+   "x": 10.0,
+   "y": 10.0,
+   "w": 91.6,
+   "h": 70.0
+  },
+  {
+   "id": "el_10",
+   "cx": 21.0,
+   "cy": 50.6,
+   "w": 35.1,
+   "font": 9
+  },
+  {
+   "id": "el_06",
+   "x": 41.1,
+   "y": 24.0,
+   "w": 56.8,
+   "font": 8
+  },
+  {
+   "id": "el_05",
+   "x": 41.1,
+   "y": 56.2,
+   "w": 56.8,
+   "font": 8
+  },
+  {
+   "id": "el_08",
+   "x": 113.6,
+   "cy": 45.0,
+   "w": 145.5,
+   "font": 18,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 273.1,
+   "y": 20.8,
+   "w": 177.6,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 273.1,
+   "y": 50.0,
+   "w": 177.6,
+   "font": 6,
+   "align": "left"
+  },
+  {
+   "id": "el_01",
+   "x": 464.7,
+   "y": 0,
+   "w": 80,
+   "h": 90
+  },
+  {
+   "id": "el_04",
+   "x": 475.9,
+   "y": 27.0,
+   "w": 50.4,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 475.9,
+   "below": "el_04",
+   "gap": 0,
+   "w": 50.4,
+   "font": 7,
+   "align": "left"
+  },
+  {
+   "id": "el_00",
+   "x": 544.7,
+   "y": 0,
+   "w": 183.3,
+   "h": 90
+  }
+ ]
+}

@@ -1,0 +1,77 @@
+{
+ "source": "docs/designer/src_15_5953611d95a7a863ddce13e0.json",
+ "target": [
+  1080,
+  1350
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Tall: the white card centred on the gradient, text stack with air inside; hairlines to the left (low) and right (high) edges.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 140.4,
+   "y": 270.0,
+   "w": 799.2,
+   "h": 810.0
+  },
+  {
+   "id": "el_02",
+   "in": "el_01",
+   "inset": 0.006
+  },
+  {
+   "id": "el_03",
+   "x": 0,
+   "y": 1023.3,
+   "w": 142.4,
+   "h": 2
+  },
+  {
+   "id": "el_04",
+   "x": 937.6,
+   "y": 315.4,
+   "w": 142.4,
+   "h": 2
+  },
+  {
+   "id": "el_08",
+   "y": 294.8,
+   "w": 735.3,
+   "font": 83,
+   "align": "center",
+   "cx": 540.0
+  },
+  {
+   "id": "el_07",
+   "y": 557.4,
+   "w": 735.3,
+   "font": 34,
+   "align": "center",
+   "cx": 540.0
+  },
+  {
+   "id": "el_06",
+   "y": 873.9,
+   "w": 735.3,
+   "font": 30,
+   "align": "center",
+   "cx": 540.0
+  },
+  {
+   "id": "el_05",
+   "y": 1011.2,
+   "w": 735.3,
+   "font": 30,
+   "align": "center",
+   "cx": 540.0
+  }
+ ]
+}

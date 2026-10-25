@@ -1,0 +1,62 @@
+{
+ "source": "docs/designer/src_07_5e709a0f4b3890eb0783cb50.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.06
+ },
+ "concept": "White gallery wall: three photos step diagonally down-right as an overlapping cascade; NEW VINTAGE runs vertically up the cascade's left, COLLECTION closes it at bottom-right with the brand strip as a rule, URL as footer. Banners put the vertical word | cascade | COLLECTION column in a row; the leaderboard sets the word horizontally with the photos in a row; the skyscraper stacks the photos.",
+ "place": [
+  {
+   "id": "el_05",
+   "x": 551.22,
+   "y": 27.72,
+   "w": 114.92
+  },
+  {
+   "id": "el_06",
+   "x": 573.6,
+   "y": 85.62,
+   "w": 189.1
+  },
+  {
+   "id": "el_04",
+   "x": 598.32,
+   "y": 180.29,
+   "w": 187.69
+  },
+  {
+   "id": "el_00",
+   "font": 39.6,
+   "cx": 494.2,
+   "cy": 215.03,
+   "w": 312.03,
+   "align": "left"
+  },
+  {
+   "id": "el_01",
+   "font": 33.66,
+   "x": 850.08,
+   "y": 143.06,
+   "w": 265.07,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 850.08,
+   "y": 194.06,
+   "w": 733.92
+  },
+  {
+   "id": "el_02",
+   "font": 17.82,
+   "x": 850.08,
+   "y": 228.0,
+   "w": 229.05,
+   "align": "left"
+  }
+ ],
+ "target": [
+  1584,
+  396
+ ]
+}

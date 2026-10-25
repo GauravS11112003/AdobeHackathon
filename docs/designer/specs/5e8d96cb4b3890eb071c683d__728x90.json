@@ -1,0 +1,72 @@
+{
+ "source": "docs/designer/src_13_5e8d96cb4b3890eb071c683d.json",
+ "target": [
+  728,
+  90
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Leaderboard: kicker over headline left, figures on the bench centre, hashtags right; walls behind the figures' outer halves.",
+ "place": [
+  {
+   "id": "el_04",
+   "x": 14,
+   "y": 1.6,
+   "w": 164.2,
+   "font": 8,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 14,
+   "y": 30.2,
+   "w": 164.2,
+   "font": 25,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 329.7,
+   "y": 12.0,
+   "h": 76.0
+  },
+  {
+   "id": "el_06",
+   "x": 399.1,
+   "y": 12.0,
+   "h": 76.0
+  },
+  {
+   "id": "el_05",
+   "cx": 395.2,
+   "y": 46.2,
+   "w": 69.4,
+   "h": 29.2
+  },
+  {
+   "id": "el_02",
+   "x": 612.1,
+   "cy": 45.0,
+   "w": 101.9,
+   "font": 9,
+   "align": "center"
+  },
+  {
+   "id": "el_00",
+   "x": 307.8,
+   "y": 0.0,
+   "w": 53.1,
+   "h": 90.0
+  },
+  {
+   "id": "el_01",
+   "x": 429.9,
+   "y": 6.1,
+   "w": 52.6,
+   "h": 83.9
+  }
+ ]
+}

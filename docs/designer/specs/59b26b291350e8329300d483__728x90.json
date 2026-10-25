@@ -1,0 +1,67 @@
+{
+ "source": "docs/designer/src_12_59b26b291350e8329300d483.json",
+ "target": [
+  728,
+  90
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "White mat, gradient card; tracked 'premiere' heads the card, a one-line detail row (date · address · dress code) sits mid-card, the headline closes it. Tall: the detail row becomes a centred column and the headline wraps to two lines; skyscraper tightens the tracking.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 22.0,
+   "y": 5.0,
+   "w": 684.0,
+   "h": 80.0
+  },
+  {
+   "id": "el_06",
+   "cx": 364.0,
+   "y": 10.0,
+   "w": 129.13,
+   "font": 8,
+   "tracking": 0.35,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "x": 150.52,
+   "cy": 33.0,
+   "w": 45.72,
+   "font": 8,
+   "align": "center"
+  },
+  {
+   "id": "el_02",
+   "x": 220.24,
+   "cy": 33.0,
+   "w": 204.28,
+   "font": 8,
+   "align": "center"
+  },
+  {
+   "id": "el_03",
+   "x": 448.52,
+   "cy": 33.0,
+   "w": 128.95,
+   "font": 8,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "cx": 364.0,
+   "y": 44.4,
+   "w": 350.13,
+   "font": 24,
+   "align": "center"
+  }
+ ]
+}

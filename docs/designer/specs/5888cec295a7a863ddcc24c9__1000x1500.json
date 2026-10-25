@@ -1,0 +1,100 @@
+{
+ "source": "docs/designer/src_14_5888cec295a7a863ddcc24c9.json",
+ "target": [
+  1000,
+  1500
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Poster: date badge | tracked headline + lede on top, full-width band of red venue panel + photo, contact line as the footer.",
+ "place": [
+  {
+   "id": "el_02",
+   "x": 50.0,
+   "y": 82.5,
+   "w": 280.0,
+   "h": 214.0
+  },
+  {
+   "id": "el_10",
+   "cx": 83.6,
+   "cy": 206.6,
+   "w": 102.8,
+   "font": 28
+  },
+  {
+   "id": "el_06",
+   "x": 145.2,
+   "y": 125.3,
+   "w": 173.6,
+   "font": 24
+  },
+  {
+   "id": "el_05",
+   "x": 145.2,
+   "y": 223.8,
+   "w": 173.6,
+   "font": 26
+  },
+  {
+   "id": "el_08",
+   "x": 380.0,
+   "y": 67.5,
+   "w": 509.3,
+   "font": 64,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 380.0,
+   "below": "el_08",
+   "gap": 0.012,
+   "w": 570.0,
+   "font": 24,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "cx": 500.0,
+   "anchor_y": "bottom",
+   "margin_y": 0.057,
+   "w": 900.0,
+   "font": 25,
+   "align": "center"
+  },
+  {
+   "id": "el_01",
+   "x": 0,
+   "y": 422.6,
+   "w": 335.0,
+   "h": 850.9
+  },
+  {
+   "id": "el_00",
+   "x": 335.0,
+   "y": 422.6,
+   "w": 665.0,
+   "h": 850.9
+  },
+  {
+   "id": "el_04",
+   "x": 46.9,
+   "y": 780.0,
+   "w": 182.8,
+   "font": 27,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 46.9,
+   "below": "el_04",
+   "gap": 0,
+   "w": 182.8,
+   "font": 27,
+   "align": "left"
+  }
+ ]
+}

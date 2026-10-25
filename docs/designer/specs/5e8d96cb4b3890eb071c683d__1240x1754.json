@@ -1,0 +1,72 @@
+{
+ "source": "docs/designer/src_13_5e8d96cb4b3890eb071c683d.json",
+ "target": [
+  1240,
+  1754
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Tall/square: the source's centred stack \u2014 kicker, big blue headline, two figures on the purple bench flanked by pink walls, hashtags below.",
+ "place": [
+  {
+   "id": "el_04",
+   "cx": 620.0,
+   "y": 157.7,
+   "w": 411.4,
+   "font": 34,
+   "align": "center"
+  },
+  {
+   "id": "el_03",
+   "cx": 620.0,
+   "y": 312.6,
+   "w": 798.6,
+   "font": 124,
+   "align": "center"
+  },
+  {
+   "id": "el_07",
+   "x": 74.4,
+   "y": 716.1,
+   "h": 633.2
+  },
+  {
+   "id": "el_06",
+   "x": 652.9,
+   "y": 716.1,
+   "h": 633.2
+  },
+  {
+   "id": "el_05",
+   "cx": 620.0,
+   "y": 1001.0,
+   "w": 578.3,
+   "h": 243.1
+  },
+  {
+   "id": "el_02",
+   "cx": 620.0,
+   "y": 1463.1,
+   "w": 384.7,
+   "font": 35,
+   "align": "center"
+  },
+  {
+   "id": "el_00",
+   "x": 0.0,
+   "y": 614.7,
+   "w": 334.7,
+   "h": 1139.3
+  },
+  {
+   "id": "el_01",
+   "x": 909.2,
+   "y": 665.3,
+   "w": 330.8,
+   "h": 1088.7
+  }
+ ]
+}

@@ -1,0 +1,112 @@
+{
+ "source": "docs/designer/src_11_59b27d591350e8329300d8b3.json",
+ "target": [
+  820,
+  312
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Nested frames (black > maroon > coral card) centred; inside the card a centred type stack (brand, white rule, two-line headline, address); three navy pills step down out of the card's foot, staggered left / wide / right. Wide: card on the left, pill cluster on the right (row on banners, stepped column on 16:9). Skyscraper: narrow stack.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "cover": true
+  },
+  {
+   "id": "el_02",
+   "x": 17.16,
+   "y": 17.16,
+   "w": 785.68,
+   "h": 277.68
+  },
+  {
+   "id": "el_03",
+   "x": 73.8,
+   "y": 46.8,
+   "w": 218.4,
+   "h": 218.4
+  },
+  {
+   "id": "el_04",
+   "in": "el_03",
+   "inset": 9.24
+  },
+  {
+   "id": "el_13",
+   "cx": 183.0,
+   "y": 89.08,
+   "w": 87.6,
+   "font": 12,
+   "align": "center"
+  },
+  {
+   "id": "el_05",
+   "cx": 183.0,
+   "y": 108.72,
+   "w": 94.92,
+   "h": 17.22
+  },
+  {
+   "id": "el_12",
+   "cx": 183.0,
+   "y": 130.98,
+   "w": 200.93,
+   "font": 30,
+   "align": "center"
+  },
+  {
+   "id": "el_11",
+   "cx": 183.0,
+   "y": 205.52,
+   "w": 200.93,
+   "font": 11,
+   "align": "center"
+  },
+  {
+   "id": "el_06",
+   "cx": 522.92,
+   "y": 104.56,
+   "w": 173.88,
+   "h": 28.01
+  },
+  {
+   "id": "el_10",
+   "in": "el_06",
+   "font": 14,
+   "inset": 2.52
+  },
+  {
+   "id": "el_07",
+   "cx": 555.72,
+   "y": 137.4,
+   "w": 292.7,
+   "h": 37.19
+  },
+  {
+   "id": "el_09",
+   "in": "el_07",
+   "font": 14,
+   "inset": 2.52
+  },
+  {
+   "id": "el_08",
+   "cx": 588.52,
+   "y": 179.43,
+   "w": 173.88,
+   "h": 28.01
+  },
+  {
+   "id": "el_14",
+   "in": "el_08",
+   "font": 14,
+   "inset": 2.52
+  }
+ ]
+}

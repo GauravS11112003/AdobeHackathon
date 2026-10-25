@@ -1,0 +1,74 @@
+{
+ "source": "docs/designer/src_16_5952645b95a7a863ddcde7c9.json",
+ "target": [
+  1280,
+  720
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Wide: photo right, '01 APRIL' straddling its top-left corner, info line above it flush right, event name vertical beside its right edge, badge bottom-left.",
+ "place": [
+  {
+   "id": "el_00",
+   "x": 280.0,
+   "y": -280.0,
+   "w": 720.0,
+   "h": 1280.0,
+   "rotation": 90
+  },
+  {
+   "id": "el_01",
+   "x": 537.6,
+   "y": 158.4,
+   "w": 652.8,
+   "h": 532.8
+  },
+  {
+   "id": "el_07",
+   "x": 778.7,
+   "y": 14.2,
+   "w": 411.7,
+   "font": 30,
+   "align": "right"
+  },
+  {
+   "id": "el_04",
+   "x": 469.8,
+   "y": 201.6,
+   "w": 226.0,
+   "font": 216,
+   "align": "left"
+  },
+  {
+   "id": "el_05",
+   "cx": 760.0,
+   "cy": 353.8,
+   "w": 203.5,
+   "font": 72
+  },
+  {
+   "id": "el_03",
+   "cx": 1235.2,
+   "cy": 424.8,
+   "w": 445.0,
+   "font": 26
+  },
+  {
+   "id": "el_02",
+   "x": 76.8,
+   "y": 549.0,
+   "w": 204.8,
+   "h": 142.2
+  },
+  {
+   "id": "el_06",
+   "x": 146.4,
+   "y": 591.7,
+   "w": 127.0,
+   "font": 28
+  }
+ ]
+}

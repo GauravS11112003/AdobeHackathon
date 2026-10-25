@@ -1,0 +1,72 @@
+{
+ "source": "docs/designer/src_13_5e8d96cb4b3890eb071c683d.json",
+ "target": [
+  1600,
+  400
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Wide banner: one row \u2014 kicker + headline left, figures on the bench centre, hashtags right; pink walls behind the figures' outer halves.",
+ "place": [
+  {
+   "id": "el_04",
+   "x": 32.0,
+   "y": 67.5,
+   "w": 516.6,
+   "font": 22,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "x": 32.0,
+   "y": 150.4,
+   "w": 516.6,
+   "font": 80,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 633.3,
+   "y": 32.0,
+   "h": 352.0
+  },
+  {
+   "id": "el_06",
+   "x": 955.0,
+   "y": 32.0,
+   "h": 352.0
+  },
+  {
+   "id": "el_05",
+   "cx": 936.7,
+   "y": 190.4,
+   "w": 321.5,
+   "h": 135.2
+  },
+  {
+   "id": "el_02",
+   "x": 1324.7,
+   "cy": 200.0,
+   "w": 243.3,
+   "font": 22,
+   "align": "center"
+  },
+  {
+   "id": "el_00",
+   "x": 585.3,
+   "y": 0.0,
+   "w": 192.7,
+   "h": 400.0
+  },
+  {
+   "id": "el_01",
+   "x": 1097.5,
+   "y": 28.2,
+   "w": 190.5,
+   "h": 371.8
+  }
+ ]
+}

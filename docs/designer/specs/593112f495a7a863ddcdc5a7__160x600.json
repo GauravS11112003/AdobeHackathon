@@ -1,0 +1,118 @@
+{
+ "source": "docs/designer/src_05_593112f495a7a863ddcdc5a7.json",
+ "grid": {
+  "cols": 12,
+  "margin": 0.06
+ },
+ "concept": "Centred typographic lockup (NATURAL / -skin care- / [] 30% [] / OFF) layered over the hero bottle on the dark field inside a thin white frame, URL as footer; wide canvases put the bottle beside the lockup, the leaderboard flattens it to one row, the skyscraper stacks bottle / lockup / URL.",
+ "place": [
+  {
+   "id": "el_00",
+   "cover": true
+  },
+  {
+   "id": "el_01",
+   "x": 10,
+   "w": 140,
+   "h": 180.0,
+   "fit_box": true,
+   "y": 30.0
+  },
+  {
+   "id": "el_12",
+   "font": 25.95,
+   "x": 10.0,
+   "y": 244.99,
+   "w": 140.0,
+   "align": "left"
+  },
+  {
+   "id": "el_11",
+   "shadow_of": "el_12",
+   "dx": 1.92,
+   "dy": 1.69
+  },
+  {
+   "id": "el_10",
+   "font": 22.32,
+   "x": 28.17,
+   "y": 282.3,
+   "w": 103.66,
+   "align": "center"
+  },
+  {
+   "id": "el_04",
+   "w": 14.0,
+   "h": 2.0,
+   "left_of": "el_10",
+   "gap": 5.71,
+   "cy_at": "el_10",
+   "dy": -1.01
+  },
+  {
+   "id": "el_05",
+   "w": 14.0,
+   "h": 2.0,
+   "right_of": "el_10",
+   "gap": 5.71,
+   "cy_at": "el_10",
+   "dy": -1.01
+  },
+  {
+   "id": "el_09",
+   "font": 66.17,
+   "x": 28.25,
+   "y": 296.1,
+   "w": 84.53,
+   "align": "left"
+  },
+  {
+   "id": "el_08",
+   "font": 15.31,
+   "right_of": "el_09",
+   "gap": 2.65,
+   "w": 16.32,
+   "top_at": "el_09",
+   "dy": 29.61,
+   "align": "left"
+  },
+  {
+   "id": "el_03",
+   "w": 15.0,
+   "h": 18.58,
+   "left_of": "el_09",
+   "gap": 7.78,
+   "cy_at": "el_09",
+   "dy": 4.63
+  },
+  {
+   "id": "el_02",
+   "w": 15.0,
+   "h": 18.58,
+   "right_of": "el_08",
+   "gap": 7.78,
+   "cy_at": "el_09",
+   "dy": 4.63
+  },
+  {
+   "id": "el_07",
+   "font": 20.76,
+   "cx_at": "el_09",
+   "y": 366.49,
+   "w": 65.2,
+   "align": "left"
+  },
+  {
+   "id": "el_06",
+   "font": 9,
+   "x": 16.34,
+   "y": 566.4,
+   "w": 127.33,
+   "align": "center"
+  }
+ ],
+ "target": [
+  160,
+  600
+ ]
+}

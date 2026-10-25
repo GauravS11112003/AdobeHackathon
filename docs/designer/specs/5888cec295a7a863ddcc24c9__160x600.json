@@ -1,0 +1,99 @@
+{
+ "source": "docs/designer/src_14_5888cec295a7a863ddcc24c9.json",
+ "target": [
+  160,
+  600
+ ],
+ "grid": {
+  "cols": 12,
+  "margin": 0.05,
+  "gutter": 0.02
+ },
+ "concept": "Skyscraper: badge, tracked headline, lede, then the red panel with the venue stacked over the full-width photo; contact line at the foot.",
+ "place": [
+  {
+   "id": "el_02",
+   "x": 12.0,
+   "y": 14.0,
+   "w": 136.0,
+   "h": 104.0
+  },
+  {
+   "id": "el_10",
+   "cx": 28.3,
+   "cy": 74.3,
+   "w": 52.9,
+   "font": 14
+  },
+  {
+   "id": "el_06",
+   "x": 58.2,
+   "y": 34.8,
+   "w": 84.3,
+   "font": 11
+  },
+  {
+   "id": "el_05",
+   "x": 58.2,
+   "y": 82.6,
+   "w": 84.3,
+   "font": 12
+  },
+  {
+   "id": "el_08",
+   "x": 12,
+   "y": 136.0,
+   "w": 122.0,
+   "font": 15,
+   "align": "left"
+  },
+  {
+   "id": "el_07",
+   "x": 12,
+   "y": 185.1,
+   "w": 136,
+   "font": 9,
+   "align": "left"
+  },
+  {
+   "id": "el_01",
+   "x": 0,
+   "y": 261.5,
+   "w": 160,
+   "h": 110
+  },
+  {
+   "id": "el_04",
+   "x": 22.4,
+   "y": 285.7,
+   "w": 83.5,
+   "font": 12,
+   "align": "left"
+  },
+  {
+   "id": "el_09",
+   "x": 22.4,
+   "below": "el_04",
+   "gap": 0,
+   "w": 83.5,
+   "font": 12,
+   "align": "left"
+  },
+  {
+   "id": "el_00",
+   "x": 0,
+   "y": 371.5,
+   "w": 160,
+   "h": 151.8
+  },
+  {
+   "id": "el_03",
+   "x": 12,
+   "anchor_y": "bottom",
+   "margin_y": 14,
+   "w": 136,
+   "font": 6,
+   "align": "center"
+  }
+ ]
+}
