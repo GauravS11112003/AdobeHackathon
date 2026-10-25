@@ -59,12 +59,16 @@ def test_level1_anchor_path():
     # background covers the new canvas
     assert (out["bg"]["x"], out["bg"]["y"], out["bg"]["width"], out["bg"]["height"]) == (0, 0, 1080, 1350)
     # nothing had to shrink (the judge may pick a content scale a little
-    # above min(sx, sy) = 1 since the taller canvas has room; never below)
+    # above min(sx, sy) = 1 since the taller canvas has room, and the v7
+    # optimiser may grow a primary unit up to the judge's size ambition
+    # (AMBITION 1.2 x the proportional size, in 10 % steps); never below)
     for i in ("logo", "headline", "cta"):
-        assert src[i]["width"] <= out[i]["width"] <= 1.3 * src[i]["width"]
+        assert src[i]["width"] <= out[i]["width"] <= 1.4 * src[i]["width"]
         assert out[i]["width"] / out[i]["height"] == pytest.approx(src[i]["width"] / src[i]["height"], rel=0.02)
-    # the logo keeps hugging the top (margin grows with the canvas, 60 -> 75) and stays centred
-    assert out["logo"]["y"] == pytest.approx(75)
+    # the logo keeps hugging the top (margin grows with the canvas, 60 -> 75;
+    # the v7 optimiser may settle it a little lower for balance, never above
+    # the proportional margin nor out of the top band) and stays centred
+    assert 75 - 0.5 <= out["logo"]["y"] <= 0.10 * 1350
     assert out["logo"]["x"] + out["logo"]["width"] / 2 == pytest.approx(540)
     # reading order and spacing preserved: logo above headline above cta
     assert out["logo"]["y"] + out["logo"]["height"] < out["headline"]["y"]

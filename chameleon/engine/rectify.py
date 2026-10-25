@@ -34,7 +34,7 @@ from typing import Any, Iterable
 from engine import contrast as contrast_est
 from engine.analyze import Analysis, BACKGROUND, FINE_PRINT, BADGE, Unit
 from engine.geometry import Box, clamp
-from engine.textfit import TextMeasurer, apply_font_size, default_measurer
+from engine.textfit import CAP_HEIGHT, DEFAULT_LINE_HEIGHT, TextMeasurer, apply_font_size, default_measurer
 
 MAX_PASSES = 6
 EPS = 0.01
@@ -46,6 +46,16 @@ GAP_FRAC = 0.01             # minimum visible gap between pushed-apart units
 EVEN_GAP_RATIO = 1.6        # gaps closer than this ratio (max/min) are made equal
 GRAZE_EM = 0.9              # a source text-on-text overlap thinner than this x the smaller font is a collision
                             # (lines that ran into each other), not a designed lockup: it is not carried over
+GRAZE_CONTAINED = 0.8       # ... unless one text's ink lies this much on the other's lines and the two differ
+LOCKUP_FONT_RATIO = 1.5     # in size by this factor (a label laid over a big figure) or are the same word (a
+                            # shadow copy offset by a few px): a lockup however thin the small text is (v6)
+# Layering (v6, from the designer references): what the designer layered on
+# purpose is not a collision when it is layered again.
+LAYER_SRC_MIN = 0.3         # a text whose ink lay at least this much over a picture / shape in the source was
+                            # layered on it (role-level: any text of that role may be layered again) ...
+LAYER_MIN = 0.3             # ... when at least this much of its ink is on the picture (not grazing its edge)
+HOSTED_INSIDE = 0.8         # a text this much inside a shape / image drawn below it is hosted by it, never a collision
+LAYER_GROW = 2.0            # a pair the source layered (one side not text) may overlap up to this x as much
 STRADDLE_MIN = 3.0          # a text straddles an edge when one slice of it reads under this ratio ...
 STRADDLE_MAX = 4.5          # ... and another slice at or above this ...
 STRADDLE_RATIO = 4.0        # ... and the best slice reads at least this many times better than the worst
@@ -100,6 +110,35 @@ def ink_box(el: dict[str, Any], box: Box, font_size: float, m: TextMeasurer) -> 
     p = m.painted(el, font_size, max(box.w, 1.0))
     ink = Box(box.x + p.x, box.y + p.top, max(p.w, 1.0), max(p.h, 1.0))
     return rotated_extent(ink, float(el.get("rotation", 0.0) or 0.0))
+
+
+def ink_lines(el: dict[str, Any], box: Box, font_size: float | None, m: TextMeasurer) -> list[Box]:
+    """One painted box per wrapped line of an (unrotated) text: caps top to
+    baseline plus the descender allowance `TextMeasurer.painted` uses,
+    each line as wide as its glyphs and aligned like the renderer aligns
+    it. The hull of a three-line heading covers its line gaps; a label
+    that merely touches its last line is not "inside" it (v6)."""
+    size = float(font_size if font_size is not None else el["font_size"])
+    p = m.painted(el, size, max(box.w, 1.0))
+    lh = float(el.get("line_height", DEFAULT_LINE_HEIGHT) or DEFAULT_LINE_HEIGHT)
+    cap = CAP_HEIGHT * size
+    last_base = p.top + cap + (p.n_lines - 1) * size * lh
+    desc = max(0.0, p.bottom - last_base)
+    align = str(el.get("text_align", "left") or "left")
+    out = []
+    for i, lw in enumerate(p.line_widths):
+        lw = max(float(lw), 1.0)
+        x = box.x + ((box.w - lw) / 2.0 if align == "center" else (box.w - lw) if align == "right" else 0.0)
+        out.append(Box(x, box.y + p.top + i * size * lh, lw, max(1.0, cap + desc)))
+    return out
+
+
+def lines_inside(small: list[Box], big: list[Box]) -> float:
+    """Share of the `small` lines' area that lies on the `big` lines."""
+    area = sum(b.area for b in small)
+    if area <= 0:
+        return 0.0
+    return sum(s.intersection_area(b) for s in small for b in big) / area
 
 
 def visible_box(el: dict[str, Any], box: Box, font_size: float | None, m: TextMeasurer) -> Box:
@@ -191,8 +230,10 @@ class _Rectifier:
         self.snap_tol = clamp(SNAP_FRAC * mn, 1.0, 6.0)
         self.gap = clamp(GAP_FRAC * mn, 2.0, 12.0)
         # How much each pair overlapped in the source (visible boxes): a
-        # pair may keep that much overlap (plus OVERLAP_TOL); more is a defect.
-        self.src_frac = source_overlap_fractions(analysis, m)
+        # pair may keep that much overlap (plus OVERLAP_TOL); more is a defect
+        # unless a layering allowance applies (`OverlapRules`, v6).
+        self.rules = overlap_rules(analysis, m)
+        self.src_frac = self.rules.src_frac
         self._vis: dict[str, Box] = {}
         self._parts: dict[str, list[Box]] = {}
         self.src_fonts = {eid: float(el["font_size"]) for eid, el in by_id.items() if el["type"] == "text"}
@@ -251,7 +292,7 @@ class _Rectifier:
 
     def allowed_pair(self, a: Live, b: Live) -> bool:
         """Did the pair overlap in the source? Such pairs are only separated
-        when their overlap grew by more than OVERLAP_TOL (see `collides`)."""
+        when their overlap grew beyond what `OverlapRules` allows."""
         return self.src_frac.get(_pair_key(a.unit.key, b.unit.key), 0.0) > 0.0
 
     def excess(self, a: Live, b: Live, pa: list[Box] | None = None, pb: list[Box] | None = None) -> float:
@@ -274,11 +315,7 @@ class _Rectifier:
         for o in self.lives:
             if o is l or o.unit.key in skip:
                 continue
-            if self.allowed_pair(l, o):
-                if self.excess(l, o, mine, self.parts(o)) > OVERLAP_TOL:
-                    return True
-                continue
-            if parts_overlap(mine, self.parts(o), tol=1.0):
+            if self.rules.conflict(l, o, mine, self.parts(o)):
                 return True
         return False
 
@@ -432,14 +469,10 @@ class _Rectifier:
             for j in range(i + 1, n):
                 a, b = self.lives[i], self.lives[j]
                 pa, pb = self.parts(a), self.parts(b)
-                if self.allowed_pair(a, b):
-                    # overlapped by design: only a clearly bigger overlap is a defect
-                    if self.excess(a, b, pa, pb) > OVERLAP_TOL:
-                        self._separate(a, b)
-                    continue
-                if not parts_overlap(pa, pb, tol=-self.gap):    # closer than the minimum gap
-                    continue
-                self._separate(a, b)
+                # Overlapped by design: only a clearly bigger overlap is a
+                # defect; unrelated pairs must also keep the minimum gap.
+                if self.rules.conflict(a, b, pa, pb, gap=self.gap):
+                    self._separate(a, b)
 
     def _separate(self, a: Live, b: Live) -> None:
         va, vb = self.vis(a), self.vis(b)
@@ -746,6 +779,12 @@ def text_graze(a: Unit, b: Unit, by_id: dict[str, dict[str, Any]], m: TextMeasur
                 return False          # a shape or image is involved: not a text graze
             if float(ea.get("rotation", 0.0) or 0.0) or float(eb.get("rotation", 0.0) or 0.0):
                 return False
+            fa, fb = float(ea["font_size"]), float(eb["font_size"])
+            la, lb = ink_lines(ea, a.members[ia], None, m), ink_lines(eb, b.members[ib], None, m)
+            same_word = " ".join(str(ea.get("content", "")).split()) == " ".join(str(eb.get("content", "")).split())
+            if max(lines_inside(lb, la), lines_inside(la, lb)) >= GRAZE_CONTAINED and (
+                    same_word or max(fa, fb) >= LOCKUP_FONT_RATIO * min(fa, fb)):
+                return False          # a label laid on a figure, or a shadow copy of the same word (v6): a lockup
             iw = min(va.right, vb.right) - max(va.x, vb.x)
             ih = min(va.bottom, vb.bottom) - max(va.y, vb.y)
             font = min(float(ea["font_size"]), float(eb["font_size"]))
@@ -753,6 +792,102 @@ def text_graze(a: Unit, b: Unit, by_id: dict[str, dict[str, Any]], m: TextMeasur
                 return False          # a full line or more: a lockup
             thin_seen = True
     return thin_seen
+
+
+# ---------------------------------------------------------------------------
+# which overlaps are allowed (v3 source-relative rule + v6 layering)
+
+
+def _on_fraction(text_parts: list[Box], other_parts: list[Box]) -> float:
+    """How much of a text's ink lies on the other unit (largest part pair)."""
+    return max((o.contains_fraction(t) for t in text_parts for o in other_parts if t.area > 0), default=0.0)
+
+
+class OverlapRules:
+    """Decides whether two content units may overlap as they do in a layout.
+    Built once per source (cached on the analysis) and shared by the
+    rectifier, the scorer, the eval metrics and the tests.
+
+    A pair may overlap as much as it did in the source plus OVERLAP_TOL
+    (v3). Beyond that (v6, from the designer references):
+
+      * text on text: never (a lockup may keep its overlap, not grow it);
+      * a pair the designer layered where one side is a picture or a shape
+        (a sticker on the photo, a figure in front of a wall) may overlap up
+        to LAYER_GROW x the source amount, since a non-uniform canvas
+        changes how much of the smaller piece lands on the bigger one;
+      * a text at least HOSTED_INSIDE inside a shape / image drawn *below*
+        it is hosted by it (a label on a block it was moved onto): never a
+        collision, the contrast and straddle rules judge its readability;
+      * a text whose role the designer layered over a picture / shape in
+        the source (ink >= LAYER_SRC_MIN on it) may be layered over a
+        picture / shape again when at least LAYER_MIN of its ink is on it
+        (a headline that sat on the hero may sit on the hero in every
+        format, not only on the identical pair it touched before).
+    """
+
+    def __init__(self, analysis: Analysis, m: TextMeasurer):
+        self.src_frac = source_overlap_fractions(analysis, m)
+        by_id = analysis.source_elements
+        order = {eid: i for i, eid in enumerate(by_id)}
+        z = {eid: float(el["z_index"]) if el.get("z_index") is not None else float(order[eid])
+             for eid, el in by_id.items()}
+        self.has_text: dict[str, bool] = {}
+        self.z_top: dict[str, float] = {}
+        self.z_bottom: dict[str, float] = {}
+        self.role: dict[str, str] = {}
+        for u in analysis.units:
+            ids = [i for i in u.ids if i in by_id]
+            self.has_text[u.key] = any(by_id[i]["type"] == "text" for i in ids)
+            self.z_top[u.key] = max((z[i] for i in ids), default=0.0)
+            self.z_bottom[u.key] = min((z[i] for i in ids), default=0.0)
+            self.role[u.key] = u.role
+        # Roles the designer layered over a picture / shape in the source.
+        self.layered_roles: set[str] = set()
+        vis = analysis.source_visible or {}
+        for (a, b), f in self.src_frac.items():
+            ta, tb = self.has_text.get(a, False), self.has_text.get(b, False)
+            if ta == tb:
+                continue
+            text, other = (a, b) if ta else (b, a)
+            if _on_fraction(vis.get(text, []), vis.get(other, [])) >= LAYER_SRC_MIN:
+                self.layered_roles.add(self.role[text])
+
+    def conflict(self, a: Live, b: Live, pa: list[Box], pb: list[Box], gap: float = 0.0,
+                 tol: float = OVERLAP_TOL) -> bool:
+        """Do these two units (visible parts `pa` / `pb`) overlap in a way the
+        source does not excuse? With `gap` > 0 (the rectifier) two unrelated
+        units closer than the gap also conflict."""
+        ka, kb = a.unit.key, b.unit.key
+        src = self.src_frac.get(_pair_key(ka, kb), 0.0)
+        if not parts_overlap(pa, pb, tol=1.0):
+            return gap > 0.0 and src <= 0.0 and parts_overlap(pa, pb, tol=-gap)
+        f = parts_overlap_fraction(pa, pb)
+        if f <= src + tol:
+            return False
+        ta, tb = self.has_text.get(ka, False), self.has_text.get(kb, False)
+        if ta and tb:
+            return True
+        if src > 0.0 and f <= LAYER_GROW * src:
+            return False
+        if ta != tb:
+            text, other = (a, b) if ta else (b, a)
+            pt, po = (pa, pb) if ta else (pb, pa)
+            on = _on_fraction(pt, po)
+            if on >= HOSTED_INSIDE and self.z_bottom[text.unit.key] > self.z_top[other.unit.key]:
+                return False
+            if on >= LAYER_MIN and self.role[text.unit.key] in self.layered_roles:
+                return False
+        return True
+
+
+def overlap_rules(analysis: Analysis, measurer: TextMeasurer | None = None) -> OverlapRules:
+    """The source's overlap rules, built once and cached on the analysis."""
+    rules = getattr(analysis, "_overlap_rules", None)
+    if rules is None:
+        rules = OverlapRules(analysis, measurer or default_measurer())
+        analysis._overlap_rules = rules   # type: ignore[attr-defined]
+    return rules
 
 
 def unwanted_overlaps(analysis: Analysis, elements: list[dict[str, Any]],
@@ -766,14 +901,11 @@ def unwanted_overlaps(analysis: Analysis, elements: list[dict[str, Any]],
     by_id = {el["id"]: el for el in elements}
     lives = _lives(analysis, by_id)
     vis = {l.unit.key: unit_visible_parts(l, by_id, m) for l in lives}
-    src = source_overlap_fractions(analysis, m)
+    rules = overlap_rules(analysis, m)
     out = []
     for i, a in enumerate(lives):
         for b in lives[i + 1:]:
             pa, pb = vis[a.unit.key], vis[b.unit.key]
-            if not parts_overlap(pa, pb, tol=1.0):
-                continue
-            f = parts_overlap_fraction(pa, pb) - src.get(_pair_key(a.unit.key, b.unit.key), 0.0)
-            if f > tol:
+            if rules.conflict(a, b, pa, pb, tol=tol):
                 out.append((a.unit.key, b.unit.key, parts_intersection(pa, pb)))
     return out

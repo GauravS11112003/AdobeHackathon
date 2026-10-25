@@ -31,6 +31,7 @@ from engine.geometry import Box  # noqa: E402
 from engine.render import render_design  # noqa: E402
 from engine.resize import resize_with_candidates  # noqa: E402
 from engine.score import score_design  # noqa: E402
+from eval.metrics import designer_agreement  # noqa: E402
 
 DOCS = ROOT.parent / "docs" / "designer"
 SPECS, OUT, CMP = DOCS / "specs", DOCS / "out", DOCS / "compare"
@@ -73,11 +74,38 @@ def stats(source, design, roles):
     }
 
 
+def label_record(name, src_path, source, W, H, an, s_ref, ref, winner):
+    """One weak calibration pair in eval/data/labels.jsonl's record format
+    (eval/labeling.py): side a = the designer reference, side b = the
+    engine's winner for the same case, decision "a", kind "weak". The
+    reference's score comes from the engine's own scorer, like a candidate's."""
+    from eval.labeling import _record, side_from_judged
+
+    a_side = {"id": "designer", "name": "designer reference", "strategy": "designer",
+              "total": round(float(s_ref.total), 3), "hard": list(s_ref.hard),
+              "penalty": round(float(s_ref.penalty), 3),
+              "breakdown": {k: round(float(v), 4) for k, v in s_ref.breakdown.items()}, "design": ref}
+    b_side = side_from_judged(winner)
+    row = {"id": name, "file": str(src_path), "title": source.get("title", name)}
+    rec = _record("designer", row, f"{W}x{H}", {"width": W, "height": H}, source, a_side, b_side)
+    rec.update({"decision": "a", "kind": "weak", "ts": time.time(),
+                "ts_iso": time.strftime("%Y-%m-%dT%H:%M:%S"), "engine_winner": winner.name,
+                # the source is a designer source, not a harness design: path from the repo root
+                "source_file": str(src_path)})
+    return rec
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--names", default="")
     ap.add_argument("--no-sheets", action="store_true")
+    ap.add_argument("--out", default="", help="write results under docs/designer/compare/<out>/ instead")
+    ap.add_argument("--labels", default="", help="also write weak calibration pairs (reference > engine winner) to this jsonl")
     a = ap.parse_args()
+    labels: list[dict] = []
+    global CMP
+    if a.out:
+        CMP = CMP / a.out
     CMP.mkdir(parents=True, exist_ok=True)
     names = sorted({p.stem.split("__")[0] for p in SPECS.glob("*__*.json")})
     if a.names:
@@ -107,15 +135,29 @@ def main():
             s_ref = score_design(an, source, ref, render=False)
             s_eng = score_design(an, source, eng, render=False)
             st_ref, st_eng = stats(source, ref, roles), stats(source, eng, roles)
+            # Designer agreement (v6, eval/metrics.designer_agreement): the
+            # winner's, and the best any judged candidate reaches (what the
+            # generator can produce vs what the judge picks).
+            da = designer_agreement(eng, ref, an)
+            best_da, best_name, best_rank = da.get("da_agreement", 0.0), judged[0].name if judged else "", 0
+            for rank, j in enumerate(judged):
+                v = designer_agreement(j.design, ref, an).get("da_agreement", 0.0)
+                if v > best_da + 1e-9:
+                    best_da, best_name, best_rank = v, j.name, rank
             row = {"name": name, "format": f"{W}x{H}", "engine_winner": judged[0].name if judged else "",
                    "engine_s": round(dt, 2),
                    "ref_score": round(s_ref.total, 1), "ref_hard": list(s_ref.hard), "ref_breakdown": s_ref.breakdown,
                    "eng_score": round(s_eng.total, 1), "eng_hard": list(s_eng.hard), "eng_breakdown": s_eng.breakdown,
-                   "ref": st_ref, "eng": st_eng}
+                   "ref": st_ref, "eng": st_eng, **da,
+                   "da_best": round(best_da, 4), "da_best_name": best_name, "da_best_rank": best_rank,
+                   "candidates": [{"name": j.name, "strategy": j.strategy, "total": round(j.score.total, 2),
+                                   "hard": len(j.score.hard)} for j in judged]}
             rows.append(row)
+            if a.labels and judged:
+                labels.append(label_record(name, src_path, source, W, H, an, s_ref, ref, judged[0]))
             if not a.no_sheets:
                 cells.append((f"{W}x{H}", rend(source, 480), rend(ref), rend(eng), row))
-            print(f"{name} {W}x{H}: ref {row['ref_score']} ({len(row['ref_hard'])}) vs eng {row['eng_score']} ({len(row['eng_hard'])})  headline {st_ref['headline_px']} vs {st_eng['headline_px']}  hull {st_ref['hull_cover']:.2f} vs {st_eng['hull_cover']:.2f}")
+            print(f"{name} {W}x{H}: ref {row['ref_score']} ({len(row['ref_hard'])}) vs eng {row['eng_score']} ({len(row['eng_hard'])})  headline {st_ref['headline_px']} vs {st_eng['headline_px']}  hull {st_ref['hull_cover']:.2f} vs {st_eng['hull_cover']:.2f}  agreement {da.get('da_agreement', 0):.2f} (best {best_da:.2f} {best_name[:24]})", flush=True)
         if cells and not a.no_sheets:
             CW, CH, PAD, LBL = 400, 300, 14, 44
             sheet = Image.new("RGB", (3 * CW + 4 * PAD + 120, 50 + len(cells) * (CH + LBL + PAD)), "#f3efe8")
@@ -137,6 +179,10 @@ def main():
                         d.text((x0, y0 + CH + 22), ("! " + "; ".join(hard))[:70], fill="#a33", font=small)
             sheet.save(CMP / f"{name}__COMPARE.png")
     (CMP / "results.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    if a.labels:
+        Path(a.labels).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.labels).write_text("\n".join(json.dumps(r) for r in labels) + "\n")
+        print("wrote", len(labels), "designer pairs to", a.labels)
     # summary
     def mean(xs):
         xs = [x for x in xs if x is not None]
@@ -144,13 +190,50 @@ def main():
     by_fmt: dict[str, list] = {}
     for r in rows:
         by_fmt.setdefault(r["format"], []).append(r)
-    lines = ["# Designer references vs engine", "", f"{len(rows)} (design, format) pairs. Scores are the engine's own scorer (no pixels).", "",
-             "| format | n | designer score | engine score | designer wins | designer headline px | engine headline px | designer hull | engine hull | designer min font | engine min font | engine hard fails |",
-             "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
-    for f, rs in sorted(by_fmt.items(), key=lambda kv: -int(kv[0].split("x")[0]) * int(kv[0].split("x")[1])):
+    def fmt_key(kv):
+        return -int(kv[0].split("x")[0]) * int(kv[0].split("x")[1])
+
+    n_ref_hard = sum(bool(r["ref_hard"]) for r in rows)
+    agree = mean([r.get("da_agreement") for r in rows])
+    best = mean([r.get("da_best") for r in rows])
+    wins = sum(r["ref_score"] > r["eng_score"] for r in rows)
+    lines = ["# Designer references vs engine", "",
+             f"{len(rows)} (design, format) pairs. Scores are the engine's own scorer (no pixels).", "",
+             f"**Headline numbers:** designer agreement of the engine's winner **{agree:.3f}** (best judged candidate "
+             f"{best:.3f}); references tripping a hard fail **{n_ref_hard}/{len(rows)}**; designer scores higher in "
+             f"{wins}/{len(rows)}; engine hard fails {sum(bool(r['eng_hard']) for r in rows)}/{len(rows)}.", "",
+             "| format | n | designer score | engine score | designer wins | designer headline px | engine headline px | designer hull | engine hull | designer min font | engine min font | designer hard fails | engine hard fails |",
+             "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+    for f, rs in sorted(by_fmt.items(), key=fmt_key):
         lines.append(f"| {f} | {len(rs)} | {mean([r['ref_score'] for r in rs]):.1f} | {mean([r['eng_score'] for r in rs]):.1f} | "
                      f"{sum(r['ref_score'] > r['eng_score'] for r in rs)}/{len(rs)} | {mean([r['ref']['headline_px'] for r in rs]):.0f} | {mean([r['eng']['headline_px'] for r in rs]):.0f} | "
-                     f"{mean([r['ref']['hull_cover'] for r in rs]):.2f} | {mean([r['eng']['hull_cover'] for r in rs]):.2f} | {mean([r['ref']['min_font'] for r in rs]):.0f} | {mean([r['eng']['min_font'] for r in rs]):.0f} | {sum(bool(r['eng_hard']) for r in rs)} |")
+                     f"{mean([r['ref']['hull_cover'] for r in rs]):.2f} | {mean([r['eng']['hull_cover'] for r in rs]):.2f} | {mean([r['ref']['min_font'] for r in rs]):.0f} | {mean([r['eng']['min_font'] for r in rs]):.0f} | "
+                     f"{sum(bool(r['ref_hard']) for r in rs)} | {sum(bool(r['eng_hard']) for r in rs)} |")
+    lines += ["", "## Designer agreement (eval/metrics.designer_agreement; 1 = the reference itself)", "",
+              "| format | n | agreement (winner) | agreement (best candidate) | winner is best | centre error | within 10 % | reading-order tau | size rho | winner >= 0.7 |",
+              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+    for f, rs in sorted(by_fmt.items(), key=fmt_key):
+        lines.append(f"| {f} | {len(rs)} | {mean([r.get('da_agreement') for r in rs]):.3f} | {mean([r.get('da_best') for r in rs]):.3f} | "
+                     f"{sum(r.get('da_best_rank') == 0 for r in rs)}/{len(rs)} | {mean([r.get('da_pos_err') for r in rs]):.3f} | "
+                     f"{mean([r.get('da_within10') for r in rs]):.2f} | {mean([r.get('da_order_tau') for r in rs]):.2f} | "
+                     f"{mean([r.get('da_size_rho') for r in rs]):.2f} | {sum((r.get('da_agreement') or 0) >= 0.7 for r in rs)}/{len(rs)} |")
+    lines.append(f"| **all** | {len(rows)} | {agree:.3f} | {best:.3f} | {sum(r.get('da_best_rank') == 0 for r in rows)}/{len(rows)} | "
+                 f"{mean([r.get('da_pos_err') for r in rows]):.3f} | {mean([r.get('da_within10') for r in rows]):.2f} | "
+                 f"{mean([r.get('da_order_tau') for r in rows]):.2f} | {mean([r.get('da_size_rho') for r in rows]):.2f} | "
+                 f"{sum((r.get('da_agreement') or 0) >= 0.7 for r in rows)}/{len(rows)} |")
+    by_name: dict[str, list] = {}
+    for r in rows:
+        by_name.setdefault(r["name"], []).append(r)
+    lines += ["", "### By design", "", "| design | n | agreement (winner) | agreement (best) | winner >= 0.7 | structure wins | designer hard fails |",
+              "|---|---:|---:|---:|---:|---:|---:|"]
+    for nm, rs in sorted(by_name.items(), key=lambda kv: mean([r.get("da_agreement") for r in kv[1]])):
+        lines.append(f"| {nm} | {len(rs)} | {mean([r.get('da_agreement') for r in rs]):.3f} | {mean([r.get('da_best') for r in rs]):.3f} | "
+                     f"{sum((r.get('da_agreement') or 0) >= 0.7 for r in rs)}/{len(rs)} | "
+                     f"{sum('structure' in (r.get('engine_winner') or '') for r in rs)}/{len(rs)} | {sum(bool(r['ref_hard']) for r in rs)} |")
+    lines += ["", "## Designer references that still trip a hard fail", ""]
+    for r in rows:
+        if r["ref_hard"]:
+            lines.append(f"- {r['name']} {r['format']}: {'; '.join(r['ref_hard'])}")
     comps = sorted({k for r in rows for k in r["ref_breakdown"]})
     lines += ["", "## Score components, mean (designer vs engine)", "", "| component | designer | engine | gap |", "|---|---:|---:|---:|"]
     for c in comps:

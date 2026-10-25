@@ -252,6 +252,38 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
     image whose extent is larger than the canvas. `eval/compare_runs.py` reports `layout.cohesion` and the
     smallest font p50 / headline-CTA p05 / p50.
 
+- **v6 designer references as the target (2026-10-25, docs/EVAL_V6.md, tests/test_v6_rules.py,
+  tests/test_structure.py)**; measured with `CHAMELEON_OPTIMIZE=0`:
+  - `rectify.OverlapRules` (`overlap_rules(analysis, m).conflict(a, b, pa, pb, gap, tol)`) is the one predicate the
+    rectifier, scorer, eval metrics and tests share. Beyond v3's source-relative rule: a text whose role the source
+    laid over a picture / shape (≥ `LAYER_SRC_MIN` 0.3 of its ink) may lie on one again (≥ `LAYER_MIN` 0.3 on it);
+    a text ≥ `HOSTED_INSIDE` 0.8 inside a shape / image drawn below it is never a collision; a source-layered pair
+    with a non-text side may overlap up to `LAYER_GROW` 2× the source amount; text on text stays at +1.5 pp. The
+    graze rule exempts lockups: ink ≥ `GRAZE_CONTAINED` 0.8 on the other text's *lines* (`ink_lines`) and the two
+    differ ≥ `LOCKUP_FONT_RATIO` 1.5× in size or are the same word (a shadow copy).
+  - `score.py`: `text_overflows` (painted ink + `OVERFLOW_SLACK` 0.5 px, also eval's `overflow_n`); `layout.margins`
+    skips picture / shape blocks ≥ `BIG_UNIT_FRAC` 0.15 of the source canvas (`margin_judged`); `bleed_allowance`
+    lets a picture / shape that bled ≥ 1 % bleed up to 1.5× (cap 25 %); `layout.spacing` is source-relative
+    (`source_spacing_cv`: the source's own gap unevenness is free); strategy `"structure"` pays the disruption
+    penalty like a floor plan. Breakdown keys, hard-fail strings and `Score` fields are unchanged.
+  - `engine/structure.py` — preserve-structure family: `detect_structure` (zones = panels + pictures / shapes
+    ≥ `ZONE_MIN_AREA` 0.10, bleeding photos ≥ 0.25, never rotated; carried content ≥ `CARRY_MIN` 0.3 on a zone
+    below it; cards ≥ 0.8 inside a zone; bands on the source's stack axis, splits on visible extents; kinds
+    bands / split / lockup, None without a zone) and `structure_relayout(analysis, target, elements, m,
+    StructureOptions(flip, swap, spacing), structure)`: text leaves re-wrap with floorplan's `_TextItem` and one
+    global k, blocks capped at their source share of the stack length, elastic full-bleed panels, aspect-kept
+    pictures, rails for vertical texts in zones, leftover to zones by source weight, splits stack on strips
+    (`UNSPLIT_RATIO` 0.4). `candidates.generate_candidates` adds 2–3 variants (strategy `"structure"`,
+    `MAX_CANDIDATES` 21): keep / flip (orientation change) / swap (split).
+  - `eval/metrics.designer_agreement(ours, ref, analysis)` → `da_*` (centre error, within-10 %, reading-order tau,
+    size rho, `da_agreement` mix); `tools/designer_compare.py` reports winner + best-candidate agreement per
+    format / design (`--out <sub>`, `--labels <jsonl>` writes the 240 weak pairs `eval/data/labels.designer.jsonl`,
+    gitignored). Numbers: references with hard fails 61 → 10 (3 CTAs the designer set under the 12 px floor, 7
+    overlaps the source never had), engine hard fails on the 240 cases 11 → 0, winner agreement 0.594 → 0.601
+    (best candidate 0.711; the judge, not the generator, is the gap), structure wins 67/240. The designer pairs do
+    not fit a linear reweighting (hand weights side with the designer in 31 %): the preference is compositional.
+    `tests/fixtures/golden_v5` regenerated from this tree (flags off, optimiser off).
+
 ## Playground (dev tool, not shipped)
 - `chameleon/tools/playground.py` serves a local UI at http://localhost:8765: pick a sample, upload or paste a
   design, pick a preset or custom size; shows source / stretch-baseline / output renders (fit or 1:1, optional
@@ -390,3 +422,40 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   (`python -m eval.labeling --n 300`, `eval/data/labels_weak.jsonl`), kept at
   `eval/data/score_weights.weak.json`; while a weights file exists in `engine/`, hand edits to `WEIGHTS` are
   overridden. Tests: `tests/test_calibrate.py`.
+
+## v7: relations, energy, optimiser (2026-10-25, docs/EVAL_V7.md, tests/test_v7_optimize.py)
+- The engine no longer only picks a template: after the no-pixel judging the top `OPTIMIZE_TOP_K` (3,
+  `CHAMELEON_OPTIMIZE_K`) seeds are walked down a design-principle energy and each refined layout competes
+  as "<seed> +opt" (same strategy / prior; dropped if the judge finds a hard fail the seed did not have).
+  `CHAMELEON_OPTIMIZE=0` leaves the output byte-identical to the unrefined loop (test); same-shape targets
+  (`ratio_change` ≤ `resize.SAME_SHAPE_MAX` 1.02) are never refined.
+- `relations.py` — O'Donovan-style perceptual graph of a design on visible boxes: alignment groups / pairs /
+  near misses, proximity neighbours (gap ≤ max(0.6 × smaller extent, 2.5 % span)), containment and panel
+  carry, axis symmetry and mirror pairs, importance, reading order, size, fonts. `source_relations(analysis)`
+  is cached; `lost_alignments` / `broken_proximity` (graded) / `order_discordance` / `lost_containment` /
+  `lost_symmetry` compare source and output; `Relations.to_dict()` serialises.
+- `energy.py` — `Layout` (unit-level state on `rectify._Rectifier`, element dicts kept in sync, cached text
+  layouts and per-text contrast estimates) and `Layout.evaluate()` → `Energy(total, hard, terms)`: hard terms
+  mirror the judge rule for rule (uses the v6 helpers `score.text_overflows` / `bleed_allowance` /
+  `margin_judged` and `rectify.OverlapRules` when present), `pres.*` terms keep the source's relations
+  (incl. `pres.drift`: displacement against the proportional copy, fading out at `ADAPT_RATIO`), `aes.*`
+  terms reuse score.py's component functions (`aes.spacing` judges white space *between* proximity groups,
+  `aes.margins` excludes fine print). `WEIGHTS` in one place; `engine/energy_weights.json` (fit, shipped)
+  overrides; `CHAMELEON_ENERGY_WEIGHTS=0|<path>`. One evaluation 0.3–1.5 ms.
+- `optimize.py` — greedy best-improvement local search per unit (snap to another unit's line, nudge ± 2 %,
+  grow / shrink 10 % about the anchored point, re-wrap a single text, swap with the next unit of its stack /
+  row, never two text-bearing units); accepts a move only if the energy drops by more than `EPS` (0.1) and
+  neither a new hard fail nor a new sub-gap near-touch (`Energy.near`, the rectifier's minimum gap) appears;
+  scale steps are snapped so the unit's largest font stays an integer; budget `max_evals` 160 (deterministic),
+  `time_cap_s` safety net; `Result.summary()` lands in `Score.notes["optimize"]`.
+- Fitting: `eval/perturb_designer.py` writes PRISM-style one-principle perturbation pairs of the designer
+  references (`eval/data/labels_designer_perturb.jsonl`) and designer > engine pairs
+  (`eval/data/labels_designer_engine.jsonl`; `tools/designer_compare.py --labels` owns `labels.designer.jsonl`,
+  which the calibration prefers when present); `eval/calibrate.py --energy [--install]` fits
+  the energy weights on human + weak + designer + perturbation pairs with the sealed hold-out designs
+  (`docs/designer2/holdout_ids.json`) reported, never fitted; pairs whose hard-fail counts differ are excluded
+  (pinned terms, they only collapse the temperature). `eval/compare_optimize.py` compares optimiser off vs on
+  on every reference (hold-out in its own table) → `docs/designer/compare/v7_optimizer/`.
+- Finding: designer references lose to the engine on the regularity terms (even spacing, margins, line count,
+  uniform scale, symmetry) and win on reading order, containment, contrast and presence; the fit moves the
+  weight there. 71 of 600 tuning references trip a hard rule (mostly deliberate layering / bleed).

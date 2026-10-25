@@ -322,7 +322,8 @@ def test_anchor_layout_pays_the_adaptation_penalty_on_a_big_shape_change():
     # on the shipped Level 2 task a real floor plan wins; the penalised anchor
     # would still win if it were the only clean candidate (penalty << hard fail)
     best, judged = resize_with_candidates(src, {"width": 1600, "height": 400})
-    assert judged[0].strategy == "floorplan" and not judged[0].score.hard
+    # a real re-layout (a floor plan, or v6's preserve-structure row) wins
+    assert judged[0].strategy in ("floorplan", "structure") and not judged[0].score.hard
     assert ADAPT_PENALTY < 1000
 
 

@@ -29,7 +29,7 @@ from engine.analyze import BACKGROUND, DECORATIVE, CTA, HEADLINE, Analysis, anal
 from engine.floorplan import Metrics, ratio_family
 from engine.geometry import Box
 from engine.rectify import rotated_extent, unwanted_overlaps
-from engine.score import below_floor
+from engine.score import below_floor, text_overflows
 from engine.textfit import TextMeasurer, default_measurer
 
 ASPECT_TOL = 0.05
@@ -158,7 +158,7 @@ def text_metrics(source: dict[str, Any], output: dict[str, Any], target: dict[st
         font = _f(e.get("font_size"))
         min_font = min(min_font, font)
         try:
-            if not mm.fits(e, font, _f(e.get("width")), _f(e.get("height"))):
+            if text_overflows(e, mm):      # painted ink past the box (v6; the scorer's rule)
                 overflow.append(e["id"])
         except Exception:
             overflow.append(e["id"])
@@ -317,6 +317,79 @@ def gt_agreement(ours: dict[str, Any], theirs: dict[str, Any]) -> dict[str, Any]
     res["gt_font_ratio"] = round(ratios[len(ratios) // 2], 3) if ratios else None
     wr = sorted((_f(a["width"]) / W1) / max(_f(b["width"]) / W2, 1e-6) for a, b in pairs)
     res["gt_width_ratio"] = round(wr[len(wr) // 2], 3) if wr else None
+    return res
+
+
+# ---------------------------------------------------------------------------
+# designer agreement (v6): the same design, hand-composed for the same canvas
+
+DA_POS_FULL = 0.25           # a centre this far off (fraction of the diagonal) scores 0 on position
+DA_WITHIN = 0.10             # "within 10 %": every box coordinate within this share of the canvas
+DA_WEIGHTS = {"pos": 0.35, "within": 0.25, "order": 0.2, "size": 0.2}
+
+
+def _extent(e: dict[str, Any]) -> Box:
+    return rotated_extent(Box.of(e), _f(e.get("rotation", 0.0)))
+
+
+def designer_agreement(ours: dict[str, Any], reference: dict[str, Any],
+                       analysis: Analysis | None = None, source: dict[str, Any] | None = None) -> dict[str, Any]:
+    """How close `ours` is to a designer's `reference` for the same source
+    and canvas (same element ids, so elements are matched by id; backgrounds
+    and decoration are left out). All in canvas-normalised coordinates on
+    the drawn extents:
+
+      da_n           matched content elements
+      da_pos_err     mean centre distance (fraction of the canvas diagonal)
+      da_pos         mean of 1 - min(1, distance / DA_POS_FULL)
+      da_within10    share of elements whose x, y, width and height are all
+                     within DA_WITHIN of the canvas size from the reference
+      da_order_tau   Kendall tau between the two reading orders
+                     (engine.score.reading_order on the extents)
+      da_size_rho    Spearman correlation of linear sizes (size hierarchy)
+      da_agreement   DA_WEIGHTS-weighted mix of pos, within10, (tau + 1) / 2
+                     and (rho + 1) / 2, in [0, 1]; 1 = the reference itself
+    """
+    from engine.score import reading_order
+
+    if analysis is None and source is not None:
+        analysis = analyze(source)
+    roles = analysis.roles if analysis is not None else {}
+    W, H = float(ours["canvas"]["width"]), float(ours["canvas"]["height"])
+    W2, H2 = float(reference["canvas"]["width"]), float(reference["canvas"]["height"])
+    theirs = {e.get("id"): e for e in reference.get("elements") or []}
+    pairs: list[tuple[str, Box, Box]] = []
+    for e in ours.get("elements") or []:
+        if roles.get(e.get("id")) in (BACKGROUND, DECORATIVE) or e.get("id") not in theirs:
+            continue
+        pairs.append((e["id"], _extent(e), _extent(theirs[e["id"]])))
+    res: dict[str, Any] = {"da_n": len(pairs)}
+    if not pairs:
+        return res
+    dist, within, sz1, sz2 = [], 0, [], []
+    for _, a, b in pairs:
+        dx, dy = a.cx / W - b.cx / W2, a.cy / H - b.cy / H2
+        dist.append(math.hypot(dx, dy) / math.sqrt(2.0))
+        if (abs(a.x / W - b.x / W2) <= DA_WITHIN and abs(a.y / H - b.y / H2) <= DA_WITHIN
+                and abs(a.w / W - b.w / W2) <= DA_WITHIN and abs(a.h / H - b.h / H2) <= DA_WITHIN):
+            within += 1
+        sz1.append(math.sqrt(a.area / (W * H)))
+        sz2.append(math.sqrt(b.area / (W2 * H2)))
+    res["da_pos_err"] = round(sum(dist) / len(dist), 4)
+    res["da_pos"] = round(sum(1.0 - min(1.0, d / DA_POS_FULL) for d in dist) / len(dist), 4)
+    res["da_within10"] = round(within / len(pairs), 4)
+    if len(pairs) >= 2:
+        o1 = reading_order([(k, a) for k, a, _ in pairs])
+        o2 = reading_order([(k, b) for k, _, b in pairs])
+        keys = [k for k, _, _ in pairs]
+        tau = kendall_tau([float(o1[k]) for k in keys], [float(o2[k]) for k in keys])
+        rho = spearman(sz1, sz2)
+    else:
+        tau = rho = 1.0
+    res["da_order_tau"] = round(tau, 4)
+    res["da_size_rho"] = round(rho, 4)
+    res["da_agreement"] = round(DA_WEIGHTS["pos"] * res["da_pos"] + DA_WEIGHTS["within"] * res["da_within10"]
+                                + DA_WEIGHTS["order"] * (tau + 1.0) / 2.0 + DA_WEIGHTS["size"] * (rho + 1.0) / 2.0, 4)
     return res
 
 

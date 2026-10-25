@@ -15,6 +15,7 @@ Nothing here looks at element ids; roles come from the analyzer.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -30,10 +31,13 @@ from engine.floorplan import (
 )
 from engine.geometry import Box
 from engine.relayout import Placement, anchor_relayout, ratio_change, resolve_vertical_collisions
+from engine.structure import detect_structure, structure_relayout, structure_variants
 from engine.textfit import TextMeasurer, default_measurer
 
+logger = logging.getLogger(__name__)
+
 SMALL_CHANGE_MAX = 1.75     # ratio_change() up to this: anchor variants compete unpenalised (score.ADAPT_RATIO)
-MAX_CANDIDATES = 18
+MAX_CANDIDATES = 21         # v6: room for the 2-3 preserve-structure variants
 ANCHOR_SCALE_BOOSTS = (1.0, 1.12, 1.25, 1.4)   # content scale = min(sx, sy) * boost, capped at max(sx, sy)
 TIGHT, LOOSE = 0.75, 1.3
 BOLD, BOLDER = 1.3, 1.5     # v4 scale_bias variants: ideal sizes past the proportional size when there is room
@@ -49,7 +53,7 @@ ARCHETYPE_PENALTY = 3.0
 @dataclass
 class Candidate:
     name: str
-    strategy: str                       # "anchor" | "floorplan"
+    strategy: str                       # "anchor" | "floorplan" | "structure"
     placement: Placement
     options: PlanOptions | None = None  # floor plan variant
     scale: float | None = None          # anchor content scale
@@ -83,6 +87,26 @@ def generate_candidates(analysis: Analysis, source: dict[str, Any], target: Box,
         resolve_vertical_collisions(analysis, pl, target)
         out.append(Candidate(f"{family} {opts.name}", "floorplan", pl, options=opts,
                              prior=archetype_prior(family, opts, archetype)))
+
+    # v6: preserve-structure variants (engine/structure.py): the source's
+    # bands / split / lockup re-proportioned for the target instead of a
+    # template; only for sources that have a zone to build a structure from.
+    try:
+        st = detect_structure(analysis, by_id)
+    except Exception:
+        logger.exception("structure detection failed; no structure candidates")
+        st = None
+    if st is not None:
+        for sv in structure_variants(st, target, analysis.canvas):
+            try:
+                pl = structure_relayout(analysis, target, by_id, m, sv, st)
+            except Exception:
+                logger.exception("structure variant %s failed; skipped", sv.name)
+                continue
+            if pl is None:
+                continue
+            resolve_vertical_collisions(analysis, pl, target)
+            out.append(Candidate(f"{family} structure {sv.name}", "structure", pl))
 
     if not small:
         # Safety candidate: proportions kept, everything slid toward its anchor.

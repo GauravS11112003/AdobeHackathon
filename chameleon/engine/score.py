@@ -66,6 +66,11 @@ DISRUPT_RATIO = 1.25         # below this ratio change a re-laid-out (floor plan
 DISRUPT_PENALTY = 4.0        # ... this (linearly, 0 at DISRUPT_RATIO): a finished design is not re-arranged for nothing
 FLOOR_REL = 0.98             # a font is below the floor only if it also shrank below this x the source font x canvas scale
 BLEED_TOL = 0.01             # a unit may be off canvas by this fraction more than it was in the source
+BLEED_SRC_MIN = 0.01         # v6: a picture / shape unit that bled at least this much in the source ...
+BLEED_GROW = 1.5             # ... may bleed up to this x as much (a photo cropped by the edge stays cropped) ...
+BLEED_CAP = 0.25             # ... but never more than this share of itself (nothing important leaves the canvas)
+BIG_UNIT_FRAC = 0.15         # v6: a picture / shape unit covering this share of the canvas is a block, not a margin matter
+OVERFLOW_SLACK = 0.5         # px of painted ink past the box that still counts as fitting (the designer DSL's tolerance)
 HIER_RATIO = 0.82            # higher-ranked text keeps >= min(this, source ratio) of the lower one's size
 
 WEIGHTS = {
@@ -190,14 +195,14 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
             # up to the same share; anything more is a defect.
             off_now = 1.0 - target.contains_fraction(fb)
             off_src = 1.0 - analysis.canvas.contains_fraction(l.unit.box)
-            if off_now > off_src + BLEED_TOL:
+            if off_now > bleed_allowance(l.unit, off_src, src_by_id):
                 hard.append(f"{l.unit.key} off canvas")
     met = Metrics.for_canvas(analysis.canvas, target, ratio_family(target))
     area_scale = math.sqrt(target.area / analysis.canvas.area)
     for el in elements:
         if el["type"] == "text":
             font = float(el["font_size"])
-            if not m.fits(el, font, float(el["width"]), float(el["height"])):
+            if text_overflows(el, m):
                 hard.append(f"{el['id']} text overflows its box")
             role = analysis.roles.get(el["id"])
             src_font = float(src_by_id[el["id"]]["font_size"]) if el["id"] in src_by_id else font
@@ -281,9 +286,16 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
     bd["layout.alignment"] = _alignment(boxes, target)
     # Legal copy sits on the bottom edge by convention; the gap above it is
     # not a rhythm defect (v4: it cost hero-beside-column layouts 3 points).
-    bd["layout.spacing"] = _spacing([vis[l.unit.key] for l in lives if l.unit.role != FINE_PRINT])
+    # The designer's own rhythm is the baseline (v6): a header / band /
+    # footer composition has uneven gaps in the source, and keeping them is
+    # not a defect; only unevenness beyond the source's is penalised.
+    bd["layout.spacing"] = _spacing([vis[l.unit.key] for l in lives if l.unit.role != FINE_PRINT],
+                                    free=source_spacing_cv(analysis, m))
     bd["layout.fill"] = _fill(boxes, target)
-    bd["layout.margins"] = _margins(boxes, target)
+    # Breathing room is a matter for text and small pieces (v6): a photo
+    # band or a colour block run to the edge is how designers compose.
+    bd["layout.margins"] = _margins([vis[l.unit.key] for l in lives if margin_judged(l.unit, src_by_id, analysis.canvas)],
+                                    target)
     bd["layout.size"] = _primary_size(lives, analysis, by_id, src_by_id, target, area_scale)
     bd["layout.cohesion"] = _cohesion([vis[l.unit.key] for l in lives if l.unit.role != FINE_PRINT], target)
 
@@ -302,13 +314,52 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
     if strategy == "anchor" and change >= ADAPT_RATIO:
         penalty = ADAPT_PENALTY
         notes["adaptation_penalty"] = penalty
-    elif strategy == "floorplan" and change < DISRUPT_RATIO:
+    elif strategy in ("floorplan", "structure") and change < DISRUPT_RATIO:
         penalty = DISRUPT_PENALTY * (DISRUPT_RATIO - change) / (DISRUPT_RATIO - 1.0)
         notes["disruption_penalty"] = round(penalty, 2)
 
     soft = sum(WEIGHTS[k] * clamp(v, 0.0, 1.0) for k, v in bd.items())
     total = soft - HARD_PENALTY * len(hard) - penalty
     return Score(total=total, hard=hard, breakdown=bd, notes=notes, penalty=penalty)
+
+
+def text_overflows(el: dict[str, Any], m: TextMeasurer, slack: float = OVERFLOW_SLACK) -> bool:
+    """Does the *painted* text run past its box? The renderer never clips,
+    so the box is a layout hint: what matters is where the glyphs land
+    (widest wrapped line, last baseline plus descender) against the box,
+    with the same half-pixel tolerance the designer DSL's validator uses
+    (v6; the box-metric check also counted the last line's full descent).
+    `max_lines` is still honoured. Shared with eval/metrics."""
+    w, h = float(el["width"]), float(el["height"])
+    font = float(el["font_size"])
+    try:
+        lay = m.layout(el, font, w)
+        if el.get("max_lines") and lay.n_lines > int(el["max_lines"]):
+            return True
+        p = m.painted(el, font, max(w, 1.0))
+    except Exception:
+        return True
+    return p.w > w + slack or p.bottom > h + slack
+
+
+def bleed_allowance(unit: Unit, off_src: float, src_by_id: dict[str, dict[str, Any]]) -> float:
+    """How much of a unit may lie off canvas: what it bled in the source
+    plus BLEED_TOL; a picture / shape unit the designer already ran off
+    the edge (v6) may bleed up to BLEED_GROW x that, capped at BLEED_CAP."""
+    allowed = off_src + BLEED_TOL
+    has_text = any(src_by_id.get(i, {}).get("type") == "text" for i in unit.ids)
+    if not has_text and off_src >= BLEED_SRC_MIN:
+        allowed = max(allowed, min(BLEED_GROW * off_src, BLEED_CAP))
+    return allowed
+
+
+def margin_judged(unit: Unit, src_by_id: dict[str, dict[str, Any]], src_canvas: Box) -> bool:
+    """Does `layout.margins` look at this unit? Text and small pieces, yes;
+    a picture or shape unit that is a block (>= BIG_UNIT_FRAC of the source
+    canvas) is composition, and full-bleed is a legitimate choice for it."""
+    if any(src_by_id.get(i, {}).get("type") == "text" for i in unit.ids):
+        return True
+    return unit.box.area < BIG_UNIT_FRAC * src_canvas.area
 
 
 def below_floor(font: float, role: str, src_font: float, met: Metrics, area_scale: float) -> bool:
@@ -577,8 +628,10 @@ def _alignment(boxes: list[Box], target: Box) -> float:
     return 0.5 * lines + 0.5 * aligned / n
 
 
-def _spacing(vis: list[Box]) -> float:
-    scores = []
+def _spacing_cvs(vis: list[Box]) -> list[float]:
+    """Coefficient of variation of the gaps along every stack / row chain of
+    three or more boxes (0 = perfectly even)."""
+    cvs = []
     for axis in ("y", "x"):
         for chain in _chains(vis, axis):
             if len(chain) < 3:
@@ -591,8 +644,33 @@ def _spacing(vis: list[Box]) -> float:
             if mean <= 0:
                 continue
             sd = math.sqrt(sum((g - mean) ** 2 for g in gaps) / len(gaps))
-            scores.append(clamp(1.0 - sd / mean, 0.0, 1.0))
+            cvs.append(sd / mean)
+    return cvs
+
+
+def _spacing(vis: list[Box], free: float = 0.0) -> float:
+    """Even gaps in stacks and rows; `free` is the unevenness (gap
+    coefficient of variation) the source had, which costs nothing (v6)."""
+    scores = [clamp(1.0 - max(0.0, cv - free), 0.0, 1.0) for cv in _spacing_cvs(vis)]
     return sum(scores) / len(scores) if scores else 1.0
+
+
+def source_spacing_cv(analysis: Analysis, m: TextMeasurer) -> float:
+    """Mean gap unevenness of the source's own stacks / rows (visible boxes,
+    fine print left out like in the output), cached on the analysis."""
+    cached = getattr(analysis, "_source_spacing_cv", None)
+    if cached is not None:
+        return cached
+    by_id = analysis.source_elements
+    try:
+        lives = _lives(analysis, by_id)
+        vis = [unit_visible_box(l, by_id, m) for l in lives if l.unit.role != FINE_PRINT]
+        cvs = _spacing_cvs(vis)
+        cv = sum(cvs) / len(cvs) if cvs else 0.0
+    except Exception:  # pragma: no cover - odd source element
+        cv = 0.0
+    analysis._source_spacing_cv = cv   # type: ignore[attr-defined]
+    return cv
 
 
 def _chains(boxes: list[Box], axis: str) -> list[list[Box]]:

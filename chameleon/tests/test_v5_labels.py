@@ -233,7 +233,9 @@ def test_vertical_texts_stay_beside_the_hero_on_a_skyscraper(src_fn):
         ext = rotated_extent(Box.of(r), float(r["rotation"]))
         yo = min(ext.bottom, hb.bottom) - max(ext.y, hb.y)
         assert yo > 0.5 * hb.h, (r["id"], ext, hb)
-        assert ext.right <= hb.x + 1.0 or ext.x >= hb.right - 1.0, (r["id"], ext, hb)
+        # beside the photo: the rail's *box* extent may graze the photo by the
+        # rectifier's minimum gap (2 px here); the painted glyphs stay clear
+        assert ext.right <= hb.x + 2.0 or ext.x >= hb.right - 2.0, (r["id"], ext, hb)
     head = next(e for e in best["elements"] if an.roles[e["id"]] == HEADLINE)
     assert float(head["font_size"]) >= met.min_font(HEADLINE)
     assert Box.of(head).cy < hb.cy          # the headline was above the photo in the source
