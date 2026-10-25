@@ -485,7 +485,9 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   the 16 weights on the hold-out (gbt 0.600–0.602 < hand 0.605), so no model file.
 - Tools / data: `eval/picker_gap.py` (720-case diagnosis + candidate dump, `--report-only`), reports in
   `docs/designer/compare/v8_picker{,_hand,_v7scorer}/`, renders `docs/sanity_v8/`. Goldens: four Level 3 files
-  regenerated deliberately (1080², 1080×1920, 1200×628, 160×600). Known: a multi-element unit's "primary" is
-  its first element in list order (`analyze._cluster`, read by `structure.py`), so a shuffled list can change a
-  structure candidate; `test_element_order_does_not_matter` is xfail (non-strict) until cluster ids are
-  canonicalised.
+  regenerated deliberately (1080², 1080×1920, 1200×628, 160×600).
+- v8.1: element order is canonical. `analyze._canon` ranks elements by z, then (y, x), then size (id only as
+  the last resort), and `_cluster` / `_panel_stacks` / `_merge_rows` order members, clusters and every tie
+  with it, so a unit's first id (a pill's background, a group's key, what `structure.py` reads as
+  `u.primary or u.ids[0]`) no longer depends on the task's element list. `test_element_order_does_not_matter`
+  is strict again; no golden moved.

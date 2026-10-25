@@ -196,11 +196,14 @@ CHAMELEON_SCORE_WEIGHTS=0 .venv/bin/python -m eval.picker_gap --workers 4 --out 
 - **The fit cannot see legibility.** Readability weights are frozen; the only legibility signals in the fit are
   the hard floors and the sample tests. Human labels (61 usable pairs) are too few to fit; more labels on
   structure-vs-template pairs would let the readability block be fitted too.
-- **Element-order sensitivity in the structure family.** A multi-element unit takes its "primary" element from
-  list position (`analyze._cluster` `ids[0]`; `engine/structure.py` reads `u.primary or u.ids[0]`), so a shuffled
-  element list lays a structure candidate out differently; with the v8 weights that candidate wins on synthetic
-  seed 11, and `tests/test_metamorphic.py::test_element_order_does_not_matter` is marked xfail (non-strict) with
-  this reason. Fix: canonicalise cluster ids (z, then reading position) in `analyze._cluster`; it will move goldens.
+- **Element-order sensitivity (fixed in v8.1).** A multi-element unit took its "primary" element from list
+  position (`analyze._cluster` `ids[0]`; `engine/structure.py` reads `u.primary or u.ids[0]`), so a shuffled
+  element list laid a structure candidate out differently, and with the v8 weights that candidate won on
+  synthetic seed 11. `analyze._canon` now ranks elements by z, then reading position (y, x), then size (the id
+  only for elements identical in all of those), and `_cluster` (member order, cluster order, holder / bar / root
+  ties), `_panel_stacks` and `_merge_rows` use it. `test_element_order_does_not_matter` passes strictly for all
+  12 corpus seeds; the three samples give identical output per id under three shuffles × six targets; no golden
+  moved and the sanity renders are unchanged.
 - **Offline re-ranking is optimistic by ≈ 0.001–0.003** against the real run (the stage-1 order decides which
   seeds the optimiser refines); the shipped column above is the real run.
 - The optimiser still lowers agreement when it refines an anchor seed (anchor+opt → anchor, 39 missed cases,

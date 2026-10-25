@@ -341,6 +341,19 @@ def analyze(source: dict[str, Any]) -> Analysis:
 # union-find over the relations that make several elements one unit
 
 
+def _canon(boxes: dict[str, Box], z: dict[str, float]):
+    """v8: an id-free, order-free ranking of elements - drawing order (z),
+    then reading position (y, x), then size - so a unit's member order, its
+    first element (the "primary" of a pill, the key of a group) and every
+    tie in the clustering are the same whatever order the task lists the
+    elements in. The id is the last resort, for elements identical in all
+    of those (then the choice cannot change what is drawn)."""
+    def key(eid: str) -> tuple:
+        b = boxes[eid]
+        return (z[eid], round(b.y, 3), round(b.x, 3), round(b.area, 3), round(b.w, 3), eid)
+    return key
+
+
 def _cluster(free: list[dict[str, Any]], by_id: dict[str, dict[str, Any]], boxes: dict[str, Box],
              z: dict[str, float], canvas: Box, roles: dict[str, str]) -> list[_Cluster]:
     parent: dict[str, str] = {el["id"]: el["id"] for el in free}
@@ -385,8 +398,9 @@ def _cluster(free: list[dict[str, Any]], by_id: dict[str, dict[str, Any]], boxes
             return asset_is_flat(el.get("asset_id"))
         return False
 
+    canon = _canon(boxes, z)
+    free = sorted(free, key=lambda el: canon(el["id"]))   # copy, canonical order (card holders may be dropped below)
     holders = [el for el in free if el["id"] not in grouped and is_holder(el)]
-    free = [el for el in free]   # copy: card holders may be dropped below
 
     # b. holders: a text inside a small flat shape / image drawn below it.
     #    A holder keeps one label (a pill, a button); a sticker-sized one may
@@ -460,13 +474,13 @@ def _cluster(free: list[dict[str, Any]], by_id: dict[str, dict[str, Any]], boxes
     small = [el for el in free if el["type"] == "shape" and el["id"] not in grouped
              and sum(1 for i in parent if find(i) == find(el["id"])) == 1
              and 0 < boxes[el["id"]].area <= HOST_MAX_AREA * canvas.area]
-    small.sort(key=lambda el: boxes[el["id"]].area)
+    small.sort(key=lambda el: (boxes[el["id"]].area, canon(el["id"])))
     n_attached: dict[str, int] = {}
     for el in small:
         sb = boxes[el["id"]]
         thin = max(sb.w, sb.h) >= HOST_THIN * max(1.0, min(sb.w, sb.h))
         best = None
-        for root in {find(i) for i in parent}:
+        for root in sorted({find(i) for i in parent}, key=canon):
             if root == el["id"] or find(el["id"]) == root:
                 continue
             if kinds.get(root, "single") == "group":
@@ -504,8 +518,8 @@ def _cluster(free: list[dict[str, Any]], by_id: dict[str, dict[str, Any]], boxes
                 k[new_root] = k.pop(root)
 
     # e. decorations drawn inside a content unit travel with it
-    roots = {find(i) for i in parent}
-    for eid, role in list(roles.items()):
+    roots = sorted({find(i) for i in parent}, key=canon)
+    for eid, role in sorted(roles.items(), key=lambda kv: canon(kv[0])):
         if role != DECORATIVE:
             continue
         db = boxes[eid]
@@ -529,13 +543,15 @@ def _cluster(free: list[dict[str, Any]], by_id: dict[str, dict[str, Any]], boxes
         attachments.setdefault(root, []).append(eid)
 
     out: list[_Cluster] = []
-    order = {el["id"]: i for i, el in enumerate(free)}
     members: dict[str, list[str]] = {}
     for i in parent:
         members.setdefault(find(i), []).append(i)
-    for root, ids in sorted(members.items(), key=lambda kv: min(order.get(i, 10 ** 9) for i in kv[1])):
+    # Clusters and their members in the canonical order (v8): the first id is
+    # the lowest-drawn, top-left-most member (a pill's background before its
+    # label), whatever order the task listed the elements in.
+    for root, ids in sorted(members.items(), key=lambda kv: min(canon(i) for i in kv[1])):
         c = _Cluster(root)
-        c.ids = sorted(ids, key=lambda i: order.get(i, 10 ** 9))
+        c.ids = sorted(ids, key=canon)
         c.group_id = group_ids.get(root)
         c.kind = kinds.get(root, "single")
         if c.kind == "group":
@@ -581,14 +597,16 @@ def _panel_stacks(panels: list[dict[str, Any]], boxes: dict[str, Box], z: dict[s
     groups: dict[str, list[str]] = {}
     for el in rects:
         groups.setdefault(find(el["id"]), []).append(el["id"])
-    return [sorted(ids, key=lambda i: -z[i]) for ids in groups.values() if len(ids) > 1]
+    canon = _canon(boxes, z)
+    stacks = [sorted(ids, key=lambda i: (-z[i], canon(i))) for ids in groups.values() if len(ids) > 1]
+    return sorted(stacks, key=lambda ids: canon(ids[-1]))
 
 
 def _merge_rows(units: list[Unit], canvas: Box) -> list[Unit]:
     """Chains of chip-like units of one role, similar height, side by side
     (left to right) become one row unit with the chain as `parts`."""
     cand = [u for u in units if u.is_content and u.role in ROW_ROLES and not u.is_row]
-    cand.sort(key=lambda u: u.box.x)
+    cand.sort(key=lambda u: (u.box.x, u.box.y, u.key))
     used: set[str] = set()
     rows: list[list[Unit]] = []
     for u in cand:

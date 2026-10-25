@@ -292,13 +292,6 @@ def test_ids_are_opaque(seed, family):
             assert e["font_size"] == x["font_size"]
 
 
-XFAIL_ORDER = ("v8 follow-up (docs/EVAL_V8.md §7): a multi-element unit takes its 'primary' element from the list "
-               "position (analyze._cluster ids[0]; engine/structure.py reads `u.primary or u.ids[0]`), so a shuffled "
-               "list can lay a preserve-structure candidate out differently; with the v8 weights that candidate wins "
-               "on synthetic seed 11 (wide -> tall). Templates and anchors are order-independent.")
-
-
-@pytest.mark.xfail(strict=False, reason=XFAIL_ORDER)
 @pytest.mark.parametrize("seed,family", CORPUS_SEEDS, ids=[f"{f}-{s}" for s, f in CORPUS_SEEDS])
 def test_element_order_does_not_matter(seed, family):
     """Shuffling the element list (z_index carries the stacking) must give the
