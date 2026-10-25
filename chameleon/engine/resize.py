@@ -48,8 +48,9 @@ from engine.analyze import BACKGROUND, DECORATIVE, HEADLINE, Analysis, analyze
 from engine.candidates import SMALL_CHANGE_MAX, Candidate, generate_candidates
 from engine.geometry import Box
 from engine import render as judge_render
+from engine import optimize as opt
 from engine.rectify import rectify, rotated_extent
-from engine.relayout import Placement, grow_panels
+from engine.relayout import Placement, grow_panels, ratio_change
 from engine import role_merge
 from engine.score import Score, score_design
 from engine.textfit import MIN_FONT_SIZE, apply_font_size, default_measurer
@@ -58,6 +59,8 @@ logger = logging.getLogger(__name__)
 
 JUDGE_RENDER = os.environ.get("CHAMELEON_NO_RENDER", "") not in ("1", "true", "yes")
 TOP_RENDER = 3                     # candidates re-judged with pixels after the no-render pass
+OPTIMIZE_TOP_K = 3                 # v7: seeds refined by the energy optimiser (CHAMELEON_OPTIMIZE_K overrides)
+SAME_SHAPE_MAX = 1.02              # ... except when the target has the source's shape (ratio_change up to this)
 DUMP_DIR = os.environ.get("CHAMELEON_DUMP_DIR") or None
 LAST_JUDGED: list["Judged"] = []     # every candidate of the most recent resize(), best first
 LAST_ANALYSIS: Analysis | None = None   # the analysis the most recent resize() laid out (roles after the vote)
@@ -134,6 +137,15 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
     # ties. The anchor safety net on a big shape change carries the scorer's
     # adaptation penalty, so it only wins when every real layout has a defect.
     judged.sort(key=lambda j: -j.score.total)
+    # v7: the top seeds are walked down the design-principle energy
+    # (engine/optimize.py); each refined layout competes as a candidate of
+    # its own, so the judge still has the last word. CHAMELEON_OPTIMIZE=0
+    # skips this and leaves the output byte-identical to the v6 engine.
+    enabled, top_k = optimize_settings()
+    if enabled and top_k > 0 and ratio_change(analysis.canvas, target) > SAME_SHAPE_MAX:
+        # A canvas of the same shape (identity, a pure scale) already holds a
+        # finished design: nothing to re-arrange, the proportional copy is it.
+        judged = refine(judged, analysis, source, target, priors, roles_info, top_k)
     if render:
         for j in judged[:TOP_RENDER]:
             t0 = time.time()
@@ -146,6 +158,62 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
         judged.sort(key=lambda j: -j.score.total)
     LAST_JUDGED = judged
     return judged[0].design, judged
+
+
+def optimize_settings() -> tuple[bool, int]:
+    """(enabled, top-K) from the environment, read per call so tests can
+    flip it: CHAMELEON_OPTIMIZE=0 disables, CHAMELEON_OPTIMIZE_K sets K."""
+    flag = os.environ.get("CHAMELEON_OPTIMIZE", "1").strip().lower()
+    enabled = flag not in ("0", "false", "no", "off")
+    try:
+        k = int(os.environ.get("CHAMELEON_OPTIMIZE_K", "") or OPTIMIZE_TOP_K)
+    except ValueError:
+        k = OPTIMIZE_TOP_K
+    return enabled, k
+
+
+def refine(judged: list[Judged], analysis: Analysis, source: dict[str, Any], target: Box,
+           priors: dict[str, float], roles_info: dict[str, Any] | None, top_k: int = OPTIMIZE_TOP_K
+           ) -> list[Judged]:
+    """Optimise the top `top_k` non-fallback seeds and add each changed
+    result as a candidate "<seed> +opt" (same strategy and prior), then
+    re-sort. A refined layout is dropped when the judge finds a hard fail
+    its seed did not have (the optimiser's own invariant covers its energy;
+    this covers the final rounding and the judge's exact rules)."""
+    extra: list[Judged] = []
+    for j in [x for x in judged if not x.fallback][:top_k]:
+        t0 = time.time()
+        try:
+            res = opt.optimize(analysis, source, j.design["elements"], target)
+            if not res.changed:
+                continue
+            elements = res.elements
+            grow_panels(analysis, elements, target)
+            _keep_headline_largest(elements, source, analysis)
+            _finalize(elements, analysis, target)
+            design = {"canvas": {"width": int(target.w), "height": int(target.h)}, "elements": elements}
+            sc = score_design(analysis, source, design, target, render=False, strategy=j.strategy)
+            _apply_prior(sc, prior=priors.get(j.name, 0.0))
+            seed_hard = {_hard_key(h) for h in j.score.hard}
+            if any(_hard_key(h) not in seed_hard for h in sc.hard):
+                logger.debug("refined %s dropped: new hard fail %s", j.name, sc.hard)
+                continue
+            sc.notes["optimize"] = res.summary()
+            name = f"{j.name} +opt"
+            extra.append(Judged(name, j.strategy, design, sc, time.time() - t0, j.fallback, roles_info))
+            priors[name] = priors.get(j.name, 0.0)
+        except Exception:
+            logger.exception("optimising %s failed; seed kept", j.name)
+    if extra:
+        judged = judged + extra
+        judged.sort(key=lambda j: -j.score.total)
+    return judged
+
+
+def _hard_key(h: str) -> str:
+    """A hard-fail message without its numbers (areas, ratios), so the same
+    defect on the same units compares equal before and after a refinement."""
+    return "".join(ch for ch in h if not (ch.isdigit() or ch in ".%"))
 
 
 def understand(source: dict[str, Any], analysis: Analysis) -> None:
