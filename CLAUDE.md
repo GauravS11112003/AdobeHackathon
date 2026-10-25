@@ -104,6 +104,41 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   unchanged). Bench: `tools/vlm_bench.py` (set-of-marks roles vs analyzer, good-vs-perturbed judge probes);
   numbers, model choice and the Docker/wheel findings in `docs/VLM_BENCH.md`. Weights are not in git;
   `python -m engine.vlm input/*.json` is the smoke test. Tests: `tests/test_vlm.py` (stub backend).
+- `perceive.py` — **S1 VLM perception (2026-10-24, docs/S1_PERCEPTION.md, tests/test_perceive.py)**: `perceive(source,
+  analysis)` renders the source once (896 px), draws one numbered magenta box per analyzer unit (set of marks, the
+  bench's overlay), asks the VLM with the *hinted* prompt (box types + text) for every box's role (the analyzer's
+  fine enum, grammar-constrained), a design `archetype` (product_ad | event_poster | editorial | quote | grid |
+  other) and the 5 most important boxes → `Perception(roles={unit_key: (coarse, conf)}, fine, archetype,
+  importance, status)`. Coarse classes (`COARSE`: picture / headline / cta / logo / badge / secondary / minor) are
+  what the merge acts on; confidence is *derived* (bench accuracy per class, divided among boxes sharing a
+  unique role, 0 on a type conflict), not a model probability. Off unless `CHAMELEON_VLM=1` **explicitly**
+  (default off; then `engine.vlm` is never imported), per-task budget `CHAMELEON_VLM_BUDGET_S` (20 s, covers
+  load + render + call), cache by source hash (memory + `CHAMELEON_VLM_CACHE_DIR`), never raises.
+  `python -m engine.perceive input/*.json` shows what the model sees. ~9 s p50 / 12 s p95 per uncached call
+  natively (4B, 8 boxes p50), 11–13 s per task in the arm64 container (≈ native, not 3×), 2.4 s model load.
+  **Verdict (docs/S1_PERCEPTION.md): no-go for VLM on by default** — against DesignAsCode labels the 4B's coarse
+  role agreement (0.69) is below the rules (0.71); the three-voter merge gains +0.2 pp over rules+classifier; the
+  300-design eval is mixed (judge hard fails −24 %, but designer reading-order tau −0.03 and the rules' headline
+  / CTA shrinks 3× as often). Next: human A/B of `s1_off` vs `s1_model` / `s1_vlm` on the label page.
+- `role_merge.py` — S4's two-voter `merged_roles` / `apply_to_analysis` plus the **S1 three-voter vote**
+  (`vote_roles` / `apply_votes(analysis, source, perception)`), called from `resize.understand()` before
+  candidate generation: background / panel / decorative / shape-only units and unit membership stay with the
+  rules; the coarse class is the majority of rules, classifier (≥ `MIN_CONF`) and VLM (≥ `VLM_MIN`), a
+  three-way split goes to the VLM at confidence ≥ `VLM_TIEBREAK` (0.6) else the rules; classifier alone keeps
+  S4's `STICKY` / margin policy, VLM alone needs 0.6; fine splits (subhead / body / fine_print, hero / image)
+  change only when both models agree against the rules; then one headline / CTA / logo / hero (strength =
+  classifier P + VLM conf + importance bonus + `RULE_BONUS`). Every unit's decision is recorded with its
+  voter in `analysis.perception["decisions"]` (`by` ∈ rules, rules+model, rules+vlm, model+vlm, model, vlm,
+  consistency); `Judged.summary()["roles"]` carries archetype / VLM status / voter counts, `resize.LAST_ANALYSIS`
+  the full record (the playground's analysis table shows "Decided by"). `candidates.py`: the archetype reorders
+  `plan_variants` and taxes plans that fight it by `ARCHETYPE_PENALTY` (3, `Candidate.prior`, applied in
+  `judge` like the adaptation penalty): editorial / quote → hero-first plans (wide hero_side ≠ stack, square
+  left / right, banner text_flow column) pay, grid → chips ≠ row pay. With both flags off nothing changes:
+  `tests/fixtures/golden_v5/` holds the three samples × 6 targets from the pre-S1 tree and
+  `test_output_is_byte_identical_to_v5_with_the_flags_off` compares byte for byte (macOS only: Linux text
+  widths differ). Measurement tools: `tools/eval_perception.py` (samples / dac / precompute / report, results
+  in `eval/data/perception/`), `eval/s1_sheet.py` (source | VLM off | VLM on rows for the both-bad cases,
+  docs/sanity_s1).
 - `geometry.py` — `Box` helpers. Tests: `chameleon/tests/` (`.venv/bin/python -m pytest tests -q`, pytest is
   dev-only, not in requirements.txt). `tests/test_judge.py` covers the judge loop (winner defect-free,
   perturbed layout scores worse, rectifier removes an injected overlap, < 10 s per task).

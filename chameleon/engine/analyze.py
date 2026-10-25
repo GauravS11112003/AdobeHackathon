@@ -165,6 +165,7 @@ class Analysis:
     source_straddle: set[str] | None = None         # texts that straddle an edge in the source (scorer fills it)
     source_elements: dict[str, dict[str, Any]] = field(default_factory=dict)   # id -> source element
     source_visible: dict[str, list[Box]] | None = None   # unit key -> painted part boxes in the source (rectify fills it)
+    perception: dict[str, Any] | None = None        # S1: archetype + per-unit role votes (engine/role_merge.apply_votes fills it)
 
     def unit(self, key: str) -> Unit:
         for u in self.units:

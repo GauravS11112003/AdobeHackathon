@@ -50,6 +50,7 @@ from engine.geometry import Box
 from engine import render as judge_render
 from engine.rectify import rectify, rotated_extent
 from engine.relayout import Placement, grow_panels
+from engine import role_merge
 from engine.score import Score, score_design
 from engine.textfit import MIN_FONT_SIZE, apply_font_size, default_measurer
 
@@ -59,6 +60,7 @@ JUDGE_RENDER = os.environ.get("CHAMELEON_NO_RENDER", "") not in ("1", "true", "y
 TOP_RENDER = 3                     # candidates re-judged with pixels after the no-render pass
 DUMP_DIR = os.environ.get("CHAMELEON_DUMP_DIR") or None
 LAST_JUDGED: list["Judged"] = []     # every candidate of the most recent resize(), best first
+LAST_ANALYSIS: Analysis | None = None   # the analysis the most recent resize() laid out (roles after the vote)
 _run_counter = 0
 
 
@@ -70,10 +72,14 @@ class Judged:
     score: Score
     elapsed: float = 0.0
     fallback: bool = False
+    roles: dict[str, Any] | None = None   # S1: who decided the roles (archetype, VLM status, voter counts)
 
     def summary(self) -> dict[str, Any]:
-        return {"name": self.name, "strategy": self.strategy, "elapsed": round(self.elapsed, 3),
-                "fallback": self.fallback, "pixels": judge_render.status(), **self.score.as_dict()}
+        out = {"name": self.name, "strategy": self.strategy, "elapsed": round(self.elapsed, 3),
+               "fallback": self.fallback, "pixels": judge_render.status(), **self.score.as_dict()}
+        if self.roles:
+            out["roles"] = self.roles
+        return out
 
 
 def resize(source: dict[str, Any], target_canvas: dict[str, Any]) -> dict[str, Any]:
@@ -99,11 +105,15 @@ def resize_with_candidates(source: dict[str, Any], target_canvas: dict[str, Any]
 
 def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tuple[dict[str, Any], list[Judged]]:
     """Generate -> materialize -> rectify -> render -> score; best first."""
-    global LAST_JUDGED
+    global LAST_JUDGED, LAST_ANALYSIS
     analysis = analyze(source)
-    render = JUDGE_RENDER if render is None else render
     judge_render.begin_task()          # per-task pixel budget; see engine/render.py
+    understand(source, analysis)       # S1: VLM + classifier votes on the roles (no-op by default)
+    LAST_ANALYSIS = analysis
+    roles_info = roles_summary(analysis)
+    render = JUDGE_RENDER if render is None else render
     judged: list[Judged] = []
+    priors: dict[str, float] = {}
     # Stage 1: every candidate is judged on geometry and the JSON contrast
     # estimate (no pixels). Stage 2: the top few are re-judged with a render
     # without text, which refines contrast / busyness under each text.
@@ -112,10 +122,12 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
         try:
             design = realize(source, analysis, cand.placement, target)
             sc = score_design(analysis, source, design, target, render=False, strategy=cand.strategy)
+            _apply_prior(sc, cand)
         except Exception:
             logger.exception("candidate %s failed; skipped", cand.name)
             continue
-        judged.append(Judged(cand.name, cand.strategy, design, sc, time.time() - t0, cand.fallback))
+        judged.append(Judged(cand.name, cand.strategy, design, sc, time.time() - t0, cand.fallback, roles_info))
+        priors[cand.name] = cand.prior
     if not judged:
         raise RuntimeError("no candidate could be realized")
     # Best first; sort is stable, so earlier (default) candidates win exact
@@ -127,12 +139,53 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
             t0 = time.time()
             try:
                 j.score = score_design(analysis, source, j.design, target, render=True, strategy=j.strategy)
+                _apply_prior(j.score, prior=priors.get(j.name, 0.0))
             except Exception:
                 logger.exception("re-judging %s with pixels failed; keeping the estimate", j.name)
             j.elapsed += time.time() - t0
         judged.sort(key=lambda j: -j.score.total)
     LAST_JUDGED = judged
     return judged[0].design, judged
+
+
+def understand(source: dict[str, Any], analysis: Analysis) -> None:
+    """S1: let the vision model (CHAMELEON_VLM=1) and the learned classifier
+    (CHAMELEON_ROLE_MODEL=1) vote on the roles the rules inferred. Both are
+    off by default, and then nothing here touches the analysis: the output
+    stays byte-identical to the rule-only engine. Never raises."""
+    perception = None
+    try:
+        if os.environ.get("CHAMELEON_VLM", "").strip().lower() in ("1", "true", "yes", "on"):
+            from engine import perceive            # imports engine.vlm only when switched on
+            perception = perceive.perceive(source, analysis)
+    except Exception:  # pragma: no cover - perceive() already swallows everything
+        logger.exception("perception failed; roles from the rules")
+        perception = None
+    try:
+        if perception is not None or role_merge.enabled():
+            role_merge.apply_votes(analysis, source, perception)
+    except Exception:  # pragma: no cover
+        logger.exception("role vote failed; roles from the rules")
+
+
+def roles_summary(analysis: Analysis) -> dict[str, Any] | None:
+    """Compact record for Judged.summary(): archetype, VLM status, how many
+    units each voter decided, how many roles changed."""
+    p = analysis.perception
+    if not p:
+        return None
+    return {"archetype": p.get("archetype"), "vlm": p.get("vlm"), "by": dict(p.get("by") or {}),
+            "changed": p.get("changed", 0)}
+
+
+def _apply_prior(sc: Score, cand: Candidate | None = None, prior: float | None = None) -> None:
+    """A candidate's archetype prior (engine/candidates.py) is a soft penalty
+    outside the 0-100 breakdown, like the adaptation penalty."""
+    v = float(cand.prior if cand is not None else (prior or 0.0))
+    if v:
+        sc.total -= v
+        sc.penalty += v
+        sc.notes["archetype_penalty"] = round(v, 2)
 
 
 def realize(source: dict[str, Any], analysis: Analysis, placement: Placement, target: Box) -> dict[str, Any]:

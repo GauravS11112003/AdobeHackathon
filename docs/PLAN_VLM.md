@@ -105,3 +105,14 @@ with MLX on the Mac; weights on a public HF repo as the rules require. High upsi
 1. Image size cap and whether weights count toward it.
 2. Will the amd64 image run under Rosetta on the M5 Pro, or can we ship arm64/multi-arch?
 3. Approximate wall-clock they consider acceptable per task.
+
+## Status 2026-10-24 (after S0 and S1)
+
+- S0: only Qwen3-VL-4B is usable; ≤ 2B models cannot judge layouts (position-locked). 4B judge: 60 % both-order
+  accuracy at ~24 s per pair. Perception: 0.75 coarse agreement with the analyzer.
+- S1: wired as a third voter (rules, learned classifier, VLM) behind CHAMELEON_VLM; **no-go by default**:
+  against labelled roles the VLM is 0.69 coarse vs 0.71 for the rules and 0.83 for the learned classifier, it
+  adds +10–13 s per task, and the image grows to 7.3 GB with the cap still unknown. Plumbing stays shipped
+  and off; byte-identical output with the flags off (golden tests).
+- Decision: the stage-one differentiator is the scorer + structure work driven by the designer references
+  (docs/designer/FINDINGS.md), not the VLM. The learned classifier (S4) is the model that earned a place.

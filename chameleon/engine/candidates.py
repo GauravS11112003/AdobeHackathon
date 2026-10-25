@@ -38,6 +38,12 @@ ANCHOR_SCALE_BOOSTS = (1.0, 1.12, 1.25, 1.4)   # content scale = min(sx, sy) * b
 TIGHT, LOOSE = 0.75, 1.3
 BOLD, BOLDER = 1.3, 1.5     # v4 scale_bias variants: ideal sizes past the proportional size when there is room
 FILL = 1.5                  # the "fill" variant: one global scale, searched from 1.5 x proportional down
+# S1: the perceived archetype (engine/perceive.py) reorders the plan variants
+# and taxes the ones that fight it: editorial / quote designs prefer a text
+# column over a hero-first plan, grids keep their chip rows. Without a
+# perception (the default) nothing changes.
+TEXT_FIRST = ("editorial", "quote")
+ARCHETYPE_PENALTY = 3.0
 
 
 @dataclass
@@ -49,6 +55,7 @@ class Candidate:
     scale: float | None = None          # anchor content scale
     fallback: bool = False              # safety net: pays the scorer's adaptation penalty, so it only
                                         # wins when every real candidate has a hard defect
+    prior: float = 0.0                  # S1: soft penalty for a plan that fights the perceived archetype
 
 
 def generate_candidates(analysis: Analysis, source: dict[str, Any], target: Box,
@@ -58,6 +65,8 @@ def generate_candidates(analysis: Analysis, source: dict[str, Any], target: Box,
     by_id = {el["id"]: el for el in source["elements"]}
     change = ratio_change(analysis.canvas, target)
     family = ratio_family(target)
+    archetype = (analysis.perception or {}).get("archetype") if getattr(analysis, "perception", None) else None
+    variants = plan_variants(family, archetype)
     out: list[Candidate] = []
 
     small = change <= SMALL_CHANGE_MAX
@@ -65,14 +74,15 @@ def generate_candidates(analysis: Analysis, source: dict[str, Any], target: Box,
         for s, label in anchor_scales(analysis.canvas, target):
             out.append(Candidate(f"anchor {label} scale={s:.3f}", "anchor",
                                  _anchor(analysis, target, s), scale=s))
-        plans = plan_variants(family)[:3] + [p for p in plan_variants(family) if p.scale_bias == BOLD][:1]
+        plans = variants[:3] + [p for p in variants if p.scale_bias == BOLD][:1]
     else:
-        plans = plan_variants(family)
+        plans = variants
 
     for opts in plans:
         pl = floorplan_relayout(analysis, target, by_id, m, opts)
         resolve_vertical_collisions(analysis, pl, target)
-        out.append(Candidate(f"{family} {opts.name}", "floorplan", pl, options=opts))
+        out.append(Candidate(f"{family} {opts.name}", "floorplan", pl, options=opts,
+                             prior=archetype_prior(family, opts, archetype)))
 
     if not small:
         # Safety candidate: proportions kept, everything slid toward its anchor.
@@ -94,10 +104,41 @@ def anchor_scales(src: Box, target: Box) -> list[tuple[float, str]]:
     return scales
 
 
-def plan_variants(family: str) -> list[PlanOptions]:
+def plan_variants(family: str, archetype: str | None = None) -> list[PlanOptions]:
     """Variants in rough order of prior usefulness (the list is truncated
     for small ratio changes). Duplicates that a design cannot realize
-    (no chips, no hero) collapse in `dedupe`."""
+    (no chips, no hero) collapse in `dedupe`. With a perceived `archetype`
+    the variants that suit it come first (stable: the rest keep their order)."""
+    variants = _plan_variants(family)
+    if archetype:
+        variants = sorted(variants, key=lambda o: archetype_prior(family, o, archetype))
+    return variants
+
+
+def hero_first(family: str, opts: PlanOptions) -> bool:
+    """Does this variant put the hero beside the text (hero-first) rather
+    than in one column with it?"""
+    if family == WIDE:
+        return opts.hero_side != "stack"
+    if family == SQUARE:
+        return opts.hero_side in ("left", "right")
+    if family == BANNER:
+        return opts.text_flow == "column"
+    return False
+
+
+def archetype_prior(family: str, opts: PlanOptions, archetype: str | None) -> float:
+    """Soft penalty for a plan variant that fights the perceived archetype."""
+    if not archetype:
+        return 0.0
+    if archetype in TEXT_FIRST and hero_first(family, opts):
+        return ARCHETYPE_PENALTY
+    if archetype == "grid" and opts.chips != "row":
+        return ARCHETYPE_PENALTY
+    return 0.0
+
+
+def _plan_variants(family: str) -> list[PlanOptions]:
     P = PlanOptions
     # v4: every family also tries bolder ideals (scale_bias 1.3 / 1.5) and a
     # "fill" variant (one global scale from 1.5 x proportional down); banners

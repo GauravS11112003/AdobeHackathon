@@ -97,12 +97,32 @@ def _self_check(source: dict, output: dict) -> list[str]:
     return engine_main.self_check(source, output)
 
 
-def _analysis_rows(analyze_mod, source: dict) -> list[dict]:
-    a = analyze_mod.analyze(source)
-    return [{
-        "unit": u.key, "role": u.role, "ids": u.ids, "importance": u.importance,
-        "anchor": f"{u.anchor_x} / {u.anchor_y}", "order": u.reading_index,
-    } for u in a.units]
+def _analysis_rows(analyze_mod, source: dict, resize_mod=None) -> list[dict]:
+    """The units the engine laid out. After a resize the analysis the engine
+    used (roles after the S1 vote, with the voter per unit) is preferred over
+    a fresh rule-only analysis."""
+    a = getattr(resize_mod, "LAST_ANALYSIS", None) if resize_mod is not None else None
+    if a is None:
+        a = analyze_mod.analyze(source)
+    decisions = ((getattr(a, "perception", None) or {}).get("decisions") or {})
+    rows = []
+    for u in a.units:
+        d = decisions.get(u.key) or {}
+        rows.append({
+            "unit": u.key, "role": u.role, "ids": u.ids, "importance": u.importance,
+            "anchor": f"{u.anchor_x} / {u.anchor_y}", "order": u.reading_index,
+            "by": d.get("by", ""), "rule": d.get("rule", ""),
+            "model": d.get("model"), "vlm": d.get("vlm"),
+        })
+    return rows
+
+
+def _perception_info(resize_mod) -> dict | None:
+    a = getattr(resize_mod, "LAST_ANALYSIS", None)
+    p = getattr(a, "perception", None) if a is not None else None
+    if not p:
+        return None
+    return {"archetype": p.get("archetype"), "vlm": p.get("vlm"), "by": p.get("by"), "changed": p.get("changed")}
 
 
 def _stretch_baseline(source: dict, width: int, height: int) -> dict:
@@ -140,7 +160,8 @@ def run_resize(source: dict, width: int, height: int, *, light: bool = False,
         # Gallery mode: just the output thumbnail.
         result["output_png"] = _render_png_b64(output, max_size=640)
     else:
-        result["analysis"] = _analysis_rows(analyze_mod, source)
+        result["analysis"] = _analysis_rows(analyze_mod, source, resize_mod)
+        result["perception"] = _perception_info(resize_mod)
         result["source_png"] = _render_png_b64(source)
         result["output_png"] = _render_png_b64(output)
         if baseline:
@@ -538,7 +559,8 @@ PAGE = r"""<!doctype html>
     </div>
     <div class="panel">
       <h2>What the analyzer inferred</h2>
-      <table id="analysis"><thead><tr><th>#</th><th>Unit</th><th>Role</th><th>Anchor</th><th>Elements</th></tr></thead><tbody></tbody></table>
+      <div id="perception" class="stat"></div>
+      <table id="analysis"><thead><tr><th>#</th><th>Unit</th><th>Role</th><th>Decided by</th><th>Anchor</th><th>Elements</th></tr></thead><tbody></tbody></table>
       <details><summary>Output JSON</summary><pre id="outJson"></pre></details>
     </div>
   </section>
@@ -631,7 +653,16 @@ async function run() {
     document.querySelectorAll('.cand').forEach(x=>x.classList.toggle('sel', x===el));
     showOutput(c.design || d.output, c.png, i===0 ? 'Output (judge\'s pick)' : `Candidate #${i+1}: ${c.name}`);
   }));
-  $('#analysis tbody').innerHTML = (d.analysis||[]).map(u=>`<tr><td>${u.order>=0?u.order:'–'}</td><td>${u.unit}</td><td><span class="role ${u.role}">${u.role}</span></td><td>${u.anchor}</td><td>${u.ids.join(', ')}</td></tr>`).join('');
+  const votes = u => {
+    const parts = [];
+    if (u.rule && u.rule !== u.role) parts.push(`rules: ${u.rule}`);
+    if (u.model) parts.push(`model: ${u.model[0]} ${(+u.model[1]).toFixed(2)}`);
+    if (u.vlm) parts.push(`vlm: ${u.vlm[0]} ${(+u.vlm[1]).toFixed(2)}`);
+    return parts.length ? ` <span class="stat">(${parts.join(' · ')})</span>` : '';
+  };
+  $('#analysis tbody').innerHTML = (d.analysis||[]).map(u=>`<tr><td>${u.order>=0?u.order:'–'}</td><td>${u.unit}</td><td><span class="role ${u.role}">${u.role}</span></td><td>${u.by||'rules'}${votes(u)}</td><td>${u.anchor}</td><td>${u.ids.join(', ')}</td></tr>`).join('');
+  const p = d.perception;
+  $('#perception').textContent = p ? `Perception: archetype ${p.archetype||'–'} · VLM ${p.vlm} · roles changed ${p.changed} · decided by ${Object.entries(p.by||{}).map(([k,v])=>k+' '+v).join(', ')}` : 'Perception: off (rules only; set CHAMELEON_VLM=1 / CHAMELEON_ROLE_MODEL=1)';
 }
 function showOutput(design, png, label) {
   shownOutput = design;
