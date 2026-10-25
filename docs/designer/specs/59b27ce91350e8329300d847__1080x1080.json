@@ -5,7 +5,7 @@
   "margin": 0.05,
   "gutter": 0.02
  },
- "concept": "Dark stage: the hero bottle on the left on the centre line, a left-aligned message column on the right (headline, pink question, bold answer, details, link) sized by the column width; tall formats stack the hero above the column; banners centre the hero + column group; the leaderboard runs the texts as three small columns after the hero.",
+ "concept": "Dark stage: the hero bottle on the left on the centre line, a left-aligned message column on the right (headline, pink question, bold answer, details, link). The headline sets the column width (two lines where wide, three where narrow); the other texts keep their own line breaks. Tall formats stack the hero above the column; banners centre the hero + column group; the leaderboard runs three text columns.",
  "place": [
   {
    "id": "el_00",
@@ -14,47 +14,47 @@
   {
    "id": "el_01",
    "x": 54.0,
-   "y": 345.6,
-   "h": 388.8
+   "y": 313.2,
+   "h": 453.6
   },
   {
    "id": "el_06",
-   "x": 488.92,
-   "y": 118.89,
-   "w": 552.27,
-   "font": 78,
+   "x": 551.57,
+   "y": 305.3,
+   "w": 484.7,
+   "font": 59,
    "align": "left"
   },
   {
    "id": "el_04",
-   "x": 488.92,
-   "y": 404.03,
-   "w": 548.08,
-   "font": 35,
+   "x": 551.57,
+   "y": 521.47,
+   "w": 485.43,
+   "font": 22,
    "align": "left"
   },
   {
    "id": "el_05",
-   "x": 488.92,
-   "y": 638.63,
-   "w": 548.08,
-   "font": 40,
+   "x": 551.57,
+   "y": 621.83,
+   "w": 485.43,
+   "font": 26,
    "align": "left"
   },
   {
    "id": "el_03",
-   "x": 488.92,
-   "y": 763.93,
-   "w": 548.08,
-   "font": 23,
+   "x": 551.57,
+   "y": 683.83,
+   "w": 485.43,
+   "font": 16,
    "align": "left"
   },
   {
    "id": "el_02",
-   "x": 488.92,
-   "y": 925.51,
-   "w": 548.08,
-   "font": 24,
+   "x": 551.57,
+   "y": 748.9,
+   "w": 485.43,
+   "font": 17,
    "align": "left"
   }
  ],

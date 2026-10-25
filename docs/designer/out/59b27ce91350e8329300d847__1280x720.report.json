@@ -1,5 +1,5 @@
 {
  "spec": "../docs/designer/specs/59b27ce91350e8329300d847__1280x720.json",
  "problems": [],
- "concept": "Dark stage: the hero bottle on the left on the centre line, a left-aligned message column on the right (headline, pink question, bold answer, details, link) sized by the column width; tall formats stack the hero above the column; banners centre the hero + column group; the leaderboard runs the texts as three small columns after the hero."
+ "concept": "Dark stage: the hero bottle on the left on the centre line, a left-aligned message column on the right (headline, pink question, bold answer, details, link). The headline sets the column width (two lines where wide, three where narrow); the other texts keep their own line breaks. Tall formats stack the hero above the column; banners centre the hero + column group; the leaderboard runs three text columns."
 }

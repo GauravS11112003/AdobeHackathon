@@ -5,7 +5,7 @@
   "margin": 0.05,
   "gutter": 0.02
  },
- "concept": "Dark stage: the hero bottle on the left on the centre line, a left-aligned message column on the right (headline, pink question, bold answer, details, link) sized by the column width; tall formats stack the hero above the column; banners centre the hero + column group; the leaderboard runs the texts as three small columns after the hero.",
+ "concept": "Dark stage: the hero bottle on the left on the centre line, a left-aligned message column on the right (headline, pink question, bold answer, details, link). The headline sets the column width (two lines where wide, three where narrow); the other texts keep their own line breaks. Tall formats stack the hero above the column; banners centre the hero + column group; the leaderboard runs three text columns.",
  "place": [
   {
    "id": "el_00",
@@ -26,19 +26,19 @@
    "align": "left"
   },
   {
-   "id": "el_05",
+   "id": "el_04",
    "x": 260.19,
    "y": 22.6,
    "w": 154.19,
-   "font": 8,
+   "font": 7,
    "align": "left"
   },
   {
-   "id": "el_04",
+   "id": "el_05",
    "x": 260.19,
-   "y": 38.8,
+   "y": 54.2,
    "w": 154.19,
-   "font": 7,
+   "font": 8,
    "align": "left"
   },
   {
