@@ -262,8 +262,11 @@ class Composer:
             else:
                 font = float(p.get("font", el["font_size"]))
             lay = self.m.layout(el, font, w)
-            if lay.max_width > w + 0.5:   # a single word wider than the span: widen
+            for _ in range(8):   # a single word (or a letter-spaced line: wrap ignores spacing) wider than the span: widen
+                if lay.max_width <= w + 0.5:
+                    break
                 w = lay.max_width + 2
+                lay = self.m.layout(el, font, w)
             if h is None:
                 h = lay.height + 2
         else:  # shape
