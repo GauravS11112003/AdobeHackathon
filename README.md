@@ -187,4 +187,4 @@ The Crello slice downloads on first use (`.venv/bin/python -m eval.crello_conver
 
 ## Team
 
-Built by **Gaurav Shrivastava**.
+Built by **Gaurav Shrivastava**, **Pranay Joshi**, and **Kavya Gupta**.
