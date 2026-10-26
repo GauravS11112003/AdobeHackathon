@@ -320,6 +320,27 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   recipes: a tracked display word gives up letter spacing before size, and a vertical / diagonal headline that
   cannot fit a strip at the floor is set horizontal.
 
+## S6: text-only LLM reading of the design JSON (2026-10-26, docs/LLM_S6.md, docs/LLM_BENCH.md, tests/test_llm.py)
+- **Benched and rejected; nothing wired.** `engine/llm.py` (the engine/vlm.py pattern without the image: an
+  id-free, order-free element listing → grammar-constrained JSON with a role per element, semantic groups,
+  archetype / focal / importance and per-family `PlanOptions` preferences; cached by source hash; off unless
+  `CHAMELEON_LLM=1`, and then the engine still never imports it: `resize.py` / `candidates.py` / `role_merge.py`
+  are untouched, so the output is byte-identical by construction). `Reading.perception()` is a
+  `perceive.Perception`, i.e. the hook into `role_merge.apply_votes` exists but is not called.
+- Numbers (`tools/llm_bench.py roles|groups|report`, 60 DesignAsCode designs ids stripped = S1's set, 60
+  designer designs × 12 formats; raw results + 360 cached answers in `eval/data/llm_bench/`): coarse role
+  agreement alone Qwen3-1.7B 0.581, Qwen3-4B-Instruct-2507 0.618, Gemma-3-4B-it 0.674 vs rules 0.713 and the
+  classifier 0.825 (in-sample); logo 0/4 for all; as a third voter at best +0.9 pp (Gemma); groups weakly
+  above chance (members adjacent in ≥ 80 % of the designer's formats 0.45–0.48 vs 0.31 random, 0.88 for the
+  analyzer's units); plan prior constant (hero left / chips row / keep true on 59–60 of 60). Latency native
+  p50 / p95 6.6 / 9.8 s (1.7B), 14.4 / 22.4 s (Qwen3-4B, plus two stalls > 100 s), 12.1 / 19.1 s (Gemma).
+- Weights (gitignored, 6.1 GB, sha256 + repos in docs/LLM_BENCH.md) in `models/`; no Dockerfile change
+  (docs/LLM_S6.md §6 has the args a second weights set would need). Gotchas: llama.cpp's JSON-schema grammar
+  ignores integer min / max (element numbers are string enums), the grammar's property order is the answer
+  order (never build it from a `sort_keys` dump), and a plain roles array lets a small model lose its place
+  (the answer is keyed by element number). The only idea left open: ask the model just where the rules'
+  headline is a guess (docs/LLM_S6.md §7).
+
 ## Playground (dev tool, not shipped)
 - `chameleon/tools/playground.py` serves a local UI at http://localhost:8765: pick a sample, upload or paste a
   design, pick a preset or custom size; shows source / stretch-baseline / output renders (fit or 1:1, optional
