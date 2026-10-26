@@ -1,4 +1,4 @@
-# Competitive landscape — CHAMELEON public repos (updated 2026-10-23)
+# Competitive landscape — CHAMELEON public repos (updated 2026-10-26; sweep 3 at the end)
 
 Full clones in `reference/competitors/` (read-only, untrusted). Nothing here is official; READMEs are
 claims and several were found to overstate what the code does. File:line pointers refer to the clones.
@@ -203,3 +203,143 @@ Behind on specific techniques listed below.
 5. Choppy-wrap penalty and γ-style hierarchy compression as candidate knobs.
 6. Holdout families/targets in the synthetic corpus to report seen-vs-unseen gap.
 7. Someone else is planning a VLM reranker; our S1/S2 lead is real but not unique. Ship it.
+
+---
+
+# Sweep 3 (2026-10-26)
+
+Method: `git fetch` of every clone and `git log --all --since=2026-10-23`; the 19 forks of jhaaj08/chameleon by push
+date (`gh api repos/jhaaj08/chameleon/forks`); repo search for "chameleon" / "adobe hackathon" created since
+2026-09-20; code search for `cr-renderer`, `chameleon_design_schema`, `solstice_holiday_badge_2025` and
+`target_canvas` in a `resize.py`. Everything below is from the code, with paths and line counts; README claims are
+marked as such. New clones went into `reference/competitors/` (read-only, untrusted). Our own engine for scale:
+14,654 lines in `chameleon/engine/`, 284 tests.
+
+## Gone private or deleted since sweep 2
+
+| Repo | State on 2026-10-26 | What our clone keeps |
+|---|---|---|
+| AngeloLandiza/Adobe-26-University-Hackathon | **404 (private)** | branches through 10-23: `offline-priority` (the real engine, 2,894 lines, 200 tests) and `angelo/distill` (3.3 GB of distillation data + a 12,217-line research engine) — see below |
+| Joonseomoon/chameleon | still gone | nothing |
+| shivraj-jadeja/chameleon, anishraj836/chameleon | 404 | nothing (scaffolds in sweep 2) |
+| justacoderq/chameleon | 404; `justacoderq/chameleon-main` (10-24) is the starter + the brief PDF | — |
+
+## Known rivals: what changed since 2026-10-23
+
+| Repo | Last commit | Approach delta | Model / weights | Eval | Strength now |
+|---|---|---|---|---|---|
+| **tailsgit/chameleon** | main 10-19 (v5, unchanged); branches `gen-integration` / `team-docs` 10-23 | main untouched. Branches, **none merged**: `critic` (10-19) learned layout critic; `diagnose` (10-20) label CV harness + tag server; `rules` (10-21) *tight groups* (label+value, shadow copy, text+underline, logo+name, small image next to a text; `eval/score.py tight_relations`, `TIGHT_MAX_AREA` 0.25) held rigid, generated *alternately* with the free analysis (`engine/resize.py _alternate`), new scorer terms `groups` 2.0 / `related_order` 1.0 / `fill` 1.15, `COVER_SRC` 0.9 → 0.2; `generator` (10-22) CVAE; `gen-integration` (10-23) `engine/candidate_budget.py` (path-coverage counts replace wall-clock cutoffs, byte-deterministic), `engine/gen_candidates.py` (ONNX, `GEN_ON=1` only) | **Critic**: 1.84M-param transformer over element tokens (`critic/model.py` 61 lines, `critic/features.py` 210: 30+ per-element features incl. colour, texture, panel_kept), ONNX; val pair accuracy 0.883 but **0.578 on 245 human labels vs the hand scorer's 0.830** → parked. **Generator**: CVAE transformer (`generator/model.py` 85 lines, d 192, 3 layers, latent 16, 16 fixed latents) on 18,108 campaign-deduped Crello designs, **6 MB ONNX**; human recall 15/40 = no gain, 0 cases where only it was acceptable → **off by default**. `requirements.txt` adds `onnxruntime==1.20.1`; Dockerfile has a `CRITIC_URL` build-arg download. | 245 hand labels (41 good / 33 okay / **171 bad**); candidate recall 17/39 acceptable; rules branch hand score 91.49 → 89.41 on dev (46 drops > 10); 600 dev cases CPU p50 / p95 / max 1.29 / 3.49 / 6.82 s; tests 71 (main) → 117 (integration). `docs/TEAM_OVERVIEW.md`: ship `submission-fallback` (v4, `14ea0dc`) if experiments fail; working deadline "around Nov 2, unconfirmed"; image 331 MB | **still the strongest shipped engine**, but the learned work went nowhere and main is 7 days old. Own weak list: collages, icon rows, CVs/invoices → banners, 160×600 |
+| **annniedong/chameleon** | **10-26** (active) | `engine/understand.py` +108: `_compound_texts` union-find joins texts that read as one phrase: geometry (layered ≥ 10 % overlap; same line gap ≤ 0.8 em, 2.0 em when the words link; stacked ≤ 0.35 em, more when linked, ≤ 3 / 6 words) widened by *language cues* (`_text_link`: number + unit, currency + number, lone & / +, trailing/leading connector words, unfinished sentence into lowercase). Since 10-20: `tools/crello.py` (Crello → tasks, every non-text layer saved as a **rendered RGBA crop asset**, fonts mapped to the two brand families), `tools/judge_set.py` (100-item hand-judging set in 4 shape buckets) | none; `score.py` still calls itself "a stand-in until the vision-model reranker exists" | 20 tests (+3 for compounds); no committed numbers | medium-high on structure, still no contrast / render / overlap gate |
+| **fernando-ace** | submission branch 10-19 (unchanged); branch `goal-2-extreme-format-generalization-rebuild` 10-20 | not on the submission branch: `engine/chameleon/allocation.py` 245 lines ("content-measured semantic lanes with disjoint rotation-aware unit cells": 1–3 line widths × 7 width fractions per text, whole groups in reserved cells), hierarchy protection, collision feasibility ranked above aesthetics | none | 1,600-case synthetic corpus in 13 buckets (dev / holdout / blind 300 / 300 / 1000, fixed seeds): collision pairs 3,307 → 0, hierarchy 675 → 0, headline p5 15.7 → 21.7 px, **but important-text minimum fell 8.0 → 6.3 px** on the legacy 112; 38 tests; Docker 11/11 (`evidence/rebuild/report.md`, unusually honest) | medium: clean but small type; still one brand kit, no pixels |
+| benso10-uw | main 10-16; `feat/design-analysis` 10-19 | the LLM is now shown the rendered source (`source_image`) for the understanding call; `temp_main.py`, PowerShell runners | hosted / Ollama only, nothing baked | 58 tests on the branch | unchanged: presets ship, LLM is dev-only |
+| gk7494, anubhav-gupta | 10-22 / 10-16 | nothing | — | — | unchanged |
+| rsingh135, fashton28, LakshyaDhingra, 4rd2 | 10-19 / 10-16 / 10-19 / 10-05 | nothing; rsingh135's and LakshyaDhingra's `engine/resize.py` are still the 3.6 KB starter | — | — | — |
+
+## New repos with real code (cloned this sweep)
+
+| Repo (clone dir) | Last commit | Engine | Candidates | Model | Judge / scoring | Tests | Threat |
+|---|---|---|---|---|---|---|---|
+| **vedanth2406/chameleon** (fork; `vedanth2406_chameleon/`) | 10-26 | 1,311 lines in 11 modules (`layout.py` 272, `horizontal.py` 280, `quality.py` 187) | 40–120: anchor, contain, 4 weighted stacks, 6 BSP partitions, ≤ 24 "editorial bands", column splits, footer variants; banners: media-rail × hero/row/column × 1–3 label rows with an 8-step binary search on one *shared readability level* | none | hard gates (protected fields, rotated bounds, measured overflow, ink off canvas, label detached from pill, rigid-group change, new overlap > 1.5 %) then 10 geometric costs; skia ink metrics; `repair()` refits; **no contrast, no render** | 28; `tools/evaluate.py` renders with sockets blocked; Dockerfile pins base image by sha256 + `constraints-linux-amd64.txt` | **medium** |
+| **preetham-ven/chameleon** (fork; `preetham-ven_chameleon/`) | 10-25 | 879 + `packing.py` 87; **modified the vendored converter** (style-run end exclusive, new `renderer/converter/textlayout.py`) so they test fit under both | ≈ 150 (2 spacings × 3 type scales × 5 families × 2 orders × 3 splits + grids + image panel), then if min font < 12 px a `_compact_candidates` scan of integer floors 12 → 1 × rails × label rows × columns (hundreds per floor) | none | `_valid` (ids, inside, fits under both converters, aspect, **zero AABB overlap between units**) then 5-term rank; image prominence and overlap from the asset's **alpha bounding box** (`_asset_bounds`) | 33; nothing committed | **medium**: rigorous fit, but no contrast and text may never touch a picture; Level 2 circle pulled on canvas (judge-visible) |
+| EbrahimHimayoun/PolymorphicTrio (fork) | 10-26 | 794 | 10–60: anchored copy + 1…8 equal columns with a DP reading-order partition, "visual / copy / controls" lanes, pressure search, greedy `_grow_text` into free rectangles | none | overflow, size ratio, hierarchy, 80× overlap; absolute text targets 14 / 11 / 9 / 7 px regardless of canvas; no contrast / render | 12 + a Level 1 golden; `VALIDATION.md` numbers point at an uncommitted folder; Docker never run | medium-low |
+| Preeyam183/AdobeHackathon (starter copy) | 10-25 | 1,606 (≈ 900 engine, rest self-checks + VLM) | 19: preserved copy + 3 families × 6 parameter sets, 5 of them **seeded-random** | `_LocalVLM` → **Ollama** `qwen3-vl:4b-instruct-q4_K_M` over HTTP: grammar roles + pairwise judge with order-swap confirmation; off unless `CHAMELEON_VLM=auto`; not in the Dockerfile, no weights → dead offline (commit: "broken VLM judge") | structural vs defect split; readability × contrast (background asset sampled 32×32 + shapes) 0.4, hierarchy 0.25, kept alignments 0.2, occupancy 0.15; **renders up to 4 finalists and writes diagnostics inside `resize()`** | 0 pytest (internal `_check_*`) | medium-low |
+| ankita320/adobe-h (starter nested) | 10-21 | 1,157, single file | ≤ 60 column assignments × 40-step global-scale search | none | priority-weighted scale, PIL background-luminance contrast grid (WCAG 3 / 4.5 by font size), coverage; logo by **regex on id / asset_id**; **blocks that cannot fit are collapsed to an invisible speck** (ids survive, content hidden) | 0 (8 JSON cases) | medium-low; the hidden-content trick is a rubric risk |
+| Revan-dev/chameleon (fork) | 10-24 | 473 | 1 | none | none; per-axis text box scaling, `font_size = max(12, ×s)` unmeasured, rewrites `fit` to cover and `z_index`, logo = "logo" in id | 0 | low |
+| Jdeww/chameleon (fork) | 10-18 | 1,011 | 3–45 (stack / split / 4–7 column templates × alpha ∈ {1, .65, .4}) | none | legibility, hero/logo floors, AABB overlap, coverage, fidelity; no contrast | 0 | low |
+| amanadhav/chameleon (starter copy) | 10-05 | 1,612 | ≤ 10 (stack, split, two-column × hero share, banner with tier waterfall) | none | 6 terms incl. source-relative new overlaps; PIL metrics, not skia | 4 | low |
+| **Parinagpal11/Project-Chameleon-Adobe_Hackathon** (Iowa State; not on the starter) | 10-25 | 4,815 lines in `backend/engine/` (`adapt.py` 2,394, `subject.py` 874, `understand.py` 753) + a web Studio deployed on Render | several per target, tiered (keep / re-flow / rebuild) | **ships weights**: `backend/engine/models/` YuNet face 232 KB, U2-Net-P saliency 4.5 MB, YOLOX-nano 3.6 MB (ONNX, onnxruntime + opencv) for photo subjects | 5 parts (content, legibility, faithfulness, composition, subject) vs stretch / crop / letterbox baselines; own pydantic schema (`fontSize`, `hidden`, `pinned`), **drops low-priority elements and crops photos around subjects** | 94 (incl. Playwright) | low for stage 1 (not schema-compatible, hides elements); the only team with photo-focal detection, relevant to the finale |
+| **AngeloLandiza** (private; clone branch `offline-priority`) | 10-23 | 2,894 in `chameleon/engine/pipeline/` (priority / layout / grading nodes) | 5–37 (templates by aspect class × `PARAM_GRID` 4 / 12 / 36 + proportional reflow) | node 1 calls Claude / Gemini (`anthropic`, `google-genai` in requirements) → **offline it is the rule ranker** (their note: "the scored engine today is the rules", rules τ 0.75 vs hosted 0.83–0.98 on 10 designs) | 9 hard gates (incl. `G9_hidden`: element fully under an opaque later one) + 10 geometry terms, then **text-less render of the top 6** for WCAG contrast at p10 / p90, Sobel busyness, placeholder share (0.7 geometry + 0.3 pixels) | 200 | medium as shipped; **medium-high if the research engine is ported** (below) |
+
+**Angelo's research branch (`angelo/distill`, `distil-research/`, "not our submission")** is the most ambitious
+learned-component programme in the field and the clearest negative result: a 12,217-line "v5" engine (567 tests)
+with bisection / anchored / design-grid strategies, a scipy-HiGHS LP geometry pass (`layout/solver.py`, 47 KB, off
+by default and scipy is not in its requirements), a retrieval module and `grading/picker_weights.json` (a linear
+picker over grader terms × family × aspect fitted on Claude Opus pairwise judgements, 282 cells). Their own numbers
+(`docs/research/2026-10-23-offline-node1.md`, commit messages 10-21/22): v5 beats their shipped layout node **70–17
+on 50 unseen Crello ads**; a Qwen3-4B LoRA student emitting layouts lost 11–13 to v5 (8B tied 8–8, DPO made it worse
+7–15), ran 23 s per layout as Q4 GGUF on CPU; "learned pickers and graders were coin flips"; learned Sonnet
+proportions lost 36–27 on real ads; their Crello role heuristic got ~80 % of headlines but 25–30 % CTA / logo
+precision. Their next plan (`beating-v5-offline.md`): a CP-SAT / LP geometry pass behind every candidate, then a
+tiny *plan* predictor (region / order / keep / anchor), never coordinates. Also: 7 adversarial dev designs
+(ghost word at opacity 0.08 as the biggest font, plain-text CTA, "SAVE 20%" read as a button) that break
+first-word-verb and largest-font rules — worth copying as test ideas.
+
+Not rivals: kelechi-c, tomosh22, GoranKim0518, umairkhalidx, amosrnb, ricardohbin, roos103, dallas8000-ops,
+Master-Roshi-Ultra, rie10170521-boop (unrelated projects named chameleon); chitrangad-ram-sapate and Gahlawat-9
+(India round, brand-audit skill); the 13 forks last pushed 2026-09-24 are untouched starters.
+
+## Field ranking on the rubric (what the code can do, 2026-10-26)
+
+| Rubric row | Us (v9) | tailsgit v5 | annniedong | vedanth2406 | preetham-ven | fernando | Angelo (shipped) |
+|---|---|---|---|---|---|---|---|
+| No unwanted collisions | source-relative `OverlapRules`, rectifier + hard fail, verified in eval (0 / 4,198) | hard rules + local repair, tiered safety | **scored only**, never gated | hard gate (> 1.5 % new overlap) | zero-overlap gate (too strict: dismantles layering) | hard feasibility, 0 on 1,600 synthetic | gate (overlap beyond source) |
+| Readable text | measured skia fit, role floors, contrast estimate + text-less render, straddle rule | renderer fit, legibility tier, no-render contrast (0.99 corr.) | measured + hinting-safe widths, no contrast | measured ink, shared readability level, no contrast | measured under two converters, floor scan, no contrast | measured, 3×3 sampled contrast; min type fell to 6.3 px | floors by role, render contrast on top 6 |
+| Brand fidelity | roles (rules + classifier), logo / hero floors, one headline / CTA / logo | roles with confidences, colour emphasis, key_size pinned | lockup / sponsor-strip logic, compound texts | coarse roles (no CTA / logo) | no roles beyond button / dominant image | roles + date regex | rule ranker (verb list) |
+| Intentional look | judge fitted on 720 designer refs, energy optimiser, critic loop | hand scorer fitted on 185 labels, CP-SAT preserve-first | drift / order / balance terms | 10 geometric costs | 5-term rank | lexicographic + proxy score | 10 terms + fitted picker only in research |
+| Holds up everywhere | 21 candidates in 4 families, structure family, rescue mode | 12–130 candidates, 7 recipes, retrieval guarded | 3–10 templates × minor multipliers, z3 refine | 40–120, banner search | ≈ 150 + exhaustive floor scan | lanes + families, 13 synthetic buckets | 5–37 |
+| Speed | 0.3 s p50 native | 1.3 s p50 CPU, 6.3 s median in Docker | fast (z3 2.5 s cap) | unknown (large pool) | likely seconds (hundreds per floor) | 0.4–0.9 s | unknown |
+
+**Who is strongest now:** tailsgit v5 remains the only rival with a fitted judge, a preserve-first solver and
+human-labelled recall, but its main branch has not moved in a week and its three learned experiments (critic,
+generator, tight-group rules) all failed to beat the hand scorer on human labels, which is the same thing we found
+with the VLM (S1) and the text LLM (S6). annniedong is the most active and the most careful about *what belongs
+together* (lockups, sponsor strips, compound phrases) but still has no collision gate or contrast signal.
+vedanth2406 and preetham-ven arrived in the last two days with large measured candidate pools and strict gates;
+both are blind to pixels and roles, so they will produce clean but generic layouts. Angelo's team has the deepest
+evidence that LLM-emitted coordinates and learned pickers lose to rules, and the most plausible next step (LP
+geometry pass + discrete plan), but their public engine is gone and the strong version is a research copy.
+**Nobody ships a layout model that is on by default; the only shipped weights in the field are Parinagpal's photo
+subject detectors (not schema-compatible) and our 391 KB role classifier.**
+
+## What to borrow (general rules, in words) and what to ignore
+
+Borrow:
+1. **Compound-phrase units with language cues** (annniedong `_compound_texts`): a number next to its unit, a
+   currency sign before a number, a lone "&" / "+" between two words, a line ending in "of / the / and" above the
+   next, a mid-sentence lowercase continuation — join them into one unit so "50" never parts from "%". Our units
+   are geometric only; this is cheap, id-free and English-light.
+2. **Tight relations held rigid, generated alternately with the free analysis** (tailsgit `rules`): label + value,
+   shadow copy, text + underline, logo + name as one rigid unit *and* the free version, both in the pool, the judge
+   picks. tailsgit's hand score dropped when rigid-only; the alternation is the general form of our holder / host
+   logic.
+3. **Alpha-bounding-box visible bounds for images** (preetham-ven `_asset_bounds`): prominence, overlap and
+   centring from the asset's opaque pixels, not its padded box. Directly fixes our known "logo looks small because
+   of transparent padding" gap and the transparent product hero on Level 3.
+4. **Hidden-under-opaque gate** (Angelo `G9_hidden`) and **content collapsed to a speck** (ankita320) as a *defect
+   to detect*: an element fully covered by a later opaque element, or shrunk below a few pixels, is content removal
+   in disguise. Add both to our hard fails and to the eval metrics.
+5. **Path-coverage candidate budgets** (tailsgit `candidate_budget.py`): guarantee every family / mode a feasible
+   representative before spending the shared budget, counts not wall-clock, so output is byte-identical on a slower
+   machine. We cap by `MAX_CANDIDATES`; a per-family floor is the same idea.
+6. **Adversarial role cases** (Angelo dev designs 05–09): ghost word at opacity 0.08 as the largest font, "SAVE 20%"
+   as a non-button, CTA starting with "find", plain-text CTA, numbered steps in reading order, wordmark-as-logo.
+   Add as role-classifier / analyzer tests (opacity-weighted size for headline choice is a one-line rule).
+7. **Judge order-swap consistency** (Preeyam183, Angelo's note): when a model judges pairs, present both orders
+   and count disagreement as a tie. Only matters if we ever re-enable a VLM tie-break.
+8. **Shared readability level across all banner text** (vedanth2406 `horizontal.py`): one binary search on a
+   readability level that every text and label row must meet, rejecting a layout rather than shrinking one piece
+   below it. Our `_largest_k` does this for floors; the rejection (instead of rescue) is a stricter variant worth
+   trying as a candidate.
+
+Ignore / traps:
+- Absolute pixel text targets (Ebrahim 14 / 11 / 9 / 7 px) and `fit = "cover"` forced on backgrounds: hand-tuned
+  to small banners, wrong at 1080×1920 and alters the design.
+- Zero-overlap gates (preetham-ven, Ebrahim's 80× penalty): dismantle every layered design; our source-relative
+  rule is right.
+- Hiding content (ankita320 speck, Parinagpal `hidden`), rewriting `z_index` / `fit` (Revan-dev), modifying the
+  vendored converter (preetham-ven): rubric or rule violations a judge will see.
+- Logo by id / asset-name regex (ankita320, Revan-dev): hidden tasks have opaque ids.
+- Learned layout generators and critics at this data scale: tailsgit (CVAE 15/40, critic 0.578), Angelo (student
+  loses 11–13, pickers coin flips), us (S1, S6). Three independent teams, same answer. Spend the remaining days on
+  rules + judge, not weights.
+- Rendering and disk writes inside `resize()` by default (Preeyam183): our render is budgeted and optional for
+  the QEMU reason in docs/DOCKER_CHECK.md.
+
+## Housekeeping
+- Organizer-side signals seen in rival docs: tailsgit works to "around November 2, unconfirmed" and a 13.5 CPU-s
+  self-imposed budget; Angelo's team still lists network-during-scoring, image size limit and reference hardware as
+  open questions. Nobody has a confirmed model cap.
+- Clones added: `vedanth2406_chameleon`, `preetham-ven_chameleon`, `EbrahimHimayoun_PolymorphicTrio`,
+  `Preeyam183_AdobeHackathon`, `ankita320_adobe-h`, `Revan-dev_chameleon`, `Jdeww_chameleon`,
+  `amanadhav_chameleon`, `Parinagpal11_Project-Chameleon-Adobe_Hackathon`. AngeloLandiza's clone is now the only
+  copy of that work.
