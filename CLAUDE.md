@@ -11,6 +11,8 @@ stretch the photo."
 - `docs/BRIEF_PDF_TEXT.md` — verbatim text of the official brief PDF (`docs/Final Chameleon Challenge.pdf`).
 - Starter repo cloned at `chameleon/` (https://github.com/jhaaj08/chameleon). Work happens there.
 - `docs/baseline/` — rendered source-vs-baseline comparisons for the three samples (stretch baseline, 2026-10-19).
+- `docs/NEXT_STEPS.md` — **where to resume** (2026-10-26): the S5 freeze checklist, the five next engine
+  implementations in priority order, and the dead ends already measured (do not re-propose them).
 
 ## Non-negotiable rules (Stage 1, automated scoring)
 - Edit **only** `engine/resize.py`: `def resize(source: dict, target_canvas: dict) -> dict`.
@@ -340,6 +342,40 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   order (never build it from a `sort_keys` dump), and a plain roles array lets a small model lose its place
   (the answer is keyed by element number). The only idea left open: ask the model just where the rules'
   headline is a guess (docs/LLM_S6.md §7).
+
+## v10: backdrop awareness (2026-10-26, docs/EVAL_V10.md, tests/test_v10_backdrop.py)
+- `engine/backdrop.py` — the background as a composition. `BackdropMap` (24×24 cells × 3×3 samples of
+  luminance / colour with summed-area tables) `from_json` (engine/contrast.py's layer compositing, ~1–2 ms) or
+  `from_image` (a text-less render; pixels are a bonus, never a dependency); a text's `Signature` under its ink
+  (lightness = luminance^0.45, busyness, *glow* = lightness − canvas median, hue / sat, `over` = the element it
+  lies on); `source_signatures(analysis)` cached per task. Three uses, all behind `CHAMELEON_BACKGROUND`
+  (=0 byte-identical to v9; `tests/test_perceive.py` pins it off for the v5 goldens) with per-piece switches
+  `CHAMELEON_BACKDROP_SLIDE / _QUIET / _PATTERNS` (default on) and `_JUDGE` (**default off**):
+  - *slide* (`slide_texts`, called by `floorplan.slide_backdrop` at the end of `floorplan_relayout` /
+    `structure_relayout`): `_place_column` records a slot per text item in `Placement.slots` (column width, the
+    room down to the neighbours' gaps); each headline / subhead / body / CTA text moves inside its slot to where
+    the target's map (built from the placement's non-text elements) looks most like its source signature, only
+    when ≥ `MIN_GAIN` (0.12) closer, never onto another unit; moves in `Placement.notes["slide"]`.
+  - *quiet area* (`quiet_position`, critic directive `quiet`, recipe "<role> onto the quiet area"): replaces the
+    v9 `onto` move on `cover` pictures (the crop changes with the box) and follows it on `contain` ones; samples
+    the text's own contrast estimate at 5×5 positions over the picture, best ratio then shortest move.
+  - *judge term* `read.backdrop` (`score.active_weights`: `BACKDROP_WEIGHT` 3 taken proportionally from the
+    layout block, `CHAMELEON_BACKDROP_WEIGHT` dev knob; `CHAMELEON_BACKDROP_PIXELS=1` compares pixels with
+    pixels in stage 2 at the cost of one source render, ~70 ms). Off by default: on the 720 designer references
+    it never paid (tuning −0.004 / −0.003 / −0.001 at weight 3 / 2 / 1, hold-out within noise).
+- `engine/patterns.py` — the free decorations (role decorative, on-canvas area < 20 % of the canvas: bleeding
+  photos are backdrops) as one arrangement: `analyze()` fills `Analysis.patterns` (`detect_patterns`: corners /
+  edge / diagonal / mirrored / scatter from geometry) and `relayout.decorative_boxes` → `place_pattern` places it
+  as a whole in all three strategies (corners keep inset ratios, edge runs their edge, mirrored pairs their axis,
+  diagonals their angle and spacing ratio, scatters their centre fractions; sizes × min(sx, sy) as before).
+  Census: 15 of 450 corpus designs (3 corners, 1 mirrored, 11 scatter) and Level 2 (corners). Goldens: the 5
+  Level 2 files in `tests/fixtures/golden_v10` (only the two circles move); everything else byte-identical.
+- Numbers (docs/EVAL_V10.md §4): no-pixel slice (300 designs, 4198 cases) judge contrast fails 11 → 10, fallback wins 7 → 5,
+  hard defects 13 → 13; pixel slice (150 designs) defects 7 → 7, terms within 0.003; designer references tuning
+  0.608 → 0.607 (up 9 / down 7), hold-out 0.614 → 0.615; runtime p50 0.626 → 0.645 s single process. The slide acts
+  in 8.6 % of plan / structure candidates but rarely in the winner (4 of 2152). Tools: `eval/backdrop_report.py` (census, by-eye `moves` sheet of
+  texts that landed on a different backdrop, single-process `runtime`), sheets in `docs/sanity_v10/`,
+  designer comparisons in `docs/designer/compare/v10_backdrop` and `v10_ablate_*`.
 
 ## Playground (dev tool, not shipped)
 - `chameleon/tools/playground.py` serves a local UI at http://localhost:8765: pick a sample, upload or paste a

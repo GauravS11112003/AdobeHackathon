@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from engine import backdrop
 from engine import contrast as contrast_est
 from engine.analyze import (
     ROW_HEIGHT_TOL,
@@ -129,6 +130,12 @@ WEIGHTS = {
     "faith.rows": 4.0,        # v8: a sibling row stays a row (or a column), no corner scatter
 }
 HAND_WEIGHTS = dict(WEIGHTS)                                  # the hand-set defaults above
+# v10: `read.backdrop` (engine/backdrop.py) joins the breakdown when
+# CHAMELEON_BACKGROUND is on; its weight is taken from the layout block in
+# proportion so the sum stays 100 (`active_weights`); the fitted file and
+# the hand weights above are untouched, and with the flag off the term is
+# absent and the weights are exactly WEIGHTS.
+BACKDROP_WEIGHT = 3.0
 WEIGHTS_FILE = Path(__file__).with_name("score_weights.json")   # written by eval/calibrate.py
 
 
@@ -162,6 +169,26 @@ def load_weights(path: str | os.PathLike | None = None) -> dict[str, float] | No
 _fitted = load_weights()
 if _fitted:
     WEIGHTS.update(_fitted)
+
+
+def active_weights() -> dict[str, float]:
+    """The weights in force: WEIGHTS, plus `read.backdrop` (v10) when the
+    backdrop judge term is on, paid for by the layout block."""
+    if not backdrop.enabled("judge"):
+        return WEIGHTS
+    try:
+        bw = float(os.environ.get("CHAMELEON_BACKDROP_WEIGHT", "") or BACKDROP_WEIGHT)   # dev knob for the measurement
+    except ValueError:
+        bw = BACKDROP_WEIGHT
+    w = dict(WEIGHTS)
+    layout = [k for k in w if k.startswith("layout.")]
+    total = sum(w[k] for k in layout)
+    if total > bw:
+        f = (total - bw) / total
+        for k in layout:
+            w[k] *= f
+    w["read.backdrop"] = bw
+    return w
 
 ASPECT_TOL = 0.05
 CONTRAST_GOOD = 4.5          # WCAG AA for normal text
@@ -284,13 +311,22 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
         except Exception as exc:  # the renderer is a bonus, never a dependency
             image = None
             notes["render_error"] = str(exc)
+    est: dict[str, Any] = {}
     try:
-        contrast, worst, src_worst, how = _contrast_terms(analysis, source, elements, design, image, m)
+        contrast, worst, src_worst, how, est = _contrast_terms(analysis, source, elements, design, image, m)
     except Exception as exc:  # pragma: no cover - odd image / crop
         contrast, worst, src_worst, how = 1.0, {}, {}, "error"
         notes["contrast_error"] = str(exc)
         image = None
     bd["read.contrast"] = contrast
+    if backdrop.enabled("judge"):
+        # v10: the backdrop under the headline / subhead / CTA looks like
+        # the source's (band, glow, texture, hue); pixels when this stage
+        # has them, the JSON composite otherwise, like with like.
+        try:
+            bd["read.backdrop"], notes["backdrop"] = _backdrop_term(analysis, source, elements, design, image, est, m)
+        except Exception as exc:  # pragma: no cover
+            bd["read.backdrop"], notes["backdrop"] = 1.0, {"error": str(exc)}
     notes["contrast"] = worst
     notes["contrast_source"] = how
     if image is None:
@@ -354,7 +390,8 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
         penalty = DISRUPT_PENALTY * (DISRUPT_RATIO - change) / (DISRUPT_RATIO - 1.0)
         notes["disruption_penalty"] = round(penalty, 2)
 
-    soft = sum(WEIGHTS[k] * clamp(v, 0.0, 1.0) for k, v in bd.items())
+    weights = active_weights()
+    soft = sum(weights[k] * clamp(v, 0.0, 1.0) for k, v in bd.items())
     total = soft - HARD_PENALTY * len(hard) - penalty
     return Score(total=total, hard=hard, breakdown=bd, notes=notes, penalty=penalty)
 
@@ -527,12 +564,13 @@ def straddling_texts(analysis: Analysis, source: dict[str, Any], elements: list[
 
 def _contrast_terms(analysis: Analysis, source: dict[str, Any], elements: list[dict[str, Any]],
                     design: dict[str, Any], image, m: TextMeasurer
-                    ) -> tuple[float, dict[str, float], dict[str, float], str]:
+                    ) -> tuple[float, dict[str, float], dict[str, float], str, dict[str, Any]]:
     """(importance-weighted contrast score in [0, 1], per-text ratio, per-text
-    source ratio, where the numbers came from). The JSON estimate serves
-    every text; a render without text, when given, refines ratio and
-    busyness for the texts it covers (the final top candidates)."""
-    ratios, busy = _contrast_estimate(elements, design, m)
+    source ratio, where the numbers came from, the JSON estimate itself).
+    The JSON estimate serves every text; a render without text, when given,
+    refines ratio and busyness for the texts it covers (the final top
+    candidates)."""
+    ratios, busy, est = _contrast_estimate(elements, design, m)
     how = "estimate" if ratios else "none"
     if image is not None:
         px_ratios, px_busy = _contrast_pixels(elements, design, image, m)
@@ -542,7 +580,7 @@ def _contrast_terms(analysis: Analysis, source: dict[str, Any], elements: list[d
             how = "pixels+estimate" if how == "estimate" else "pixels"
     src = source_contrast(analysis, source, m)
     if not ratios:
-        return 1.0, {}, src, how
+        return 1.0, {}, src, how, est
     num = den = 0.0
     for el in elements:
         eid = el["id"]
@@ -555,13 +593,36 @@ def _contrast_terms(analysis: Analysis, source: dict[str, Any], elements: list[d
         imp = max(imp, 0.05)
         num += imp * score
         den += imp
-    return (num / den if den else 1.0), ratios, src, how
+    return (num / den if den else 1.0), ratios, src, how, est
 
 
 def _contrast_estimate(elements: list[dict[str, Any]], design: dict[str, Any],
-                       m: TextMeasurer) -> tuple[dict[str, float], dict[str, float]]:
+                       m: TextMeasurer) -> tuple[dict[str, float], dict[str, float], dict[str, Any]]:
     est = contrast_est.estimate(design, _ink_boxes(elements, m))
-    return {k: v.ratio for k, v in est.items()}, {k: v.busy for k, v in est.items()}
+    return {k: v.ratio for k, v in est.items()}, {k: v.busy for k, v in est.items()}, est
+
+
+def _backdrop_term(analysis: Analysis, source: dict[str, Any], elements: list[dict[str, Any]],
+                   design: dict[str, Any], image, est: dict[str, Any], m: TextMeasurer
+                   ) -> tuple[float, dict[str, Any]]:
+    """v10 `read.backdrop` (engine/backdrop.py): per-text statistics under
+    the headline / subhead / CTA ink from the pixels when `image` is given,
+    else from the JSON contrast estimate already computed for the contrast
+    term; the source measured the same way (cached per task)."""
+    judged = {el["id"] for el in elements if el["type"] == "text" and analysis.roles.get(el["id"]) in backdrop.JUDGE_ROLES
+              and str(el.get("content", "")).strip()}
+    if not judged:
+        return 1.0, {}
+    if image is not None and not backdrop.pixels_enabled():
+        image = None          # both stages judge the term on the composite (same direction, no source render)
+    if image is not None:
+        ink = {eid: box for eid, box in _ink_boxes(elements, m).items() if eid in judged}
+        stats = backdrop.text_stats(design, ink, image, m)
+    else:
+        stats = {eid: (tc.mean_lum, tc.busy, tc.mean_rgb) for eid, tc in est.items() if eid in judged}
+    if not stats:
+        return 1.0, {}
+    return backdrop.backdrop_term(analysis, source, design, stats, image, m)
 
 
 def _contrast_pixels(elements: list[dict[str, Any]], design: dict[str, Any], image,

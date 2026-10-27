@@ -32,6 +32,9 @@ class Placement:
     font_scale: dict[str, float] = field(default_factory=dict) # element id -> multiplier
     font_size: dict[str, float] = field(default_factory=dict)  # element id -> explicit size
                                                                # (already fitted; wins over font_scale)
+    slots: dict[str, Box] = field(default_factory=dict)        # v10: unit key -> the region a column placer
+                                                               # let the unit occupy (engine/backdrop.slide_texts)
+    notes: dict[str, Any] = field(default_factory=dict)        # v10: what a strategy did beyond the boxes (slides)
 
 
 def ratio_change(source_canvas: Box, target: Box) -> float:
@@ -49,6 +52,7 @@ def anchor_relayout(analysis: Analysis, target: Box, content_scale: float | None
     s = min(sx, sy) if content_scale is None else float(content_scale)
     out = Placement()
 
+    deco = decorative_boxes(analysis, target, s)
     for unit in analysis.units:
         if unit.role == BACKGROUND:
             # A background keeps covering the canvas; the renderer's `fit`
@@ -62,7 +66,7 @@ def anchor_relayout(analysis: Analysis, target: Box, content_scale: float | None
             continue   # zones are laid out around the content below
 
         if unit.role == DECORATIVE:
-            new = _map_decorative(unit.box, src, target, s)
+            new = deco.get(unit.key) or _map_decorative(unit.box, src, target, s)
         else:
             new = _map_content(unit, src, target, sx, sy, s)
 
@@ -88,6 +92,17 @@ def _cover_box(mb: Box, src: Box, target: Box) -> Box:
     y0 = min(0.0, ty) * target.h
     y1 = target.h + max(0.0, by) * target.h
     return Box(x0, y0, x1 - x0, y1 - y0)
+
+
+def decorative_boxes(analysis: Analysis, target: Box, s: float) -> dict[str, Box]:
+    """v10: unit key -> box for the decorations that belong to a pattern
+    (engine/patterns.py), placed as one arrangement; empty when patterns
+    are off. Decorations not in it keep `_map_decorative`."""
+    from engine.patterns import pattern_boxes
+    try:
+        return pattern_boxes(analysis, target, s)
+    except Exception:  # pragma: no cover - a pattern is a bonus, never a dependency
+        return {}
 
 
 def _map_decorative(box: Box, src: Box, target: Box, s: float) -> Box:

@@ -31,6 +31,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
+from engine import backdrop
 from engine.analyze import (
     BACKGROUND,
     BADGE,
@@ -354,11 +355,29 @@ def _contrast_recipes(eid: str, analysis: Analysis, source: dict[str, Any], best
         out.append(Recipe(f"{role} on its plate", directives={"backing": {eid: backing}}))
     picture = layered_picture(eid, analysis, m)
     if picture is not None:
-        out.append(Recipe(f"{role} on the picture", directives={"onto": {eid: picture}}))
+        # v10: a `cover` picture is cropped differently in every box, so the
+        # pixels under the source position are not the source's; the text
+        # goes to the band of the picture where its colour reads instead
+        # (engine/backdrop.quiet_position). A `contain` picture keeps the
+        # source move and tries the quiet area as a second recipe.
+        quiet = backdrop.enabled("quiet")
+        if not (quiet and _is_cover(picture, analysis)):
+            out.append(Recipe(f"{role} on the picture", directives={"onto": {eid: picture}}))
+        if quiet:
+            out.append(Recipe(f"{role} onto the quiet area", directives={"quiet": {eid: picture}}))
     cover = covering_unit(eid, analysis, best.design, m)
     if cover is not None and cover != picture and cover != backing:
         out.append(Recipe(f"{role} off the {analysis.unit(cover).role}", directives={"off": {eid: cover}}))
     return out
+
+
+def _is_cover(key: str, analysis: Analysis) -> bool:
+    """Is the unit's primary element a `cover`-fitted image?"""
+    u = _unit(analysis, key)
+    if u is None:
+        return False
+    el = analysis.source_elements.get(u.primary or u.ids[0], {})
+    return el.get("type") == "image" and str(el.get("fit", "contain") or "contain") == "cover"
 
 
 # ---------------------------------------------------------------------------
@@ -522,6 +541,8 @@ def apply_directives(elements: list[dict[str, Any]], analysis: Analysis, target:
       widen:   [text id, ...]      widen the box until the text wraps on the allowed lines
       backing: {text id: unit key} the plate / panel covers the text with the source's padding
       onto:    {text id: hero key} the text unit moves onto the hero where it sat in the source
+      quiet:   {text id: pic key}  (v10) the text unit moves to the band of the picture where its
+                                   colour reads best (engine/backdrop.quiet_position)
       pin:     [unit key, ...]     the unit moves back to the canvas edge(s) it hugged in the source
       shrink:  {unit key: factor}  the unit scales about its centre (fonts follow)
       refit:   [text id, ...]      the font shrinks until the text fits its box
@@ -549,6 +570,12 @@ def apply_directives(elements: list[dict[str, Any]], analysis: Analysis, target:
     for eid, key in (directives.get("onto") or {}).items():
         if eid in by_id and _onto(eid, key, by_id, analysis, target):
             done.setdefault("onto", {})[eid] = key
+    for eid, key in (directives.get("quiet") or {}).items():
+        if eid in by_id and _quiet(eid, key, by_id, analysis, target, m):
+            done.setdefault("quiet", {})[eid] = key
+            unit_key = analysis.element_unit.get(eid)
+            if unit_key is not None:
+                done.setdefault("protect", []).append(unit_key)
     for eid, key in (directives.get("off") or {}).items():
         if eid in by_id and _off(eid, key, by_id, analysis, target, m):
             done.setdefault("off", {})[eid] = key
@@ -1027,6 +1054,21 @@ def _onto(eid: str, key: str, by_id: dict[str, dict[str, Any]], analysis: Analys
     cx = clamp(cx, tb.w / 2.0, target.w - tb.w / 2.0)
     cy = clamp(cy, tb.h / 2.0, target.h - tb.h / 2.0)
     _move(_members(text_unit, by_id), cx - tb.cx, cy - tb.cy)
+    return True
+
+
+def _quiet(eid: str, key: str, by_id: dict[str, dict[str, Any]], analysis: Analysis, target: Box,
+           m: TextMeasurer) -> bool:
+    """v10: move the text unit to where it reads best against the picture
+    `key` (engine/backdrop.quiet_position); False when nowhere reads better."""
+    got = backdrop.quiet_position(eid, key, by_id, analysis, target, m)
+    if got is None:
+        return False
+    dx, dy, _before, _after = got
+    text_unit = _unit(analysis, eid)
+    if text_unit is None:
+        return False
+    _move(_members(text_unit, by_id), dx, dy)
     return True
 
 

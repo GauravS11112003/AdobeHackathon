@@ -60,6 +60,7 @@ class TextContrast:
     mean_lum: float         # mean luminance (0..1) under the text
     ratios: dict[str, float]   # per text colour (main colour first)
     slices: list[float] = None  # type: ignore[assignment]  # 25th-percentile ratio per slice along the long side
+    mean_rgb: Any = None        # mean composited colour under the text (r, g, b in 0..255; v10 backdrop signatures)
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +327,8 @@ def estimate(design: dict[str, Any], ink_boxes: dict[str, Box] | None = None,
                 slices = per_slice
         busy = float(bg.std(axis=0).mean())
         out[el["id"]] = TextContrast(ratio=min(ratios.values()), busy=busy,
-                                     mean_lum=float(lum_bg.mean()), ratios=ratios, slices=slices)
+                                     mean_lum=float(lum_bg.mean()), ratios=ratios, slices=slices,
+                                     mean_rgb=tuple(float(v) for v in bg.mean(axis=0)))
     return out
 
 

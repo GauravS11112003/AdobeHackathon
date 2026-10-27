@@ -48,7 +48,7 @@ from engine.analyze import (
     Unit,
 )
 from engine.geometry import Box, clamp
-from engine.relayout import Placement, _cover_box, _map_decorative, _place_members, place_panels
+from engine.relayout import Placement, _cover_box, _map_decorative, _place_members, decorative_boxes, place_panels
 from engine.textfit import TextMeasurer, default_measurer, scaled_letter_spacing
 
 TALL = "tall"
@@ -1291,6 +1291,8 @@ def _place_column(items: list[_Item], gaps: list[float], x0: float, y0: float, a
     else:
         before[0] = leftover / 2.0
     y = y0
+    tops: list[float] = []
+    bottoms: list[float] = []
     for i, it in enumerate(items):
         y += before[i]
         if i > 0:
@@ -1302,7 +1304,18 @@ def _place_column(items: list[_Item], gaps: list[float], x0: float, y0: float, a
         else:
             x = x0 + (aw - it.w) / 2.0
         it.place(x, y, it.w, it.h, out)
+        tops.append(y)
         y += it.h
+        bottoms.append(y)
+    # v10: the region each text may slide in (engine/backdrop.slide_texts):
+    # the column's width, and the room down to its neighbours' gaps, so a
+    # slide never changes the reading order.
+    for i, it in enumerate(items):
+        if not isinstance(it, _TextItem):
+            continue
+        lo = bottoms[i - 1] + gaps[i - 1] if i > 0 else y0
+        hi = tops[i + 1] - gaps[i] if i + 1 < n else y0 + ah
+        out.slots[it.unit.key] = Box(x0, lo, aw, max(hi - lo, it.h))
 
 
 def _column_items(b: _Builder, met: Metrics, H: float, with_hero: bool, tight: bool,
@@ -1641,13 +1654,14 @@ def floorplan_relayout(analysis: Analysis, target: Box, elements: dict[str, dict
     s = min(target.w / src.w, target.h / src.h)
     out = Placement()
 
+    deco = decorative_boxes(analysis, target, s)
     for unit in analysis.units:
         if unit.role == BACKGROUND:
             for eid, mb in unit.members.items():
                 out.boxes[eid] = _cover_box(mb, src, target)
                 out.font_scale[eid] = s
         elif unit.role == DECORATIVE:
-            _place_members(unit, _map_decorative(unit.box, src, target, s), s, out)
+            _place_members(unit, deco.get(unit.key) or _map_decorative(unit.box, src, target, s), s, out)
             for eid in unit.ids:
                 out.font_scale[eid] = s
 
@@ -1668,6 +1682,10 @@ def floorplan_relayout(analysis: Analysis, target: Box, elements: dict[str, dict
 
     # Panels (colour zones) are rebuilt around the content they carried.
     place_panels(analysis, out, target, mode="wrap", measurer=m)
+    # v10: texts slide inside their slots to the backdrop that looks like
+    # their source backdrop (engine/backdrop.py); panels re-wrap after.
+    if slide_backdrop(analysis, out, target, elements, m):
+        place_panels(analysis, out, target, mode="wrap", measurer=m)
 
     # Safety net: anything a plan did not place keeps its proportions and
     # its relative position (should not happen; keeps every id present).
@@ -1680,3 +1698,22 @@ def floorplan_relayout(analysis: Analysis, target: Box, elements: dict[str, dict
         for eid in unit.ids:
             out.font_scale[eid] = s
     return out
+
+
+def slide_backdrop(analysis: Analysis, out: Placement, target: Box, elements: dict[str, dict[str, Any]],
+                   m: TextMeasurer) -> bool:
+    """v10: `engine.backdrop.slide_texts` on a placement whose column placer
+    recorded slots; records the moves in `out.notes["slide"]`. Off (and a
+    no-op) unless CHAMELEON_BACKGROUND / CHAMELEON_BACKDROP_SLIDE are on."""
+    from engine import backdrop
+    if not out.slots or not backdrop.enabled("slide"):
+        return False
+    try:
+        moved = backdrop.slide_texts(analysis, out, target, elements, m)
+    except Exception:  # pragma: no cover - the slide is a bonus, never a dependency
+        import logging
+        logging.getLogger(__name__).exception("backdrop slide failed; placement kept")
+        return False
+    if moved:
+        out.notes["slide"] = moved
+    return bool(moved)

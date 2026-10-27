@@ -29,7 +29,7 @@ Measured on real designs, not on the three samples. The eval corpus is 453 templ
 | Cases with any hard defect: text overflow, unwanted overlap, content off canvas, distorted image, unreadable font | **13 of 4,198 (0.31 %)** on the v9 slice; 28 of 6,058 on the last full run (v7) |
 | Headline or CTA below the readable floor, on the 4,198-case slice | 23 → **13** after the critic loop |
 | Headline or CTA with a contrast failure, same slice | 19 → **11** |
-| Agreement with the designer's own layout, hold-out designs (0 to 1) | 0.595 → 0.603 → 0.610 → **0.614** across v6 · v7 · v8 · v9 |
+| Agreement with the designer's own layout, hold-out designs (0 to 1) | 0.595 → 0.603 → 0.610 → 0.614 → **0.615** across v6 · v7 · v8 · v9 · v10 |
 | Adversarial synthetic corpus (2,474 cases: 45-element designs, 1×1 and 4000×4000 targets, empty text, missing assets, rotation 725°) | never crashes, every id preserved |
 | Runtime per task, single process, Apple Silicon | **p50 0.3 s · p95 1.0 s** |
 
@@ -71,7 +71,7 @@ Every task gets 18 to 21 candidate layouts from three families. **Anchor** keeps
 <td width="50%" valign="top">
 
 ### 3. Judge like the rubric, then repair 📏
-A deterministic rectifier removes collisions, overflow and off-canvas content at unit level. A judge then scores every candidate: hard fails (−1000 each) for anything the brief calls disqualifying, and a 0 to 100 soft score for readability, layout (balance, alignment, even spacing, fill, margins, cohesion) and faithfulness (reading order, anchors, size hierarchy). Its 16 weights were fitted on the designer references. The top three are refined by a local search over a design-principle energy, and a critic loop reads what the judge still dislikes, maps it to a repair recipe (raise the CTA to its floor, put the headline back on its plate, pin the logo to its corner, keep the badges in a row) and regenerates targeted variants. Best candidate wins.
+A deterministic rectifier removes collisions, overflow and off-canvas content at unit level. A judge then scores every candidate: hard fails (−1000 each) for anything the brief calls disqualifying, and a 0 to 100 soft score for readability, layout (balance, alignment, even spacing, fill, margins, cohesion) and faithfulness (reading order, anchors, size hierarchy). Its 16 weights were fitted on the designer references. The top three are refined by a local search over a design-principle energy, and a critic loop reads what the judge still dislikes, maps it to a repair recipe (raise the CTA to its floor, put the headline back on its plate, pin the logo to its corner, keep the badges in a row) and regenerates targeted variants. The background is read as a composition too: a text-less render becomes a map of light, glow and busyness, each text keeps its relation to that map (on the glow, on the quiet part of the picture) rather than its coordinates, and decorative shapes move as one arrangement (corners, diagonal, mirrored) instead of one by one. Best candidate wins.
 
 </td>
 <td width="50%"><img src="docs/sanity_critic/level2_sheet.png" alt="The Level 2 sample in all twelve formats"></td>
@@ -146,6 +146,7 @@ All default to the shipped behaviour; each `=0` switch is byte-identical to the 
 | --- | --- | --- |
 | `CHAMELEON_OPTIMIZE` | `1` | local-search refinement of the top three candidates |
 | `CHAMELEON_CRITIC` | `1` | diagnose-and-repair rounds after judging |
+| `CHAMELEON_BACKGROUND` | `1` | backdrop-aware text placement and decoration patterns |
 | `CHAMELEON_ROLE_MODEL` | `0` | learned role classifier votes with the rules |
 | `CHAMELEON_VLM` | `0` | vision-language perception (needs the baked weights) |
 | `CHAMELEON_RENDER` | auto | pixel checks in the judge; off automatically under emulation |
@@ -177,13 +178,15 @@ The Crello slice downloads on first use (`.venv/bin/python -m eval.crello_conver
 
 | Folder | What it does |
 | --- | --- |
-| [`chameleon/engine/`](chameleon/engine) | The engine. `resize.py` orchestrates `analyze` → `candidates` (`relayout`, `floorplan`, `structure`) → `rectify` → `score` → `optimize` → `critic`; `textfit` mirrors the renderer's wrapping; `contrast` estimates WCAG contrast from the JSON; `role_model` is the shipped classifier |
+| [`chameleon/engine/`](chameleon/engine) | The engine. `resize.py` orchestrates `analyze` → `candidates` (`relayout`, `floorplan`, `structure`) → `rectify` → `score` → `optimize` → `critic`; `textfit` mirrors the renderer's wrapping; `contrast` estimates WCAG contrast from the JSON; `backdrop` and `patterns` read the background as a composition; `role_model` is the shipped classifier |
 | [`chameleon/eval/`](chameleon/eval) | Harness: Crello conversion, 6k-case runs, metrics, synthetic corpus, calibration, reports |
 | [`chameleon/tools/`](chameleon/tools) | Playground, designer DSL and comparison, role-model training |
 | [`chameleon/tests/`](chameleon/tests) | Unit, golden, metamorphic and judge-loop tests |
 | [`docs/`](docs) | Every milestone's write-up with numbers and renders: `EVAL_V1` to `EVAL_V8`, `CRITIC_LOOP`, `EVAL_SYNTH`, `ROLE_MODEL`, `VLM_BENCH`, `DOCKER_CHECK`; the designer references under `designer/` and `designer2/` |
 
 `chameleon/` started from the organisers' starter kit ([jhaaj08/chameleon](https://github.com/jhaaj08/chameleon)); only `engine/`, `requirements.txt` and the `Dockerfile` ship.
+
+**Where this goes next:** [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md) lists the freeze checklist, the five engine ideas with the most expected gain, and the approaches already measured and set aside.
 
 ## Team
 

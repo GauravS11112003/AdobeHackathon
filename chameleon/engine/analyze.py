@@ -166,6 +166,7 @@ class Analysis:
     source_elements: dict[str, dict[str, Any]] = field(default_factory=dict)   # id -> source element
     source_visible: dict[str, list[Box]] | None = None   # unit key -> painted part boxes in the source (rectify fills it)
     perception: dict[str, Any] | None = None        # S1: archetype + per-unit role votes (engine/role_merge.apply_votes fills it)
+    patterns: list[Any] = field(default_factory=list)   # v10: arrangements of the free decorations (engine/patterns.Pattern)
 
     def unit(self, key: str) -> Unit:
         for u in self.units:
@@ -333,8 +334,13 @@ def analyze(source: dict[str, Any]) -> Analysis:
     units.sort(key=lambda u: (u.reading_index if u.reading_index >= 0 else 10_000, u.key))
     shape_types = {el["id"]: str(el.get("shape_type", "rectangle") or "rectangle")
                    for el in elements if el["type"] == "shape"}
+    # v10: the free decorations as one arrangement (engine/patterns.py);
+    # only read when backdrop awareness is on (relayout.decorative_boxes).
+    from engine.patterns import detect_patterns   # local: keeps analyze import-light
+    patterns = detect_patterns([u for u in units if u.role == DECORATIVE], canvas, by_id)
     return Analysis(canvas=canvas, units=units, roles=roles, element_unit=element_unit,
-                    headline_font_size=headline_size, shape_types=shape_types, source_elements=by_id)
+                    headline_font_size=headline_size, shape_types=shape_types, source_elements=by_id,
+                    patterns=patterns)
 
 
 # ---------------------------------------------------------------------------
