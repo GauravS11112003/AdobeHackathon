@@ -27,13 +27,14 @@ from engine.floorplan import (
     WIDE,
     PlanOptions,
     floorplan_relayout,
+    is_strip,
     ratio_family,
 )
 from engine.geometry import Box
 from engine.relayout import Placement, anchor_relayout, ratio_change, resolve_vertical_collisions
 from engine.structure import StructureOptions, detect_structure, structure_relayout, structure_variants
 from engine.textfit import TextMeasurer, default_measurer
-from engine import critic
+from engine import critic, flags
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,22 @@ def generate_candidates(analysis: Analysis, source: dict[str, Any], target: Box,
     family = ratio_family(target)
     archetype = (analysis.perception or {}).get("archetype") if getattr(analysis, "perception", None) else None
     variants = plan_variants(family, archetype)
+    if flags.enabled("air") and family in (TALL, SQUARE, WIDE):
+        # v11: whitespace allocated before the k search (PlanOptions.air)
+        extra = [PlanOptions(air=True), PlanOptions(air=True, scale_bias=BOLD)]
+        variants = variants[:3] + extra + variants[3:]
+        limit += len(extra)
+    if flags.enabled("strip") and is_strip(target):
+        # v11 strip composer: triage first, the secondary copy and the badges
+        # give way before the headline / logo / CTA (PlanOptions.rescue)
+        extra = [PlanOptions(rescue=True), PlanOptions(rescue=True, scale_bias=BOLD),
+                 PlanOptions(rescue=True, spacing=TIGHT)]
+        variants = variants[:3] + extra + variants[3:]
+        limit += len(extra)
+    if flags.enabled("compose"):
+        extra = compose_variants(family, target)
+        variants = variants[:3] + extra + variants[3:]
+        limit += len(extra)
     out: list[Candidate] = []
 
     small = change <= SMALL_CHANGE_MAX
@@ -233,6 +250,23 @@ def archetype_prior(family: str, opts: PlanOptions, archetype: str | None) -> fl
     if archetype == "grid" and opts.chips != "row":
         return ARCHETYPE_PENALTY
     return 0.0
+
+
+def compose_variants(family: str, target: Box) -> list[PlanOptions]:
+    """v11: the compositions mined from the designer references (floorplan
+    PlanOptions.compose). Wide: hero bleeding off its side edge, headline
+    across the top. Banner: logo / CTA bookends, a two-tier strip, a bleeding
+    hero (and, on a strip tall enough for a column, the bleeding wide plan)."""
+    P = PlanOptions
+    if family == WIDE:
+        return [P(compose="bleed"), P(compose="header"), P(compose="bleed", scale_bias=BOLD)]
+    if family == BANNER:
+        out = [P(compose="bookend"), P(compose="twotier"), P(compose="bleed"),
+               P(compose="bookend", hero_side="right")]
+        if target.h >= 160:
+            out.append(P(compose="bleed", text_flow="column"))
+        return out
+    return []
 
 
 def _plan_variants(family: str) -> list[PlanOptions]:

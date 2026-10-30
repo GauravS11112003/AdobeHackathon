@@ -46,7 +46,7 @@ from typing import Any
 
 from engine.analyze import BACKGROUND, CTA, DECORATIVE, HEADLINE, Analysis, analyze
 from engine.candidates import SMALL_CHANGE_MAX, Candidate, generate_candidates, generate_repairs, placement_key
-from engine import critic
+from engine import critic, flags
 from engine.geometry import Box
 from engine import render as judge_render
 from engine import optimize as opt
@@ -131,11 +131,14 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
             design = realize(source, analysis, cand.placement, target)
             sc = score_design(analysis, source, design, target, render=False, strategy=cand.strategy)
             _apply_prior(sc, cand)
+            sp = strip_prior(analysis, design, target)
+            if sp:
+                _apply_prior(sc, prior=sp, note="strip_prior")
         except Exception:
             logger.exception("candidate %s failed; skipped", cand.name)
             continue
         judged.append(Judged(cand.name, cand.strategy, design, sc, time.time() - t0, cand.fallback, roles_info))
-        priors[cand.name] = cand.prior
+        priors[cand.name] = cand.prior + sp
         cands_by_name[cand.name] = cand
     if not judged:
         raise RuntimeError("no candidate could be realized")
@@ -172,6 +175,10 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
         # A canvas of the same shape (identity, a pure scale) already holds a
         # finished design: nothing to re-arrange, the proportional copy is it.
         judged = refine(judged, analysis, source, target, priors, roles_info, top_k)
+    # v11: the joint minimal-move constraint pass (engine/solve.py) on the
+    # best few layouts; each solved layout competes as "<seed> +solve".
+    if flags.enabled("solve") and change > SAME_SHAPE_MAX:
+        judged = solve_pass(judged, analysis, source, target, priors, roles_info)
     if render:
         for j in judged[:TOP_RENDER]:
             t0 = time.time()
@@ -184,6 +191,69 @@ def judge(source: dict[str, Any], target: Box, render: bool | None = None) -> tu
         judged.sort(key=lambda j: -j.score.total)
     LAST_JUDGED = judged
     return judged[0].design, judged
+
+
+STRIP_HEAD_LINES = 3         # v11 strip composer: on a banner <= floorplan.STRIP_MAX_H tall the headline
+STRIP_LINES_PENALTY = 3.0    # reads on at most this many lines; a layout that wraps it further pays this prior
+
+
+def strip_prior(analysis: Analysis, design: dict[str, Any], target: Box) -> float:
+    """v11 (STRIP): the triage rule the judge only weakly knows. A headline
+    wrapped on six 10 px lines in a 90 px leaderboard scored within 0.1 of
+    the same headline on three lines; on a short banner every layout that
+    wraps the headline beyond STRIP_HEAD_LINES pays STRIP_LINES_PENALTY."""
+    from engine.floorplan import STRIP_MAX_H, WIDE_MAX_RATIO
+    if not flags.enabled("strip") or target.h > STRIP_MAX_H or target.w / max(target.h, 1.0) <= WIDE_MAX_RATIO:
+        return 0.0
+    heads = [u for u in analysis.units if u.role == HEADLINE]
+    if not heads:
+        return 0.0
+    eid = heads[0].primary or heads[0].ids[0]
+    el = next((e for e in design["elements"] if e["id"] == eid), None)
+    if el is None or el["type"] != "text" or abs(float(el.get("rotation", 0.0) or 0.0)) >= 1.0:
+        return 0.0
+    from engine.textfit import default_measurer
+    if str(el.get("content", "")).count("\n") + 1 > STRIP_HEAD_LINES:
+        return 0.0          # its own hard line breaks: nothing a layout can do about them
+    return STRIP_LINES_PENALTY if default_measurer().layout(el).n_lines > STRIP_HEAD_LINES else 0.0
+
+
+SOLVE_TOP_K = 1              # v11: the joint constraint pass polishes the winner; on the top 3 its few
+                             # tenths of a point lifted a worse seed over the best one (Level 3, 728x90)
+
+
+def solve_pass(judged: list[Judged], analysis: Analysis, source: dict[str, Any], target: Box,
+               priors: dict[str, float], roles_info: dict[str, Any] | None, top_k: int = SOLVE_TOP_K
+               ) -> list[Judged]:
+    """v11: re-position the top `top_k` non-fallback layouts with the joint
+    constraint solver (alignment, even rhythm, order, canvas) and add each
+    changed one as a candidate; dropped when the judge finds a hard fail the
+    seed did not have. Sizes and fonts are untouched by construction."""
+    from engine.solve import solve
+    extra: list[Judged] = []
+    for j in [x for x in judged if not x.fallback][:top_k]:
+        t0 = time.time()
+        try:
+            elements = solve(analysis, j.design["elements"], target)
+            if elements is None:
+                continue
+            grow_panels(analysis, elements, target)
+            _finalize(elements, analysis, target)
+            design = {"canvas": {"width": int(target.w), "height": int(target.h)}, "elements": elements}
+            sc = score_design(analysis, source, design, target, render=False, strategy=j.strategy)
+            _apply_prior(sc, prior=priors.get(j.name, 0.0), note="prior")
+            seed_hard = {_hard_key(h) for h in j.score.hard}
+            if any(_hard_key(h) not in seed_hard for h in sc.hard):
+                continue
+        except Exception:
+            logger.exception("solving %s failed; skipped", j.name)
+            continue
+        name = f"{j.name} +solve"
+        priors[name] = priors.get(j.name, 0.0)
+        extra.append(Judged(name, j.strategy, design, sc, time.time() - t0 + j.elapsed, False, roles_info))
+    if extra:
+        judged = sorted(judged + extra, key=lambda x: -x.score.total)
+    return judged
 
 
 def optimize_settings() -> tuple[bool, int]:
@@ -294,6 +364,10 @@ def repair(judged: list[Judged], cands_by_name: dict[str, Candidate], analysis: 
                                      cand.strategy == "structure" and structure_survives(sc))
                 if sp:
                     _apply_prior(sc, prior=sp, note="structure_prior")
+                lp = strip_prior(analysis, design, target)
+                if lp:
+                    _apply_prior(sc, prior=lp, note="strip_prior")
+                    sp += lp
             except Exception:
                 logger.exception("repair %s failed; skipped", cand.name)
                 continue
@@ -416,6 +490,10 @@ def materialize(source: dict[str, Any], analysis: Analysis, placement: Placement
         box = placement.boxes[el["id"]]
         new["x"], new["y"], new["width"], new["height"] = box.x, box.y, box.w, box.h
         if el["type"] == "text":
+            if el["id"] in placement.leading:
+                new["line_height"] = placement.leading[el["id"]]
+            if el["id"] in placement.tracking and new.get("letter_spacing"):
+                new["letter_spacing"] = float(new["letter_spacing"]) * placement.tracking[el["id"]]
             apply_font_size(new, _fit_text(new, el, placement.font_scale.get(el["id"], 1.0),
                                            placement.font_size.get(el["id"])))
         elements.append(new)
@@ -438,7 +516,15 @@ def _fit_text(new: dict[str, Any], src: dict[str, Any], scale: float,
         wanted = max(1.0, float(explicit))
         if measurer.fits(new, wanted, w, h):
             return float(int(wanted)) if wanted >= 1.0 else wanted
-        return measurer.fit_font_size(new, w, h, wanted, min(wanted, 1.0))
+        size = measurer.fit_font_size(new, w, h, wanted, min(wanted, 1.0))
+        if size < 0.8 * wanted and flags.enabled("strip"):
+            # v11: the plan measured this size; a box a little short (wrap
+            # differences on tracked text) grows instead of halving the font
+            needed = measurer.natural_height(new, wanted, w)
+            if needed <= h * 1.6 and measurer.layout(new, wanted, w).max_width <= w + 0.5:
+                new["height"] = needed
+                return float(int(wanted))
+        return size
     wanted = max(MIN_FONT_SIZE, float(src["font_size"]) * scale)
     if measurer.fits(new, wanted, w, h):
         return float(int(wanted))

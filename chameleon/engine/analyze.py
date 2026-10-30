@@ -78,6 +78,9 @@ FINE_PRINT_RATIO = 0.45      # font_size <= this * headline size ...
 FINE_PRINT_MAX_PX = 16       # ... and absolutely small, or very long (legal copy)
 FINE_PRINT_MIN_CHARS = 80
 CTA_MAX_CHARS = 32
+PHRASE_ROW_TOL = 0.35       # v11 compound phrases: centres within this share of the smaller height ...
+PHRASE_GAP_EM = 0.6         # ... at most this many ems apart ...
+PHRASE_MAX_CHARS = 30       # ... and short together
 PANEL_MIN_COVER = 0.15       # an ungrouped shape covering >= this much of the canvas is a panel ...
 PANEL_EDGE = 0.02            # ... or one that runs from one canvas edge to the opposite one
 PANEL_CARRY = 0.5            # a unit sits "on" a panel when this fraction of its box is inside it
@@ -523,6 +526,42 @@ def _cluster(free: list[dict[str, Any]], by_id: dict[str, dict[str, Any]], boxes
             if root in k and root != new_root:
                 k[new_root] = k.pop(root)
 
+    # d2. compound phrases (v11, engine/flags UNITS): two single-line texts on
+    #     one baseline row, a word space apart ("JUNE" "12-18", "SUNDAY, SEP 8"
+    #     "5PM"), read as one phrase: the larger (then longer) text hosts the
+    #     other as an attachment, so the pair keeps its spacing in font units.
+    from engine import flags   # local: keeps analyze import-light
+    if flags.enabled("units"):
+        singles = [el for el in free if el["type"] == "text" and el["id"] not in grouped
+                   and sum(1 for i in parent if find(i) == find(el["id"])) == 1
+                   and "\n" not in str(el.get("content", "")).strip()
+                   and abs(float(el.get("rotation", 0.0) or 0.0)) < 1.0]
+        singles.sort(key=lambda el: canon(el["id"]))
+        for a in singles:
+            for b in singles:
+                if a is b or find(a["id"]) == find(b["id"]):
+                    continue
+                if sum(1 for i in parent if find(i) == find(b["id"])) > 1:
+                    continue
+                ab, bb = boxes[a["id"]], boxes[b["id"]]
+                fa, fb = float(a["font_size"]), float(b["font_size"])
+                fm = min(fa, fb)
+                ca, cb = str(a.get("content", "")).strip(), str(b.get("content", "")).strip()
+                gap = bb.x - ab.right
+                if not (abs(ab.cy - bb.cy) <= PHRASE_ROW_TOL * min(ab.h, bb.h)
+                        and -0.1 * fm <= gap <= PHRASE_GAP_EM * fm and len(ca) + len(cb) <= PHRASE_MAX_CHARS):
+                    continue
+                if sum(1 for i in parent if find(i) == find(a["id"])) > 1 and kinds.get(find(a["id"])) != "host":
+                    continue
+                host, guest = (a, b) if (fa, len(ca)) >= (fb, len(cb)) else (b, a)
+                root = find(host["id"])
+                union(root, guest["id"])
+                new_root = find(host["id"])
+                kinds[new_root] = "host"
+                primaries[new_root] = primaries.get(root, host["id"])
+                attachments[new_root] = attachments.pop(root, []) + [guest["id"]]
+                break
+
     # e. decorations drawn inside a content unit travel with it
     roots = sorted({find(i) for i in parent}, key=canon)
     for eid, role in sorted(roles.items(), key=lambda kv: canon(kv[0])):
@@ -846,13 +885,23 @@ def _assign_group_roles(groups: dict[Any, list[dict[str, Any]]], canvas: Box,
     candidates = []
     for gid, box in button_like:
         below = box.cy > headline_box.cy if headline_box else box.cy > canvas.h / 2
-        one_label = sum(1 for el in groups[gid] if el["type"] == "text") == 1
+        labels = [el for el in groups[gid] if el["type"] == "text"]
+        one_label = len(labels) == 1
+        if one_label and _units_on():
+            # v11: a button holds a short label; a paragraph in a box is a card
+            text = str(labels[0].get("content", "")).strip()
+            one_label = len(text) <= 2 * CTA_MAX_CHARS and text.count("\n") <= 1
         if below and one_label and box.w >= CTA_MIN_ASPECT * box.h:
             candidates.append((box.area, gid))
     if candidates:
         candidates.sort(key=lambda t: -t[0])
         out[candidates[0][1]] = CTA
     return out
+
+
+def _units_on() -> bool:
+    from engine import flags
+    return flags.enabled("units")
 
 
 def _readable_on(unit: Unit, panel: dict[str, Any], by_id: dict[str, dict[str, Any]]) -> bool:

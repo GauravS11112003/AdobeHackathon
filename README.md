@@ -24,12 +24,12 @@ An engine for the Adobe University Hackathon 2026 "CHAMELEON" challenge that mov
 
 Measured on real designs, not on the three samples. The eval corpus is 453 templates from the public Crello dataset, each resized to the 12 platform formats the brief names, plus 608 cases where the template's own designer published a second size (6,058 cases). On top of that, 720 layouts were composed by hand as references (60 designs × 12 formats); 10 of those designs were sealed as a hold-out and never tuned on.
 
-| What we measure | Engine v9 |
+| What we measure | Engine v11 |
 | --- | --- |
-| Cases with any hard defect: text overflow, unwanted overlap, content off canvas, distorted image, unreadable font | **13 of 4,198 (0.31 %)** on the v9 slice; 28 of 6,058 on the last full run (v7) |
-| Headline or CTA below the readable floor, on the 4,198-case slice | 23 → **13** after the critic loop |
+| Cases with any hard defect: text overflow, unwanted overlap, content off canvas, distorted image, unreadable font | **0 of 4,198** on the v11 slice (13 in v9 / v10); 28 of 6,058 on the last full run (v7) |
+| Headline or CTA below the readable floor, on the 4,198-case slice | 23 → 13 after the critic loop → **0** with the tiny-format composer (v11) |
 | Headline or CTA with a contrast failure, same slice | 19 → **11** |
-| Agreement with the designer's own layout, hold-out designs (0 to 1) | 0.595 → 0.603 → 0.610 → 0.614 → **0.615** across v6 · v7 · v8 · v9 · v10 |
+| Agreement with the designer's own layout, hold-out designs (0 to 1) | 0.595 → 0.603 → 0.610 → 0.614 → 0.615 → **0.615** across v6 · v7 · v8 · v9 · v10 · v11 |
 | Adversarial synthetic corpus (2,474 cases: 45-element designs, 1×1 and 4000×4000 targets, empty text, missing assets, rotation 725°) | never crashes, every id preserved |
 | Runtime per task, single process, Apple Silicon | **p50 0.3 s · p95 1.0 s** |
 
@@ -186,7 +186,7 @@ The Crello slice downloads on first use (`.venv/bin/python -m eval.crello_conver
 
 `chameleon/` started from the organisers' starter kit ([jhaaj08/chameleon](https://github.com/jhaaj08/chameleon)); only `engine/`, `requirements.txt` and the `Dockerfile` ship.
 
-**Where this goes next:** [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md) lists the freeze checklist, the five engine ideas with the most expected gain, and the approaches already measured and set aside.
+**Where this goes next:** [`docs/NEXT_STEPS.md`](docs/NEXT_STEPS.md) lists the freeze checklist and the approaches already measured and set aside; its five engine ideas shipped as v11 ([`docs/EVAL_V11.md`](docs/EVAL_V11.md)).
 
 ## Team
 

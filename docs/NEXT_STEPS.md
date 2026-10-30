@@ -14,6 +14,11 @@ text LLM (S6) benched and rejected; the 391 KB role classifier is the only model
    record sizes and timings. Nothing of v7–v10 has been run in Docker yet.
 3. Organizer answers still open: Rosetta on the M5 Pro or arm64 accepted, size cap, per-task time, submission form.
 
+## Status 2026-10-29: the five below are implemented as v11 (docs/EVAL_V11.md, CLAUDE.md "v11")
+All five ship on by default behind `engine/flags.py` (`CHAMELEON_V11=0` restores v10 byte for byte). The
+whitespace-budget variant from idea 3 (`air`) measured worse and is opt-in. The S5 freeze above is still the
+first thing to do: nothing of v7-v11 has run inside Docker.
+
 ## The five implementations that would move layout quality most (in order of expected gain per day)
 
 1. **Composition library for wide and banner formats, mined from the 720 references.** Banners agree with the

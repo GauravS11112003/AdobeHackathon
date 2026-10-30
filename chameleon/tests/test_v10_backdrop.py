@@ -54,6 +54,7 @@ def _env(monkeypatch):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("CHAMELEON_BACKGROUND", "1")
     monkeypatch.setenv("CHAMELEON_BACKDROP_JUDGE", "1")     # off by default (docs/EVAL_V10.md); the judge tests need it
+    monkeypatch.setenv("CHAMELEON_V11", "0")                # the v10 contract and goldens predate v11 (engine/flags.py)
 
 
 def load(name: str) -> dict:

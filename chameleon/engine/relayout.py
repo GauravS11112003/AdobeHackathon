@@ -35,6 +35,9 @@ class Placement:
     slots: dict[str, Box] = field(default_factory=dict)        # v10: unit key -> the region a column placer
                                                                # let the unit occupy (engine/backdrop.slide_texts)
     notes: dict[str, Any] = field(default_factory=dict)        # v10: what a strategy did beyond the boxes (slides)
+    tracking: dict[str, float] = field(default_factory=dict)   # v11: element id -> letter-spacing multiplier
+                                                               # (strip composer: tracking gives way before size)
+    leading: dict[str, float] = field(default_factory=dict)    # v11: element id -> line_height (strip composer)
 
 
 def ratio_change(source_canvas: Box, target: Box) -> float:

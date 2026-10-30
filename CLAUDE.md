@@ -377,6 +377,45 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   texts that landed on a different backdrop, single-process `runtime`), sheets in `docs/sanity_v10/`,
   designer comparisons in `docs/designer/compare/v10_backdrop` and `v10_ablate_*`.
 
+## v11: the five roadmap implementations (2026-10-29, docs/EVAL_V11.md)
+- `engine/flags.py`: `CHAMELEON_V11=0|1` master, `CHAMELEON_V11_<PIECE>` per piece (COMPOSE, SOLVE, TYPESCALE, UNITS,
+  STRIP on by default; AIR opt-in only, the master never turns it on). `CHAMELEON_V11=0` is byte-identical to v10
+  (`tests/test_perceive.py` / `tests/test_v10_backdrop.py` pin it for their goldens).
+- COMPOSE (`floorplan.PlanOptions.compose`, `candidates.compose_variants`): designer compositions as plan variants.
+  Wide: `bleed` (hero flush with its side edge at full height, wider gutter), `header` (`_plan_header`: headline
+  across the top on <= 2 lines, hero beside a `_Stack` of the rest). Banner: `bookend` (logo / CTA pinned to the two
+  ends, rest centred with the cohesion cap), `twotier` (one-line headline above a `_Row` of copy / chips / CTA),
+  `bleed` (hero full strip height at one end), and `bleed` + `text_flow=column` on strips >= 160 px. New generic item
+  `_Stack`. The candidate `limit` grows by the variants added, so the fallback is never truncated.
+- SOLVE (`engine/solve.py`, `resize.solve_pass`): joint minimal-move pass per axis, Dykstra projections (numpy):
+  near-aligned edges / centres (`ALIGN_FRAC` 1.2 % of the short side) exactly aligned, nearly even stack gaps
+  (`EVEN_RATIO` 1.6) exactly even, order + min(gap, rectifier gap) kept, layered pairs move together, canvas margin;
+  translations only (no font change), any move > `MAX_MOVE_FRAC` 4 % drops the solution; contradictory families
+  are retried alone. Runs on the winner only (`SOLVE_TOP_K` 1: on the top 3 its tenths of a point lifted a worse
+  seed) as "<seed> +solve", dropped on a new hard fail.
+- TYPESCALE (`floorplan._Builder._type_scale`): every horizontal secondary text keeps its distance under the
+  headline (`TYPE_RATIO_MIN` 1.25 / `TYPE_RATIO_MAX` 2.6, or the source's ratio when outside) via `_TextItem.lead`
+  in `font_at`; copy longer than `MEASURE_MAX_CHARS` (75) wraps at that measure (`measure_w`). `PlanOptions.air`
+  (reserve `AIR_SHARE` 12 % of the column as whitespace) exists but is AIR-gated: 13 wins, agreement -0.022.
+- UNITS: `analyze` d2 compound phrases (two single-line texts on one row <= `PHRASE_GAP_EM` apart, <= 30 chars:
+  the bigger hosts the other as an attachment; 5 of 450 corpus designs), a button label must be <= 64 chars and
+  <= 2 lines (a paragraph in a box is not a CTA); `floorplan._collect` moves pictures >= `SECONDARY_IMAGE_MIN`
+  (6 %) of the canvas out of the chips into `_Slots.images`, sized from their own source share
+  (`_Builder.images`, a `_Row` gallery for several) right after the hero in column plans; banners keep them as
+  chips (`chips(with_images=True)`). 53 of the corpus's 95 secondary images are that big.
+- STRIP (tiny formats, `floorplan.is_strip`: w/h <= 0.5 or a banner <= `STRIP_MAX_H` 120 px): tall strips get
+  `STRIP_MARGIN` 3.5 % / `STRIP_GAP` 3 % margins; tracking gives way before size (`_Builder._tracking`,
+  `TRACKING_STEPS`, measured on the wrapped lines at 0.9 of the inner width because the renderer wraps on glyph
+  widths and paints the spacing on top; also in the button squeeze), carried as `Placement.tracking` and applied in
+  `resize.materialize`; attachments are clipped to the slot width (`_TextItem.clip_att`: a headline's bars pushed it
+  off a 160 px canvas and the rectifier halved it); `_keep_inside` slides units poking past the edge back in;
+  `_fit_text` grows a box (<= 1.6x) instead of halving a planned font; rescue variants (`rescue=True`, + bold,
+  + tight) on strips, and only those set multi-line headlines tighter on short banners (`_leading`,
+  `LEADING_MIN` 0.95, `Placement.leading`: on every plan it pushed a clean leaderboard into a collision);
+  `resize.strip_prior`: on a short banner a headline wrapped beyond `STRIP_HEAD_LINES` (3) pays
+  `STRIP_LINES_PENALTY` (3) unless its own line breaks make it longer.
+- Eval tooling: `eval/compare_optimize.py --workers N` (spawned pool) and a "best candidate agreement" row.
+
 ## Playground (dev tool, not shipped)
 - `chameleon/tools/playground.py` serves a local UI at http://localhost:8765: pick a sample, upload or paste a
   design, pick a preset or custom size; shows source / stretch-baseline / output renders (fit or 1:1, optional

@@ -29,7 +29,7 @@ Nothing here looks at element ids: roles come from the analyzer.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from engine.analyze import (
@@ -42,6 +42,7 @@ from engine.analyze import (
     FINE_PRINT,
     HEADLINE,
     HERO,
+    IMAGE,
     LOGO,
     SUBHEAD,
     TEXT,
@@ -127,6 +128,26 @@ RESCUE_STEPS = ((TIER_MINOR, 0.55), (TIER_SECONDARY, 0.55), (TIER_MINOR, 0.55), 
 ABS_MIN_FONT = 4.0          # rescue mode never lowers a text floor below this (a floor that was lower stays)
 
 
+# Type scale and whitespace (v11, engine/flags TYPESCALE). Secondary copy keeps
+# a hierarchy under the headline (never closer than TYPE_RATIO_MIN, or the
+# source's own ratio when that was smaller; never further than TYPE_RATIO_MAX
+# or the source's ratio when that was larger), body copy wraps at a readable
+# measure (MEASURE_MAX_CHARS average characters per line), and the `air`
+# variant reserves AIR_SHARE of the slot height as whitespace before the k
+# search hands out the room.
+STRIP_MAX_H = 120.0
+STRIP_MARGIN = 0.035        # v11 strip composer: margin and gap as shares of the short side
+STRIP_GAP = 0.03
+TRACKING_STEPS = (0.5, 0.25, 0.0)
+LEADING_MIN = 0.95          # ... and line height down to this before the font goes under its floor
+STRIP_WORD_ROOM = 0.9       # ... measured against this share of the strip's inner width (a column's text width)   # ... letter spacing given up in these steps before a text goes under its floor
+SECONDARY_IMAGE_MIN = 0.06  # v11 (UNITS): a picture at least this share of the canvas gets its own slot
+TYPE_RATIO_MIN = 1.25
+TYPE_RATIO_MAX = 2.6
+MEASURE_MAX_CHARS = 75
+AIR_SHARE = 0.12
+
+
 @dataclass(frozen=True)
 class PlanOptions:
     """Knobs that turn one floor plan into several candidates (see
@@ -158,6 +179,12 @@ class PlanOptions:
     chips: str = "row"
     text_flow: str = "stacked"
     fill: bool = False
+    air: bool = False           # v11 (TYPESCALE): AIR_SHARE of the column height is reserved as whitespace
+    compose: str = ""           # v11 compositions mined from the designer references (engine/flags COMPOSE):
+                                # bookend (banner: logo and CTA at the two ends, the rest centred between),
+                                # bleed (the hero flush with its side edge, full height), twotier (banner:
+                                # one-line headline above a row of copy / chips / CTA), header (wide: the
+                                # headline across the top, hero beside the rest below)
     rescue: bool = False        # v9 (critic recipe): secondary copy yields first; the secondary and minor
                                 # floors start lowered by the first two RESCUE_STEPS, so the k search hands
                                 # the room to the headline / logo / CTA on a canvas where not everything can
@@ -171,6 +198,10 @@ class PlanOptions:
             v, d = getattr(self, f), getattr(DEFAULT_OPTIONS, f)
             if v != d:
                 parts.append(f"{f.replace('_side', '').replace('_flow', '').replace('_bias', '')}={v:g}" if isinstance(v, float) else f"{f.replace('_side', '').replace('_flow', '')}={v}")
+        if self.compose:
+            parts.append(f"compose={self.compose}")
+        if self.air:
+            parts.append("air")
         if self.fill:
             parts.append("fill")
         if self.rescue:
@@ -179,6 +210,13 @@ class PlanOptions:
 
 
 DEFAULT_OPTIONS = PlanOptions()
+
+
+def is_strip(target: Box) -> bool:
+    """A tiny format where every pixel of the short side counts (v11): a tall
+    strip (w / h <= STRIP_MAX_RATIO) or a banner at most STRIP_MAX_H tall."""
+    return target.w / max(target.h, 1.0) <= STRIP_MAX_RATIO or (
+        target.w / max(target.h, 1.0) > WIDE_MAX_RATIO and target.h <= STRIP_MAX_H)
 
 
 def ratio_family(target: Box) -> str:
@@ -212,6 +250,14 @@ class Metrics:
         mn = min(target.w, target.h)
         margin = clamp(0.05 * mn * spacing, 4.0, 60.0)
         gap = clamp(0.035 * mn * spacing, 4.0, 48.0)
+        if target.w / max(target.h, 1.0) <= STRIP_MAX_RATIO:
+            from engine import flags
+            if flags.enabled("strip"):
+                # v11 strip composer: on a 160 px skyscraper the margins are what the
+                # headline needs to stay readable (on a 90 px leaderboard the tighter
+                # margins pushed one layout into a collision and fixed nothing)
+                margin = clamp(STRIP_MARGIN * mn * spacing, 3.0, 60.0)
+                gap = clamp(STRIP_GAP * mn * spacing, 3.0, 48.0)
         prop = clamp(math.sqrt(target.area / src.area), 0.2, 2.5)
         cap = prop
         if family in (WIDE, BANNER):
@@ -329,12 +375,16 @@ class _Scaled(_Item):
         self.label = _button_label(unit, elements) if (m is not None and label_floor > 0) else None
         self.squeezed = False
         self.sq: tuple = ()
+        from engine import flags
+        self.strip = flags.enabled("strip") and m is not None   # v11: tracking may give way in a squeeze
+        self.tracking = 1.0
 
     def size(self, k: float, aw: float, ah: float) -> tuple[float, float]:
         s = max(self.floor_s, self.ideal_s * k ** self.prio)
         s = min(s, aw * self.w_frac / self.ext_w, ah / self.ext_h)   # never larger than the slot
         self.s = max(s, self.min_s)
         self.squeezed = False
+        self.tracking = 1.0
         if self.label is not None:
             src_font = float(self.elements[self.label]["font_size"])
             if src_font * self.s < self.label_floor - 1e-6 and self._squeeze(k, aw, ah):
@@ -403,7 +453,18 @@ class _Scaled(_Item):
         # At the floor: a long label may take three lines; as a last resort
         # the pill is reshaped at the floor font whatever its height (the
         # plan's shrink search and rescue mode make room, a 2 px label never reads).
-        return attempt(self.label_floor, 3, True) or attempt(self.label_floor, 4, False)
+        if attempt(self.label_floor, 3, True) or attempt(self.label_floor, 4, False):
+            return True
+        # v11 strip composer: a tracked label gives up its letter spacing
+        # before the button gives up its readable size.
+        ls = float(el.get("letter_spacing", 0.0) or 0.0)
+        if self.strip and ls > 0.0:
+            for f in TRACKING_STEPS:
+                el = dict(self.elements[self.label], letter_spacing=ls * f)
+                if attempt(self.label_floor, 3, True) or attempt(self.label_floor, 4, False):
+                    self.tracking = f
+                    return True
+        return False
 
     def place(self, x: float, y: float, w: float, h: float, out: Placement) -> None:
         box = self.unit.box
@@ -417,6 +478,8 @@ class _Scaled(_Item):
                     out.boxes[eid] = Box(pill.x + pl - 0.5, pill.y + pt, ink_w + 1.0, text_h)
                     out.font_size[eid] = font
                     out.font_scale[eid] = font / src_font
+                    if self.tracking < 1.0:
+                        out.tracking[eid] = self.tracking
                 else:
                     out.boxes[eid] = Box(pill.x + (mb.x - box.x) * sx, pill.y + (mb.y - box.y) * sy,
                                          mb.w * sx, mb.h * sy)
@@ -485,6 +548,13 @@ class _TextItem(_Item):
         self.box_off = (0.0, 0.0)       # text box top-left relative to the footprint top-left
         self.att: list[tuple[str, float, float, float, float, str, str]] = []   # attachments (see _attach)
         self.att_boxes: dict[str, Box] = {}   # attachment boxes relative to the footprint at the last size()
+        from engine import flags
+        self.clip_att = flags.enabled("strip")   # v11: attachments clipped to the slot's width
+        self.tracking = 1.0                   # v11 strip composer: letter-spacing multiplier (self.el has it applied)
+        self.leading: float | None = None     # ... and a tighter line_height (self.el has it applied)
+        self.lead: _TextItem | None = None    # v11 type scale: the headline this text stays under
+        self.ratio_lo = self.ratio_hi = 0.0   # ... font within [lead / ratio_hi, lead / ratio_lo]
+        self.measure_w = 0.0                  # v11: widest line a body text may set (0 = none)
         self._attach()
 
     def _attach(self) -> None:
@@ -510,7 +580,13 @@ class _TextItem(_Item):
             self.att.append((eid, dx / src_font, dy / src_font, ab.w / src_font, ab.h / src_font, align, vref))
 
     def font_at(self, k: float) -> float:
-        return max(self.floor, float(int(self.cap * k ** self.prio)))
+        f = max(self.floor, float(int(self.cap * k ** self.prio)))
+        if self.lead is not None:
+            lead = self.lead.font_at(k)
+            f = min(f, float(int(lead / self.ratio_lo)))
+            f = max(f, float(int(lead / self.ratio_hi)))
+            f = max(self.floor, f)
+        return f
 
     def relax(self, factor: float, tier: int = TIER_SECONDARY) -> None:
         if self.tier >= tier:
@@ -521,7 +597,10 @@ class _TextItem(_Item):
         # slot's height; in a column it may take only `len_share` of it and
         # wraps onto a second (third) line beyond that, like a spine label.
         bw, bh = (ah * self.len_share, aw) if self.vertical else (aw, ah)
-        return self._size_at(self.font_at(k), bw, bh)
+        font = self.font_at(k)
+        if self.measure_w > 0.0 and not self.vertical:
+            bw = min(bw, max(self.measure_w * font, 1.0))
+        return self._size_at(font, bw, bh)
 
     def rail_size(self, k: float, thick_budget: float, len_budget: float) -> tuple[float, float]:
         """A vertical text beside the hero (v5): one line along `len_budget`
@@ -602,6 +681,18 @@ class _TextItem(_Item):
                 ay = min(ay, pb.bottom + room - a_h)
             else:
                 ay = max(ay, pb.bottom - bh)
+            if self.clip_att:
+                # v11 strip composer: a bar never makes the footprint wider than
+                # the slot (an 84 px rule beside a 145 px headline on a 160 px
+                # skyscraper pushed the pair off canvas and the rectifier halved
+                # the headline); it is clipped to the slot centred on the text
+                span = max(bw, pb.w)
+                lo = pb.cx - span / 2.0
+                x0, x1 = max(ax, lo), min(ax + a_w, lo + span)
+                if x1 - x0 < 1.0:
+                    x0 = clamp(ax, lo, lo + span - 1.0)
+                    x1 = x0 + max(1.0, min(a_w, span))
+                ax, a_w = x0, x1 - x0
             rel[eid] = Box(ax, ay, a_w, a_h)
             boxes.append(rel[eid])
         foot = Box.union(boxes)
@@ -639,6 +730,10 @@ class _TextItem(_Item):
                 out.font_scale[aid] = self.font / src_font
         out.font_size[eid] = self.font
         out.font_scale[eid] = self.font / src_font
+        if self.tracking < 1.0:
+            out.tracking[eid] = self.tracking
+        if self.leading is not None:
+            out.leading[eid] = self.leading
 
 
 def is_vertical(rotation: float) -> bool:
@@ -983,6 +1078,45 @@ class _Row(_Item):
             cx += it.w + self.gap
 
 
+class _Stack(_Item):
+    """Items on top of each other (v11 compositions: a one-line headline above
+    a row of copy / chips / CTA, a headline across the top of a wide canvas
+    above the hero and the rest), aligned left, centred or right."""
+
+    def __init__(self, items: list[_Item], gaps: list[float], align: str = "center", w_frac: float = 1.0):
+        self.items = items
+        self.gaps = gaps
+        self.align = align
+        self.w_frac = w_frac
+        self.prio = min(it.prio for it in items)
+
+    def size(self, k: float, aw: float, ah: float) -> tuple[float, float]:
+        aw = aw * self.w_frac
+        self.w, self.h = 0.0, sum(self.gaps)
+        for it in self.items:
+            w, h = it.size(k, aw if it.applies_w_frac else aw * it.w_frac, ah)
+            self.w = max(self.w, w)
+            self.h += h
+        return self.w, self.h
+
+    def relax(self, factor: float, tier: int = TIER_SECONDARY) -> None:
+        for it in self.items:
+            it.relax(factor, tier)
+
+    def place(self, x: float, y: float, w: float, h: float, out: Placement) -> None:
+        cy = y + (h - self.h) / 2.0
+        x0 = x + (w - self.w) / 2.0
+        for i, it in enumerate(self.items):
+            if self.align == "left":
+                ix = x0
+            elif self.align == "right":
+                ix = x0 + self.w - it.w
+            else:
+                ix = x0 + (self.w - it.w) / 2.0
+            it.place(ix, cy, it.w, it.h, out)
+            cy += it.h + (self.gaps[i] if i < len(self.gaps) else 0.0)
+
+
 # ---------------------------------------------------------------------------
 # measuring helpers
 
@@ -1083,6 +1217,7 @@ class _Slots:
     chips: list[Unit]          # badges, extra images, shapes, grouped text blocks
     text_align: str            # headline's alignment drives column alignment
     hero_side: str             # left | right (wide plan)
+    images: list[Unit] = field(default_factory=list)   # v11 (UNITS): secondary pictures with their own slot
 
 
 def _collect(analysis: Analysis, elements: dict[str, dict[str, Any]]) -> _Slots:
@@ -1104,6 +1239,16 @@ def _collect(analysis: Analysis, elements: dict[str, dict[str, Any]]) -> _Slots:
             fine.append(u)
         else:
             chips.append(u)
+    images: list[Unit] = []
+    from engine import flags
+    if flags.enabled("units"):
+        # v11: a secondary picture that was a real part of the composition
+        # (>= SECONDARY_IMAGE_MIN of the canvas) is not a badge-sized chip
+        for u in list(chips):
+            if u.role == IMAGE and not u.is_row and u.primary_type(elements) == "image" \
+                    and u.box.area >= SECONDARY_IMAGE_MIN * analysis.canvas.area:
+                chips.remove(u)
+                images.append(u)
     head = next((u for u in texts if u.role == HEADLINE), texts[0] if texts else None)
     align = "center"
     if head is not None:
@@ -1113,7 +1258,7 @@ def _collect(analysis: Analysis, elements: dict[str, dict[str, Any]]) -> _Slots:
     side = "left"
     if hero is not None and head is not None and hero.box.cx > head.box.cx + 0.1 * analysis.canvas.w:
         side = "right"
-    return _Slots(logo, hero, cta, texts, fine, chips, align, side)
+    return _Slots(logo, hero, cta, texts, fine, chips, align, side, images)
 
 
 # ---------------------------------------------------------------------------
@@ -1132,6 +1277,10 @@ class _Builder:
         self.target = met.target
         self.uniform = uniform      # PlanOptions.fill: one shrink speed for everything
         self.rescue = rescue        # PlanOptions.rescue: secondary / minor floors pre-lowered (v9)
+        from engine import flags
+        self.typescale = flags.enabled("typescale")
+        self.strip = flags.enabled("strip") and is_strip(met.target)
+        self._lead: _TextItem | None = None
 
     def prio(self, p: float) -> float:
         return PRIO_PRIMARY if self.uniform else p
@@ -1141,22 +1290,104 @@ class _Builder:
     def text(self, unit: Unit, prio: float, natural_width: bool = False) -> _TextItem:
         el = self.elements[unit.primary or unit.ids[0]]
         cap = float(el["font_size"]) * self.met.cap_scale
-        it = _TextItem(unit, el, self.m, cap, self.met.min_font(unit.role), self.prio(prio), natural_width,
+        floor = self.met.min_font(unit.role)
+        tracking = self._tracking(el, floor) if self.strip else 1.0
+        if tracking < 1.0:
+            el = dict(el, letter_spacing=float(el["letter_spacing"]) * tracking)
+        # tighter leading only in the triage (rescue) variants: applied to every
+        # plan it moved one clean leaderboard layout into a collision
+        leading = self._leading(el, floor) if self.strip and self.rescue else None
+        if leading is not None:
+            el = dict(el, line_height=leading)
+        it = _TextItem(unit, el, self.m, cap, floor, self.prio(prio), natural_width,
                        hard_w=self.target.w,   # a line may run into the margins before it goes under the floor
                        tier=tier_of(prio))
+        it.tracking = tracking
+        it.leading = leading
         if self.rescue:
             _pre_relax(it)
         return it
+
+    def _tracking(self, el: dict[str, Any], floor: float) -> float:
+        """v11 strip composer: the letter-spacing multiplier at which the
+        text's longest word fits the strip's width at its floor font (1.0 =
+        unchanged). Tracking is decoration; size is legibility."""
+        ls = float(el.get("letter_spacing", 0.0) or 0.0)
+        if ls <= 0.0 or is_vertical(float(el.get("rotation", 0.0) or 0.0)):
+            return 1.0
+        room = STRIP_WORD_ROOM * (self.target.w - 2.0 * self.met.margin)
+
+        def fits(e: dict[str, Any]) -> bool:
+            # the renderer wraps on glyph widths and paints the spacing on top:
+            # the painted lines at the wrap width must fit, not only the longest word
+            return self.m.layout(e, floor, room).max_width <= room + 0.5
+
+        if fits(el):
+            return 1.0
+        for f in TRACKING_STEPS:
+            if fits(dict(el, letter_spacing=ls * f)):
+                return f
+        return 0.0
+
+    def _leading(self, el: dict[str, Any], floor: float) -> float | None:
+        """v11 strip composer: on a short banner a text whose hard line breaks
+        alone make it taller than the strip at its floor font sets its lines
+        closer (down to LEADING_MIN) before it goes under the floor."""
+        if self.target.h > STRIP_MAX_H or is_vertical(float(el.get("rotation", 0.0) or 0.0)):
+            return None
+        lay = self.m.layout(el, floor, 1e7)
+        if lay.n_lines < 2:
+            return None
+        room = self.target.h - 2.0 * self.met.margin - 2.0
+        if lay.height <= room:
+            return None
+        lh = float(el.get("line_height", 0.0) or 0.0) or (lay.height / max(1, lay.n_lines) / floor)
+        new = max(LEADING_MIN, lh * room / lay.height)
+        return round(new, 3) if new < lh - 1e-3 else None
 
     def text_items(self) -> list[_TextItem]:
         items = []
         for u in self.slots.texts:
             prio = PRIO_PRIMARY if u.role == HEADLINE else PRIO_SECONDARY
             items.append(self.text(u, prio))
+        self._lead = None
+        self._type_scale(items)
         return items
 
     def fine_items(self) -> list[_TextItem]:
-        return [self.text(u, PRIO_MINOR) for u in self.slots.fine]
+        items = [self.text(u, PRIO_MINOR) for u in self.slots.fine]
+        self._type_scale(items)
+        return items
+
+    def _type_scale(self, items: list[_TextItem]) -> None:
+        """v11 (TYPESCALE): every horizontal secondary text keeps its distance
+        under the headline (see TYPE_RATIO_MIN / MAX) and long copy wraps at
+        a readable measure. A no-op with the flag off."""
+        if not self.typescale:
+            return
+        head_unit = next((u for u in self.slots.texts if u.role == HEADLINE), None)
+        if head_unit is None:
+            return
+        if self._lead is None or self._lead.unit is not head_unit:
+            self._lead = next((it for it in items if it.unit is head_unit), None) or self.text(head_unit, PRIO_PRIMARY)
+        lead = self._lead
+        if lead.rotation:
+            return
+        head_src = float(lead.el["font_size"])
+        for it in items:
+            if it.unit is head_unit or it.rotation:
+                continue
+            src = max(1.0, float(it.el["font_size"]))
+            ratio = head_src / src
+            if ratio < 1.0:
+                continue          # a text bigger than the headline in the source: not ours to rank
+            it.lead = lead
+            it.ratio_lo = min(TYPE_RATIO_MIN, ratio)
+            it.ratio_hi = max(TYPE_RATIO_MAX, ratio)
+            content = str(it.el.get("content", ""))
+            if len(content) > MEASURE_MAX_CHARS and it.unit.role != HEADLINE:
+                per_char = _single_line_width(it.m, it.el, 100.0) / 100.0 / max(1, len(content))
+                it.measure_w = MEASURE_MAX_CHARS * per_char
 
     def text_gap(self) -> Callable[[float], float]:
         g = self.met.gap
@@ -1196,6 +1427,24 @@ class _Builder:
             _pre_relax(it)
         return it
 
+    def images(self, H: float) -> _Item | None:
+        """v11 (UNITS): the secondary pictures as one column item, sized from
+        their own share of the source (not a chip's): one picture alone, or a
+        row of them side by side (a gallery strip)."""
+        if not self.slots.images:
+            return None
+        src = self.analysis.canvas
+        items: list[_Item] = []
+        for u in self.slots.images:
+            share = u.box.h / src.h
+            ideal = clamp(share, 0.12, 0.35) * H
+            items.append(self.scaled(u, ideal, 0.06 * H, PRIO_HERO, 0.85, floor_frac=STAMP_FLOOR_FRAC))
+        if len(items) == 1:
+            return items[0]
+        row = _Row(items, max(3.0, self.met.gap * 0.5))
+        row.w_frac = 0.9
+        return row
+
     def logo(self, ideal_h: float, floor_h: float, w_frac: float) -> _Scaled | None:
         if self.slots.logo is None:
             return None
@@ -1218,11 +1467,13 @@ class _Builder:
             return self.text(u, PRIO_PRIMARY, natural_width)
         return self.scaled(u, ideal_h, 0.0, PRIO_PRIMARY, w_frac, role_for_floor=CTA, cap_mult=1.15)
 
-    def chips(self, badge_h: float, image_h: float, direction: str, w_frac: float = 1.0) -> _Chips | None:
-        if not self.slots.chips:
+    def chips(self, badge_h: float, image_h: float, direction: str, w_frac: float = 1.0,
+              with_images: bool = True) -> _Chips | None:
+        units = list(self.slots.chips) + (list(self.slots.images) if with_images else [])
+        if not units:
             return None
         items = []
-        for u in self.slots.chips:
+        for u in units:
             # A sibling row re-flows: its parts are separate chips that the
             # cluster packs into rows / columns of the available size.
             for part in (u.parts if u.is_row else [u]):
@@ -1365,7 +1616,18 @@ def _column_items(b: _Builder, met: Metrics, H: float, with_hero: bool, tight: b
         items.extend(t for t in texts if t.unit.reading_index >= hero_idx)
     else:
         items.extend(texts)
-    chips = b.chips(badge_h=0.045 * H, image_h=0.07 * H, direction="row", w_frac=0.95)
+    gallery = b.images(H)
+    if gallery is not None:
+        # beside the hero in the reading order: right after it, or, with no
+        # hero in the column, before the first text that followed it
+        if hero_item is not None and hero_item in items:
+            items.insert(items.index(hero_item) + 1, gallery)
+        else:
+            idx = min(u.reading_index for u in b.slots.images)
+            pos = next((i for i, it in enumerate(items)
+                        if isinstance(it, _TextItem) and it.unit.reading_index > idx), len(items))
+            items.insert(pos, gallery)
+    chips = b.chips(badge_h=0.045 * H, image_h=0.07 * H, direction="row", w_frac=0.95, with_images=False)
     cta = b.cta(ideal_h=0.065 * H, w_frac=0.7)
     if cta:
         cta.w_frac = 0.7 if isinstance(cta, _Scaled) else 0.9
@@ -1463,8 +1725,9 @@ def _plan_column(b: _Builder, met: Metrics, out: Placement, family: str,
                                               tight=(family == SQUARE), chips_mode=opts.chips)
     k = 1.0
     if items:
-        k, _ = _largest_k(_column_fits(items, gaps, aw, ah), items + ([corner_chips] if corner_chips else []))
-        _absorb_leftover(items, gaps, aw, ah, met)
+        ah_fit = ah * (1.0 - AIR_SHARE) if opts.air else ah
+        k, _ = _largest_k(_column_fits(items, gaps, aw, ah_fit), items + ([corner_chips] if corner_chips else []))
+        _absorb_leftover(items, gaps, aw, ah_fit, met)
         top = bool(b.slots.logo) and isinstance(items[0], _Scaled) and items[0].unit is b.slots.logo
         bottom = bool(b.slots.fine) or _anchored_bottom(items[-1])
         _place_column(items, gaps, m, m, aw, ah, "center", met, out, top, bottom)
@@ -1476,7 +1739,12 @@ def _plan_wide(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = DE
     t = met.target
     m = met.margin
     aw, ah = t.w - 2 * m, t.h - 2 * m
-    hero = b.hero(ideal_h=ah, floor_h=0.4 * ah, w_frac=1.0)
+    # v11 "bleed": the hero runs flush with its side edge at the canvas's full
+    # height (the designer's photo-off-the-edge composition); the column keeps
+    # the margins and a wider gutter.
+    bleed = opts.compose == "bleed"
+    hero_h = t.h if bleed else ah
+    hero = b.hero(ideal_h=hero_h, floor_h=0.4 * ah, w_frac=1.0)
     items, gaps, corner_chips = _column_items(b, met, t.h, with_hero=False, tight=False,
                                               chips_mode=opts.chips)
     side = opts.hero_side if opts.hero_side in ("left", "right") else b.slots.hero_side
@@ -1492,6 +1760,9 @@ def _plan_wide(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = DE
         # its share of the width bound it); only the column shrinks with k.
         # v3 shrank the hero with the column's k although it never competed
         # for the column's height.
+        if bleed:
+            hero.size(1.0, t.w * share, hero_h)
+            return t.w - hero.w - m - max(met.gap, m)
         hero.size(1.0, aw * share, ah)
         return aw - hero.w - met.gap
 
@@ -1505,7 +1776,7 @@ def _plan_wide(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = DE
         cw = col_w()
         if not items:
             return True
-        if not _column_fits(items, gaps, cw, ah)(k):
+        if not _column_fits(items, gaps, cw, ah * (1.0 - AIR_SHARE) if opts.air else ah)(k):
             return False
         # A headline on more than HEAD_MAX_LINES lines is a defect to the
         # judge however well it fits (v4): the search shrinks it (and the
@@ -1532,7 +1803,12 @@ def _plan_wide(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = DE
         k, _ = _largest_k(fits, items + ([corner_chips] if corner_chips else []))
         col_w()
     cw = aw - hero.w - met.gap if hero is not None else aw * col_frac
-    if hero is not None:
+    if hero is not None and bleed:
+        cw = t.w - hero.w - m - max(met.gap, m)
+        hx = 0.0 if side == "left" else t.w - hero.w
+        hero.place(hx, (t.h - hero.h) / 2.0, hero.w, hero.h, out)
+        x0 = hero.w + max(met.gap, m) if side == "left" else m
+    elif hero is not None:
         hx = m if side == "left" else t.w - m - hero.w
         hero.place(hx, m + (ah - hero.h) / 2.0, hero.w, hero.h, out)
         x0 = m + hero.w + met.gap if side == "left" else m
@@ -1546,6 +1822,53 @@ def _plan_wide(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = DE
         _place_corner_chips(corner_chips, k, met, Box(x0, m, cw, ah), out)
 
 
+def _plan_header(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = DEFAULT_OPTIONS) -> bool:
+    """v11 "header" composition (wide): the headline runs across the top of
+    the canvas on at most two lines; below it the hero stands beside a column
+    with everything else (logo, copy, chips, CTA, fine print). False when the
+    design has no headline or no hero (the caller falls back to the wide plan)."""
+    t = met.target
+    m = met.margin
+    aw, ah = t.w - 2 * m, t.h - 2 * m
+    if b.slots.hero is None:
+        return False
+    items, gaps, _ = _column_items(b, met, t.h, with_hero=False, tight=False, chips_mode="row")
+    head = next((it for it in items if isinstance(it, _TextItem) and it.unit.role == HEADLINE
+                 and not it.rotation), None)
+    if head is None:
+        return False
+    i = items.index(head)
+    rest = items[:i] + items[i + 1:]
+    rest_gaps = [met.gap] * max(0, len(rest) - 1)
+    for j in range(len(rest) - 1):
+        # keep the column's own gaps where both neighbours were adjacent before
+        a, c = rest[j], rest[j + 1]
+        if a in items and c in items and items.index(c) == items.index(a) + 1:
+            rest_gaps[j] = gaps[items.index(a)]
+    head.w_frac = 1.0
+    hero = b.hero(ideal_h=0.62 * ah, floor_h=0.25 * ah, w_frac=1.0)
+    side = opts.hero_side if opts.hero_side in ("left", "right") else b.slots.hero_side
+    align = b.slots.text_align
+    lower_items: list[_Item] = [hero]
+    shares = [0.45]
+    if rest:
+        col = _Stack(rest, rest_gaps, align=align)
+        lower_items = [hero, col] if side == "left" else [col, hero]
+        shares = [0.45, 0.55] if side == "left" else [0.55, 0.45]
+    lower = _Row(lower_items, max(met.gap, m), shares)
+    whole = _Stack([head, lower], [met.gap * 1.2], align=align)
+
+    def fits(k: float) -> bool:
+        w, h = whole.size(k, aw, ah)
+        if h > ah + 0.5 or w > aw + 0.5:
+            return False
+        return k <= 0.0 or head.m.layout(head.el, head.font, max(1.0, head.own_w)).n_lines <= 2
+
+    _largest_k(fits, [whole])
+    whole.place(m, m, aw, ah, out)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # banner plan (single row)
 
@@ -1555,31 +1878,71 @@ def _plan_banner(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = 
     m = met.margin
     aw, ah = t.w - 2 * m, t.h - 2 * m
     gap = met.gap
+    compose = opts.compose
 
     logo = b.logo(ideal_h=0.4 * ah, floor_h=max(10.0, 0.2 * ah), w_frac=0.3)
-    hero = b.hero(ideal_h=ah, floor_h=0.35 * ah, w_frac=0.3)
+    # v11 "bleed": the hero fills the strip's full height flush with one end;
+    # the row is laid out on the rest of the width.
+    bleed = compose == "bleed" and b.slots.hero is not None
+    hero = b.hero(ideal_h=t.h if bleed else ah, floor_h=0.35 * ah, w_frac=0.3)
+    x_lo = m
+    if bleed and hero is not None:
+        hero.size(1.0, 0.3 * t.w, t.h)
+        aw = t.w - hero.w - m - max(gap, m)
+        if opts.hero_side != "right":
+            x_lo = hero.w + max(gap, m)
     texts = b.text_items() + b.fine_items()
     column: _TextColumn | None = None     # the column the line policy steers (holds the headline)
     rest_column: _TextColumn | None = None
+    chips = b.chips(badge_h=0.26 * ah, image_h=0.3 * ah,
+                    direction="col" if opts.chips == "stack" else "auto", w_frac=0.3)
+    cta = b.cta(ideal_h=0.38 * ah, w_frac=0.3, natural_width=True)
+    tiered: _Stack | None = None
     if texts:
         head = next((x for x in texts if x.unit.role == HEADLINE), texts[0])
         others = [x for x in texts if x is not head]
-        if opts.text_flow == "inline" and others:
+        if compose == "twotier" and (others or chips or cta):
+            # v11: the headline on one line across the strip's text area, the
+            # copy, badges and CTA in one row underneath (the designer's
+            # two-tier banner); chips and CTA leave the main row.
+            column = _TextColumn([head], head, b.text_gap(), w_frac=1.0, max_lines=1, flow=False)
+            lower: list[_Item] = []
+            shares: list[float] = []
+            if others:
+                rest_column = _TextColumn(others, others[0], b.text_gap(), w_frac=1.0, max_lines=2)
+                lower.append(rest_column)
+                shares.append(0.5)
+            if chips:
+                chips.w_frac = 1.0
+                lower.append(chips)
+                shares.append(0.25)
+            if cta:
+                lower.append(cta)
+                shares.append(0.25)
+            tot = sum(shares)
+            row = _Row(lower, gap, [x / tot for x in shares])
+            used = (0.0 if bleed or hero is None else 0.3) + (0.15 if logo is not None else 0.0)
+            tiered = _Stack([column, row], [max(3.0, 0.5 * gap)], align="left", w_frac=1.0 - used)
+            chips = cta = None
+            rest_column = None
+        elif opts.text_flow == "inline" and others:
             column = _TextColumn([head], head, b.text_gap(), w_frac=0.36)
             rest_column = _TextColumn(others, others[0], b.text_gap(), w_frac=0.3, max_lines=3)
         else:
             column = _TextColumn(texts, head, b.text_gap(), w_frac=0.6)
-    # Chips in a row first, like the designer's badge strip; they stack into
-    # columns only when the rows would not fit the banner's height (v4).
-    chips = b.chips(badge_h=0.26 * ah, image_h=0.3 * ah,
-                    direction="col" if opts.chips == "stack" else "auto", w_frac=0.3)
-    cta = b.cta(ideal_h=0.38 * ah, w_frac=0.3, natural_width=True)
+    body: _Item | None = tiered if tiered is not None else column
+    row_hero = None if bleed else hero
 
-    if opts.hero_side == "right":
-        order = (logo, column, rest_column, chips, cta, hero)
+    if compose == "bookend" or opts.hero_side != "right":
+        order = (logo, row_hero, body, rest_column, chips, cta)
     else:
-        order = (logo, hero, column, rest_column, chips, cta)
+        order = (logo, body, rest_column, chips, cta, row_hero)
+    if compose == "bookend" and opts.hero_side == "right":
+        order = (logo, body, rest_column, chips, row_hero, cta)
     items: list[_Item] = [it for it in order if it is not None]
+    if bleed and hero is not None:
+        hx = 0.0 if opts.hero_side != "right" else t.w - hero.w
+        hero.place(hx, (t.h - hero.h) / 2.0, hero.w, hero.h, out)
     if not items:
         return
 
@@ -1617,19 +1980,44 @@ def _plan_banner(b: _Builder, met: Metrics, out: Placement, opts: PlanOptions = 
         k, ok = _largest_k(fits, items)      # rescue mode: lower the minor floors
 
     leftover = aw - sum(it.w for it in items) - gap * (len(items) - 1)
-    if column is not None and leftover > 0:
+    if column is not None and column in items and leftover > 0:
         comfy = column.comfortable_width(k, aw * column.w_frac)
         column.widen(k, min(comfy, column.w + leftover), ah)
         leftover = aw - sum(it.w for it in items) - gap * (len(items) - 1)
     leftover = max(0.0, leftover)
 
+    n = len(items)
+    max_gap = max(MAX_GAP_MULT * gap, MAX_GAP_FRAC * t.w)
+    ends = [it for it in (items[0], items[-1]) if it is logo or it is cta] if n >= 3 else []
+    if compose == "bookend" and ends:
+        # v11 "bookend": the logo and the CTA hold the two ends of the strip,
+        # the rest is centred between them with the cohesion cap on its gaps.
+        first = items[0] if items[0] in ends else None
+        last = items[-1] if items[-1] in ends else None
+        mid = [it for it in items if it is not first and it is not last]
+        lo_x = x_lo
+        hi_x = x_lo + aw
+        if first is not None:
+            first.place(lo_x, m + (ah - first.h) / 2.0, first.w, first.h, out)
+            lo_x += first.w + gap
+        if last is not None:
+            last.place(hi_x - last.w, m + (ah - last.h) / 2.0, last.w, last.h, out)
+            hi_x -= last.w + gap
+        span = hi_x - lo_x
+        used = sum(it.w for it in mid) + gap * max(0, len(mid) - 1)
+        free = max(0.0, span - used)
+        extra = min(free / (len(mid) + 1), max(0.0, max_gap - gap)) if mid else 0.0
+        x = lo_x + (free - extra * max(0, len(mid) - 1)) / 2.0
+        for it in mid:
+            it.place(x, m + (ah - it.h) / 2.0, it.w, it.h, out)
+            x += it.w + gap + extra
+        return
+
     # Cohesion (v5): gaps grow only up to a cap; the rest of the leftover
     # centres the row instead of pushing its ends to the canvas edges.
-    n = len(items)
     extra = leftover / (n - 1) if n > 1 else 0.0
-    max_gap = max(MAX_GAP_MULT * gap, MAX_GAP_FRAC * t.w)
     extra = min(extra, max(0.0, max_gap - gap))
-    x = m + (leftover - extra * (n - 1)) / 2.0
+    x = x_lo + (leftover - extra * (n - 1)) / 2.0
     for it in items:
         it.place(x, m + (ah - it.h) / 2.0, it.w, it.h, out)
         x += it.w + gap + extra
@@ -1676,9 +2064,13 @@ def floorplan_relayout(analysis: Analysis, target: Box, elements: dict[str, dict
     if plan in (TALL, SQUARE):
         _plan_column(b, met, out, family, opts)
     elif plan == WIDE:
-        _plan_wide(b, met, out, opts)
+        if not (opts.compose == "header" and _plan_header(b, met, out, opts)):
+            _plan_wide(b, met, out, opts)
     else:
         _plan_banner(b, met, out, opts)
+
+    if b.strip:
+        _keep_inside(analysis, out, target)
 
     # Panels (colour zones) are rebuilt around the content they carried.
     place_panels(analysis, out, target, mode="wrap", measurer=m)
@@ -1698,6 +2090,38 @@ def floorplan_relayout(analysis: Analysis, target: Box, elements: dict[str, dict
         for eid in unit.ids:
             out.font_scale[eid] = s
     return out
+
+
+STRIP_EDGE = 0.015          # the rectifier's on-canvas margin (rectify.MARGIN_FRAC of the short side)
+
+
+def _keep_inside(analysis: Analysis, out: Placement, target: Box) -> None:
+    """v11 strip composer: a content unit the plan left poking past the
+    canvas edge by a few pixels (a 146 px headline centred on a column whose
+    footprint was wider than the text) slides back inside, so the rectifier
+    does not shrink it under its floor to make it fit."""
+    mg = max(1.0, STRIP_EDGE * min(target.w, target.h))
+    for unit in analysis.content_units():
+        boxes = [out.boxes[e] for e in unit.ids if e in out.boxes]
+        if not boxes:
+            continue
+        hull = Box.union(boxes)
+        dx = dy = 0.0
+        if hull.w <= target.w - 2 * mg:
+            if hull.x < mg:
+                dx = mg - hull.x
+            elif hull.right > target.w - mg:
+                dx = target.w - mg - hull.right
+        if hull.h <= target.h - 2 * mg:
+            if hull.y < mg:
+                dy = mg - hull.y
+            elif hull.bottom > target.h - mg:
+                dy = target.h - mg - hull.bottom
+        if dx or dy:
+            for e in unit.ids:
+                if e in out.boxes:
+                    bx = out.boxes[e]
+                    out.boxes[e] = Box(bx.x + dx, bx.y + dy, bx.w, bx.h)
 
 
 def slide_backdrop(analysis: Analysis, out: Placement, target: Box, elements: dict[str, dict[str, Any]],

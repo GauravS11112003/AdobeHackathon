@@ -63,15 +63,30 @@ def run_case(ref: Ref) -> dict[str, Any]:
         dt = time.time() - t0
         sc = judged[0].score if judged else score_design(an, ref.source, design, target, render=False)
         da = designer_agreement(design, ref.design, an)
+        best_cand = max((float(designer_agreement(j.design, ref.design, an).get("da_agreement", 0.0))
+                         for j in judged if not j.fallback), default=float("nan"))
         e = energy_of(an, ref.source, design, target)
         row[mode] = {"winner": judged[0].name if judged else "", "score": round(sc.total, 2), "hard": list(sc.hard),
                      "agreement": round(float(da.get("da_agreement", 0.0)), 4),
                      "pos_err": round(float(da.get("da_pos_err", 0.0)), 4),
                      "order_tau": da.get("da_order_tau"), "energy": round(e.total, 3), "energy_hard": list(e.hard),
-                     "seconds": round(dt, 3), "designer_wins": bool(s_ref.total > sc.total),
+                     "best_cand": round(best_cand, 4), "seconds": round(dt, 3), "designer_wins": bool(s_ref.total > sc.total),
                      "opt_won": bool(judged and judged[0].name.endswith("+opt"))}
     os.environ.pop(FLAG, None)
     return row
+
+
+def _init_worker(flag: str) -> None:
+    global FLAG
+    FLAG = flag
+
+
+def _safe_case(ref: Ref) -> dict[str, Any] | None:
+    try:
+        return run_case(ref)
+    except Exception as exc:
+        print(f"{ref.name} {ref.W}x{ref.H}: failed {exc!r}", flush=True)
+        return None
 
 
 def _mean(xs):
@@ -99,6 +114,7 @@ def summary(rows: list[dict[str, Any]]) -> str:
         L.append("|---|---:|---:|")
         for label, fn, fmt in (
             ("designer agreement, mean", lambda m: _mean([r[m]["agreement"] for r in rs]), "{:.3f}"),
+            ("best candidate agreement, mean", lambda m: _mean([r[m].get("best_cand") for r in rs]), "{:.3f}"),
             ("designer agreement >= 0.7", lambda m: sum(r[m]["agreement"] >= 0.7 for r in rs), "{}"),
             ("centre error, mean", lambda m: _mean([r[m]["pos_err"] for r in rs]), "{:.3f}"),
             ("reading-order tau, mean", lambda m: _mean([r[m]["order_tau"] for r in rs]), "{:.3f}"),
@@ -147,6 +163,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, default=OUT_DIR)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--flag", default=FLAG, help="environment switch compared at 0 vs 1 (default CHAMELEON_OPTIMIZE)")
+    ap.add_argument("--workers", type=int, default=1, help="spawned worker processes")
     args = ap.parse_args(argv)
     FLAG = args.flag
     names = {n for n in args.names.split(",") if n} or None
@@ -157,12 +174,15 @@ def main(argv: list[str] | None = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     rows = []
     t0 = time.time()
+    if args.workers > 1:
+        import multiprocessing as mp
+        pool = mp.get_context("spawn").Pool(args.workers, initializer=_init_worker, initargs=(FLAG,))
+        results = pool.imap(_safe_case, refs, chunksize=2)
+    else:
+        results = map(_safe_case, refs)
     with (args.out / "results.jsonl").open("w") as f:
-        for i, ref in enumerate(refs):
-            try:
-                row = run_case(ref)
-            except Exception as exc:
-                print(f"{ref.name} {ref.W}x{ref.H}: failed {exc!r}", flush=True)
+        for i, row in enumerate(results):
+            if row is None:
                 continue
             rows.append(row)
             f.write(json.dumps(row) + "\n")
