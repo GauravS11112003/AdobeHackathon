@@ -335,10 +335,65 @@ Ignore / traps:
 - Rendering and disk writes inside `resize()` by default (Preeyam183): our render is budgeted and optional for
   the QEMU reason in docs/DOCKER_CHECK.md.
 
+## Sweep 4 (2026-10-29): who moved, who arrived, where we rank
+
+Read-only review of 15 repos (all branches; nothing executed). Moved since 10-26: Revan-dev, preetham-ven,
+anubhav-gupta, EbrahimHimayoun, vedanth2406, gk7494, rsingh135 (branch `codex/hackathon-ready`), LakshyaDhingra
+(branches `cadentesting`, `feature/engine-qa-addon-submission`). New: **EvanL888/adobe-chameleon-engine**,
+**anudeep-bonagiri/Meridian**, xiao-mao88/chameleon---PFB, shlokrj/chameleon-solution. Idle: tailsgit (main 10-19,
+docs 10-23), annniedong (10-26). anishraj836's repo is a different track (Round 3 agent-skill marketplace).
+
+| Repo | Engine now | Selection | Pixels / contrast | ML | Evidence | Threat |
+|---|---|---|---|---|---|---|
+| **EvanL888** | 1,738 lines (branch `kush/hidden-design-hardening`): rigid clusters, look-alike widgets as flow rows / grids, bands redrawn as canvas fractions; every contiguous 1–4 (≤ 6) column split of the reading order × width recipes, largest uniform scale by bisection, top 8 re-evaluated exactly; hero pinned at ≥ 20 px in a second search | scale × column-fit × min-font × hero boost | text-less render contrast in a dev tool only | none | 63 adversarial × 32 sizes = 2,112 runs, 0 checker errors; 200-design fuzz; Docker offline | **high** |
+| **Meridian** | ~4,800 lines: preserve + 16 row + 8 column + 24 strip + 48 tower candidates, re-searched at 70 % / 50 % floors on tiny formats, post-pick readability nudge, a visibility guard (anything ≥ 90 % under a higher solid element moves) | 93-item checklist scorer **calibrated on vision-model grades** (claude-opus via API, dev only) | luminance contrast + busyness under text | none at runtime | grader 5.51 → 5.82 / 10 on 184 renders; their pick agrees with the grader 73 %, an oracle pick adds only +0.22, source designs themselves grade ~5–6 / 10; Docker amd64 + arm64; finale add-on built | **high** |
+| gk7494 | 2,338 lines, single candidate: XY-cut tree re-oriented (stack / flow, hysteresis 0.3 on near-square), global k over 56 log steps, √(size ratio) hierarchy floors up to 2×, buttons re-wrap at the floor, hero grows ≤ 2× after k | one plan | luminance / edge map of the cover crop nudges the block | none | 91 stress layouts + 22 adversarial; Docker offline | medium-high |
+| anubhav-gupta | 3,605 lines (+8k since 10-16): aspect archetypes (strip / wide / stack), importance-scaled floors, push-apart + 4 px grid snap; offer-ribbon relocation search | collisions by importance | **busiest 6–16 px block** of the cover-cropped background under each text; texts slide along their row to a calmer spot | optional Llama 3.2 3B for text roles (aliased ids, schema-forced; not shipped) | 114 tests; Docker stale | medium, rising |
+| vedanth2406 | + `spatial_relationships.py`: containers (opaque panel behind ≥ 2 units, confidence) and deliberately layered image pairs (alpha extents) preserved as units with `containment` / `layering` costs | gates + 12 costs | none | none | 39 tests, Docker offline | medium |
+| rsingh135 | `engine/layout/*` 20 modules: source relationship graph (ownership, axes, campaigns), preserve / stacked / columns / focal states | **lexicographic safety tuple** (photo keeps ≥ 85 % of its source-visible fraction, collisions, relationship breaks, order inversions) then fidelity | alpha bounds only | VLM critic designed (allowlist ids, shadow mode), not shipped | 523 tests; "tiny 728x90 formats remain unreadable" | medium |
+| PFB (xiao-mao88) | 2,540 lines: multi-column strip split by **dynamic programming** over the reading order; tracking before size; 12-step floor ladder | lexicographic critic | WCAG in eval only | none | 1,534 cases 0 failures; 504 designer pairs (IoU / relation metric) 58.5 | medium |
+| LakshyaDhingra | branch engine (10-19, 3.7k lines, QA auditor, 7 px variants) + `cadentesting` 24 KB NumPy MLP "nudger" applied after selection without a re-audit | QA objective | visible-pixel collisions | 24 KB MLP | 1,260-case sweep; Docker under QEMU | medium |
+| shlokrj, Revan-dev, preetham-ven, EbrahimHimayoun, annniedong | small or unchanged (preetham: renderer fixes only; Ebrahim: missing-asset placeholder clearance; Revan: keyword roles, 3.5 px floors) | | | | | low – medium |
+
+**Where we rank:** still first or second on the rubric among public engines. Nobody else combines a judge fitted on
+designer layouts, a critic loop, an optimiser, contrast estimation (and a text-less render), and 0 defects on 4,198
+real-design cases. The two that close the gap are **EvanL888** (wider exhaustive search, systematic adversarial suite)
+and **Meridian** (a scorer calibrated on a strong vision model's grades, the widest candidate families, a finished
+finale add-on). Neither has contrast in the selection loop as we do, but Meridian checks every element is *visible*,
+which we never measured (below).
+
+**What is worth taking (general rules, in our own words):**
+1. **Visibility.** Meridian's commit cites an "Oct 21 info session" ruling: *every element must be visible in the
+   render, not just present in the JSON*, and brand marks weigh most. Measured on our v11 slice: 538 of 4,198 outputs
+   newly hide something the source showed. Most are colour layers (a background under a grown panel), but about 110
+   cases hide content: hero under a panel 48, hero under hero 15, badge 15, logo 14, image 13, subhead / body / fine
+   print / headline ~36. Same in v10. The renders confirm it (a story whose photo vanished under a white panel that
+   grew over it). **Fixed the same day as v12** (engine/visibility.py: repair in realize + judge hard fail): 107 → 0.
+2. **Busiest-block background check** (anubhav): the maximum, not the mean, local contrast of 6–16 px blocks under
+   a text, so one dot under fine print counts; slide along the row to a calmer spot. Our v10 slide uses mean
+   busyness on 24×24 cells.
+3. **Hero pinned at a minimum, searched again** (EvanL888), and √(size-ratio) floors for text above body size
+   (gk7494) on tiny formats.
+4. **Calibration ceiling** (Meridian): against a vision-model grader the oracle pick from their pool adds only +0.22
+   / 10 and grader noise is ~0.57 sd per render. Distilling an evaluator into a re-ranker (our open idea) has a
+   small ceiling unless the pool improves too.
+5. Renderer facts (preetham): the stock converter downscales the PNG to 2,048 px on the long side (our copy too),
+   drops shape strokes and ignores text opacity. Never rely on strokes or text opacity.
+
+**Organizer-side signals:** rsingh135, LakshyaDhingra, tailsgit and shlokrj all read the final PDF as putting the
+Express add-on, pitch and video in the **finale**; stage one is engine + Dockerfile + read-me (matches our
+docs/BRIEF_PDF_TEXT.md). Deadline: still no date anywhere; tailsgit works to "around November 2, unconfirmed".
+Revan-dev's README: keep the repo private, technical feedback by email with "Feedback" in the subject. shlokrj's
+deleted `SUBMISSION.md` (commit 8018898^) links a Microsoft Forms "provided submission form"; unverified, from a
+rival's repo, not opened.
+
 ## Housekeeping
 - Organizer-side signals seen in rival docs: tailsgit works to "around November 2, unconfirmed" and a 13.5 CPU-s
   self-imposed budget; Angelo's team still lists network-during-scoring, image size limit and reference hardware as
   open questions. Nobody has a confirmed model cap.
+- Sweep 4 clones added: `EvanL888_adobe-chameleon-engine`, `anudeep-bonagiri_Meridian`, `xiao-mao88_chameleon---PFB`,
+  `shlokrj_chameleon-solution`, `rsingh135_chameleon`, `LakshyaDhingra_adobehackathon`,
+  `anishraj836_Adobe_University_Hackathon_2026` (not CHAMELEON).
 - Clones added: `vedanth2406_chameleon`, `preetham-ven_chameleon`, `EbrahimHimayoun_PolymorphicTrio`,
   `Preeyam183_AdobeHackathon`, `ankita320_adobe-h`, `Revan-dev_chameleon`, `Jdeww_chameleon`,
   `amanadhav_chameleon`, `Parinagpal11_Project-Chameleon-Adobe_Hackathon`. AngeloLandiza's clone is now the only

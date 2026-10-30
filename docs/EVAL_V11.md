@@ -70,3 +70,24 @@ cd chameleon
 .venv/bin/python -m eval.compare_optimize --flag CHAMELEON_V11 --workers 9 --out ../docs/designer/compare/v11_final
 for p in COMPOSE SOLVE TYPESCALE UNITS STRIP; do .venv/bin/python -m eval.compare_optimize --flag CHAMELEON_V11_$p --workers 9 --out ../docs/designer/compare/v11_$(echo $p | tr A-Z a-z); done
 ```
+
+## v12 follow-up: nothing the source showed is hidden (2026-10-29)
+
+Competitor sweep 4 (docs/COMPETITORS.md) turned up an info-session ruling, cited in a rival's commit, that every
+element must be visible in the render. Measured on the v11 slice with `engine/visibility.hidden_content`:
+**107 of 4,198 outputs** drew content under an opaque panel drawn above it while the source showed it (37 heroes,
+19 logos, 7 images, 1 headline, 77 free shapes). The cause was panels grown or remapped over content with a lower
+z (a white card at 69 % of a 3:1 poster became the full height of a 9:16 story, above the photo it half
+covered). v10 had the same.
+
+Fix: `visibility.reveal` in `resize.realize` cuts the covering panel back to the larger side that clears the
+content, or draws the content above its cover (integer z renumbered); the judge fails whatever remains.
+
+| | v11 | v12 |
+|---|---:|---:|
+| outputs hiding content the source showed | 107 | **0** |
+| any other hard defect | 0 | 0 |
+| judge score mean | 83.79 | 83.77 |
+| runtime p50 / p95 (s, 8–9 workers) | 0.57 / 1.70 | 0.49 / 1.52 |
+| designer agreement tuning / hold-out | 0.607 / 0.615 | 0.607 / 0.615 |
+| designer references tripping the rule | — | 0 of 720 |

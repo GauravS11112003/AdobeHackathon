@@ -416,6 +416,26 @@ Idea 2 (generate-fix-rank), then Idea 3 (Crello retrieval) as stretch.
   `STRIP_LINES_PENALTY` (3) unless its own line breaks make it longer.
 - Eval tooling: `eval/compare_optimize.py --workers N` (spawned pool) and a "best candidate agreement" row.
 
+## v12: nothing the source showed is hidden (2026-10-29, docs/EVAL_V11.md "v12", tests/test_v12_visible.py)
+- Found by competitor sweep 4: a rival cites an Oct 21 info-session ruling that every element must be *visible in
+  the render*, not just present in the JSON. Ours hid content in 107 of 4,198 slice outputs (37 heroes, 19 logos, 7
+  images, 1 headline, 77 free shapes), also in v10, e.g. a white card blown up to a story's full height drawn above
+  the photo it used to sit beside.
+- `engine/visibility.py`: `coverage` samples a 9×9 grid over each element's visible box (text = ink) against
+  opaque elements drawn above it from other units (`is_cover`: rectangle / ellipse shapes with fill alpha × opacity
+  >= 0.95, `cover` images, unrotated); `hidden_content(analysis, elements)` = content (not background / panel /
+  decorative) >= `HIDDEN_FRAC` 0.9 covered while the source had it < `SOURCE_FRAC` 0.75 covered (one entry per
+  unit; a unit's shapes count only when it has no text / picture). `reveal` repairs in place, up to 3 passes: a
+  covering panel / background / decorative shape is cut back to the largest side clearing the element when that
+  keeps >= `MIN_PANEL_KEEP` 25 %, else the hidden unit is drawn just above its cover and every `z_index` is
+  renumbered to integers (the schema's type; the renderer paints by z, stable).
+- Wiring (flag `CHAMELEON_V11_VISIBLE`, on; the master `CHAMELEON_V11=0` turns it off with the rest):
+  `resize.realize` calls `reveal` after `grow_panels`; `score_design` adds the hard fail "<id> hidden under <id>
+  (n%)"; `eval/metrics` reports `hidden_n` / `hidden_ids` (a defect count), `compare_runs` a "content hidden under
+  a panel" row. 0 of the 720 designer references trip the rule.
+- Numbers: slice hidden content 107 -> 0, every other defect still 0, judge mean 83.79 -> 83.77, runtime unchanged;
+  designer agreement 0.607 / 0.615 unchanged (`docs/designer/compare/v12_visible`).
+
 ## Playground (dev tool, not shipped)
 - `chameleon/tools/playground.py` serves a local UI at http://localhost:8765: pick a sample, upload or paste a
   design, pick a preset or custom size; shows source / stretch-baseline / output renders (fit or 1:1, optional

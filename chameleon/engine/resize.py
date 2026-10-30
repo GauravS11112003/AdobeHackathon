@@ -46,7 +46,7 @@ from typing import Any
 
 from engine.analyze import BACKGROUND, CTA, DECORATIVE, HEADLINE, Analysis, analyze
 from engine.candidates import SMALL_CHANGE_MAX, Candidate, generate_candidates, generate_repairs, placement_key
-from engine import critic, flags
+from engine import critic, flags, visibility
 from engine.geometry import Box
 from engine import render as judge_render
 from engine import optimize as opt
@@ -477,6 +477,10 @@ def realize(source: dict[str, Any], analysis: Analysis, placement: Placement, ta
         if critic.apply_directives(elements, analysis, target, {"floor": directives["floor"]}).get("floor"):
             elements = rectify(analysis, elements, target, passes=2, protect=protect)
     grow_panels(analysis, elements, target)   # zones follow the content the rectifier moved
+    if flags.enabled("visible"):
+        # v12: content the source showed is never drawn under a panel that grew
+        # over it (engine/visibility.py); the judge fails whatever remains.
+        visibility.reveal(analysis, elements, target)
     _keep_headline_largest(elements, source, analysis,
                            floors=critic.cap_floors(analysis, target) if applied.get("cap_floor") else None)
     _finalize(elements, analysis, target)

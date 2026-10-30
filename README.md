@@ -29,6 +29,7 @@ Measured on real designs, not on the three samples. The eval corpus is 453 templ
 | Cases with any hard defect: text overflow, unwanted overlap, content off canvas, distorted image, unreadable font | **0 of 4,198** on the v11 slice (13 in v9 / v10); 28 of 6,058 on the last full run (v7) |
 | Headline or CTA below the readable floor, on the 4,198-case slice | 23 → 13 after the critic loop → **0** with the tiny-format composer (v11) |
 | Headline or CTA with a contrast failure, same slice | 19 → **11** |
+| Content the source showed but drawn under a panel (a photo hidden behind a grown card), same slice | 107 → **0** (v12) |
 | Agreement with the designer's own layout, hold-out designs (0 to 1) | 0.595 → 0.603 → 0.610 → 0.614 → 0.615 → **0.615** across v6 · v7 · v8 · v9 · v10 · v11 |
 | Adversarial synthetic corpus (2,474 cases: 45-element designs, 1×1 and 4000×4000 targets, empty text, missing assets, rotation 725°) | never crashes, every id preserved |
 | Runtime per task, single process, Apple Silicon | **p50 0.3 s · p95 1.0 s** |

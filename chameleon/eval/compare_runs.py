@@ -56,7 +56,7 @@ def table(runs: dict[str, dict[str, dict[str, Any]]], presets: list[str] | None)
         return lambda rows: sum(_fail_flags(rows[k])[flag] for k in keys)
 
     for flag, label in (("any_defect", "any hard defect"), ("overflow", "text overflow"), ("below_floor", "headline/CTA below floor"),
-                        ("overlap", "unwanted overlap"), ("offcanvas", "off canvas"), ("judge_contrast", "judge contrast fail"),
+                        ("overlap", "unwanted overlap"), ("hidden", "content hidden under a panel"), ("offcanvas", "off canvas"), ("judge_contrast", "judge contrast fail"),
                         ("fallback", "anchor fallback wins"), ("error", "errors")):
         row(f"{label} (%)", rate(flag), "{:.2f}")
         row(f"{label} (n)", count(flag), "{:.0f}")

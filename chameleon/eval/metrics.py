@@ -41,7 +41,7 @@ REQUIRED = {
 }
 IMMUTABLE = ("type", "content", "font_family", "asset_id", "shape_type", "style_runs", "group_id")
 DEFECT_FLAGS = ("ids_ok", "fields_ok", "immutable_ok", "canvas_ok")
-DEFECT_COUNTS = ("offcanvas_n", "aspect_fail_n", "overflow_n", "below_floor_n", "overlap_n")
+DEFECT_COUNTS = ("offcanvas_n", "aspect_fail_n", "overflow_n", "below_floor_n", "overlap_n", "hidden_n")
 
 
 def _f(v: Any) -> float:
@@ -197,7 +197,14 @@ def overlap_metrics(source: dict[str, Any], output: dict[str, Any], target: dict
         pairs = []
     area = sum(a for _, _, a in pairs)
     canvas_area = max(1.0, float(target["width"]) * float(target["height"]))
+    try:
+        from engine.visibility import hidden_content   # v12: content the source showed, now under a panel
+        hidden = hidden_content(analysis, output["elements"], measurer or default_measurer())
+    except Exception:
+        hidden = []
     return {
+        "hidden_n": len(hidden),
+        "hidden_ids": ";".join(f"{e}<{c}" for e, c, _ in hidden[:6]),
         "overlap_n": len(pairs),
         "overlap_area": round(area, 1),
         "overlap_frac": round(area / canvas_area, 5),

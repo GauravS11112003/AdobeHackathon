@@ -279,6 +279,12 @@ def score_design(analysis: Analysis, source: dict[str, Any], design: dict[str, A
     overlaps = unwanted_overlaps(analysis, elements, m)
     for a, b, area in overlaps:
         hard.append(f"{a} collides with {b} ({area:.0f}px²)")
+    from engine import flags
+    if flags.enabled("visible"):
+        # v12: what the source showed must still be visible in the render
+        from engine.visibility import hidden_content
+        for eid, cid, frac in hidden_content(analysis, elements, m):
+            hard.append(f"{eid} hidden under {cid} ({frac:.0%})")
 
     # ---- 2. readability ------------------------------------------------------
     size_num = size_den = 0.0
